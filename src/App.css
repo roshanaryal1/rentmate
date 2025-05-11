@@ -36,3 +36,20 @@
     transform: rotate(360deg);
   }
 }
+/* Add to your main CSS file */
+.loading {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  height: 100vh;
+  font-size: 1.2rem;
+}
+
+.error {
+  color: #dc3545;
+  background: #f8d7da;
+  padding: 10px;
+  border-radius: 4px;
+  margin-bottom: 15px;
+  border: 1px solid #f5c6cb;
+}

@@ -1,9 +1,10 @@
-// Import the functions you need from Firebase SDK
-import { initializeApp } from 'firebase/app';
-import { getAuth } from 'firebase/auth';
-import { getFirestore } from 'firebase/firestore';
+// firebase.js
+import { initializeApp } from "firebase/app";
+import { getAnalytics } from "firebase/analytics";
+import { getAuth } from "firebase/auth";
+import { getFirestore } from "firebase/firestore";
 
-// Your web app's Firebase configuration
+// Your Firebase configuration
 const firebaseConfig = {
   apiKey: "AIzaSyBcxPcu_CZtwWhhbBgFiJkRmgtcRW3FQs4",
   authDomain: "rentmate-c7360.firebaseapp.com",
@@ -16,8 +17,10 @@ const firebaseConfig = {
 
 // Initialize Firebase
 const app = initializeApp(firebaseConfig);
+const analytics = getAnalytics(app);
 
-// Initialize Firebase Authentication and Firestore
-export const auth = getAuth(app); // For user authentication
-export const db = getFirestore(app); // For Firestore database
+// ✅ Export auth and firestore
+const auth = getAuth(app);
+const db = getFirestore(app);
 
+export { app, auth, db };
