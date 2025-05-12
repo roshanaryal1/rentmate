@@ -1,16 +1,13 @@
 import React, { useContext, useState, useEffect } from "react";
 import { 
-  createUserWithEmailAndPassword, 
-  signInWithEmailAndPassword, 
-  signOut, 
-  sendPasswordResetEmail,
+  GoogleAuthProvider, 
+  OAuthProvider,
+  signInWithPopup,
   onAuthStateChanged,
-  updateEmail,
-  updatePassword,
-  updateProfile
+  signOut
 } from "firebase/auth";
 import { auth, db } from "../firebase";
-import { doc, getDoc, setDoc } from "firebase/firestore";
+import { doc, setDoc } from "firebase/firestore";
 
 const AuthContext = React.createContext();
 
@@ -20,93 +17,97 @@ export function useAuth() {
 
 export function AuthProvider({ children }) {
   const [currentUser, setCurrentUser] = useState(null);
-  const [userRole, setUserRole] = useState(null);
   const [loading, setLoading] = useState(true);
 
-  async function signup(email, password, name, role) {
+  // Google Sign In Implementation
+  async function signInWithGoogle() {
     try {
-      const userCredential = await createUserWithEmailAndPassword(auth, email, password);
-      await updateProfile(userCredential.user, { displayName: name });
+      const provider = new GoogleAuthProvider();
+      const result = await signInWithPopup(auth, provider);
       
-      // Store user role in Firestore
-      await setDoc(doc(db, "users", userCredential.user.uid), {
-        email,
-        name,
-        role,
-        createdAt: new Date().toISOString()
-      });
-      
-      return userCredential;
+      // Create/update user document in Firestore
+      await setDoc(doc(db, "users", result.user.uid), {
+        uid: result.user.uid,
+        email: result.user.email,
+        displayName: result.user.displayName,
+        photoURL: result.user.photoURL,
+        authProvider: "google",
+        lastLogin: new Date().toISOString()
+      }, { merge: true });
+
+      return result;
     } catch (error) {
+      console.error("Google Sign In Error:", error);
       throw error;
     }
   }
-  
-  function login(email, password) {
-    return signInWithEmailAndPassword(auth, email, password);
-  }
-  
-  function logout() {
-    return signOut(auth);
-  }
-  
-  function resetPassword(email) {
-    return sendPasswordResetEmail(auth, email);
-  }
-  
-  function updateUserEmail(email) {
-    return updateEmail(currentUser, email);
-  }
-  
-  function updateUserPassword(password) {
-    return updatePassword(currentUser, password);
-  }
 
-  async function fetchUserRole(uid) {
+  // Apple Sign In Implementation
+  async function signInWithApple() {
     try {
-      const userDoc = await getDoc(doc(db, "users", uid));
-      if (userDoc.exists()) {
-        return userDoc.data().role;
-      }
-      return null;
+      const provider = new OAuthProvider('apple.com');
+      provider.addScope('email');
+      provider.addScope('name');
+      
+      const result = await signInWithPopup(auth, provider);
+      
+      await setDoc(doc(db, "users", result.user.uid), {
+        uid: result.user.uid,
+        email: result.user.email,
+        displayName: result.user.displayName || 'Apple User',
+        photoURL: result.user.photoURL,
+        authProvider: "apple",
+        lastLogin: new Date().toISOString()
+      }, { merge: true });
+
+      return result;
     } catch (error) {
-      console.error("Error fetching user role:", error);
-      return null;
+      console.error("Apple Sign In Error:", error);
+      throw error;
     }
   }
-  
+
+  // Logout Implementation
+  async function logout() {
+    try {
+      await signOut(auth);
+    } catch (error) {
+      console.error("Logout Error:", error);
+      throw error;
+    }
+  }
+
+  // Auth State Observer
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
-      setCurrentUser(user);
-      
-      if (user) {
-        // Fetch user role when user logs in
-        const role = await fetchUserRole(user.uid);
-        setUserRole(role);
-      } else {
-        setUserRole(null);
+      try {
+        if (user) {
+          await setDoc(doc(db, "users", user.uid), {
+            lastLogin: new Date().toISOString()
+          }, { merge: true });
+        }
+        setCurrentUser(user);
+      } catch (error) {
+        console.error("Auth State Change Error:", error);
+      } finally {
+        setLoading(false);
       }
-      
-      setLoading(false);
     });
-    
+
     return unsubscribe;
   }, []);
-  
+
   const value = {
     currentUser,
-    userRole,
-    login,
-    signup,
-    logout,
-    resetPassword,
-    updateUserEmail,
-    updateUserPassword
+    loading,
+    signInWithGoogle,
+    signInWithApple,
+    logout
   };
-  
+
   return (
     <AuthContext.Provider value={value}>
-      {!loading && children}
+      {children}
     </AuthContext.Provider>
   );
 }
