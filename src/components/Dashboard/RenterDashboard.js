@@ -2,34 +2,40 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
-import { collection, query, where, getDocs } from 'firebase/firestore';
-import { db } from '../../firebase';
+import { sampleEquipment } from '../../data/sampleEquipment';
 
 function RenterDashboard() {
   const { currentUser } = useAuth();
   const [rentedItems, setRentedItems] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [showAllEquipment, setShowAllEquipment] = useState(false);
 
   useEffect(() => {
     const fetchRentedItems = async () => {
       if (currentUser) {
         try {
-          const q = query(
-            collection(db, "rentals"),
-            where("renterId", "==", currentUser.uid)
-          );
+          // In a real app, fetch actual rented items from Firestore
+          // For now, we'll simulate some rented items
+          const simulatedRentals = [
+            {
+              id: 'rental-001',
+              equipmentName: 'Power Drill (Cordless, 18V)',
+              ownerName: 'Tool Rental Pro',
+              status: 'active',
+              endDate: { toDate: () => new Date(Date.now() + 3 * 24 * 60 * 60 * 1000) },
+              totalPrice: 75
+            },
+            {
+              id: 'rental-002',
+              equipmentName: 'Pressure Washer (3000 PSI)',
+              ownerName: 'Clean Force',
+              status: 'active',
+              endDate: { toDate: () => new Date(Date.now() + 1 * 24 * 60 * 60 * 1000) },
+              totalPrice: 150
+            }
+          ];
           
-          const querySnapshot = await getDocs(q);
-          const items = [];
-          
-          querySnapshot.forEach((doc) => {
-            items.push({
-              id: doc.id,
-              ...doc.data()
-            });
-          });
-          
-          setRentedItems(items);
+          setRentedItems(simulatedRentals);
         } catch (error) {
           console.error("Error fetching rented items:", error);
         } finally {
@@ -40,6 +46,8 @@ function RenterDashboard() {
     
     fetchRentedItems();
   }, [currentUser]);
+
+  const featuredEquipment = sampleEquipment.filter(item => item.available).slice(0, 6);
 
   return (
     <div>
@@ -54,10 +62,10 @@ function RenterDashboard() {
         <div className="flex justify-between mb-4">
           <h4 className="text-md font-medium text-gray-700">Current Rentals</h4>
           <Link
-            to="/browse-equipment"
+            to="/"
             className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-blue-600 hover:bg-blue-700"
           >
-            Browse Equipment
+            Browse All Equipment
           </Link>
         </div>
         
@@ -75,7 +83,7 @@ function RenterDashboard() {
                       </p>
                       <div className="ml-2 flex-shrink-0 flex">
                         <p className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-green-100 text-green-800">
-                          {new Date(item.endDate.toDate()).toLocaleDateString()}
+                          Until {new Date(item.endDate.toDate()).toLocaleDateString()}
                         </p>
                       </div>
                     </div>
@@ -101,7 +109,7 @@ function RenterDashboard() {
             <p className="text-gray-500">You don't have any active rentals</p>
             <div className="mt-4">
               <Link
-                to="/browse-equipment"
+                to="/"
                 className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-blue-700 bg-blue-100 hover:bg-blue-200"
               >
                 Find Equipment to Rent
@@ -109,6 +117,47 @@ function RenterDashboard() {
             </div>
           </div>
         )}
+      </div>
+
+      {/* Featured Equipment Section */}
+      <div className="mt-8">
+        <div className="flex justify-between items-center mb-4">
+          <h4 className="text-md font-medium text-gray-700">Featured Equipment</h4>
+          <button
+            onClick={() => setShowAllEquipment(!showAllEquipment)}
+            className="text-blue-600 hover:text-blue-500 text-sm font-medium"
+          >
+            {showAllEquipment ? 'Show Less' : 'View All Available Equipment'}
+          </button>
+        </div>
+        
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          {(showAllEquipment ? sampleEquipment.filter(item => item.available) : featuredEquipment)
+            .map((item) => (
+            <div key={item.id} className="bg-white overflow-hidden shadow rounded-lg hover:shadow-lg transition-shadow">
+              <div className="p-4">
+                <h5 className="text-md font-medium text-gray-900">{item.name}</h5>
+                <p className="text-sm text-blue-600 font-medium mt-1">{item.category}</p>
+                <p className="text-sm text-gray-600 mt-2">{item.description.substring(0, 80)}...</p>
+                <div className="mt-3 flex justify-between items-center">
+                  <p className="text-lg font-semibold text-green-600">
+                    ${item.ratePerDay}/day
+                  </p>
+                  <Link
+                    to={`/rent/${item.id}`}
+                    className="px-3 py-1 border border-transparent text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700"
+                  >
+                    Rent Now
+                  </Link>
+                </div>
+                <div className="mt-2 text-xs text-gray-500">
+                  <p>Owner: {item.ownerName}</p>
+                  <p>Location: {item.location}</p>
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
       </div>
       
       <div className="mt-8 grid grid-cols-1 gap-5 sm:grid-cols-2">
