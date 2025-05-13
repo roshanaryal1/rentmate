@@ -1,5 +1,5 @@
 // src/components/Login.js
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import './Login.css';
@@ -14,6 +14,14 @@ function Login() {
   const { login } = useAuth();
   const navigate = useNavigate();
 
+  useEffect(() => {
+    // Check if user was trying to rent something before login
+    const pendingRental = localStorage.getItem('pendingRental');
+    if (pendingRental) {
+      setError('Please login to rent this equipment');
+    }
+  }, []);
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
@@ -21,7 +29,15 @@ function Login() {
 
     try {
       await login(email, password);
-      navigate('/dashboard');
+      
+      // Check if there was a pending rental
+      const pendingRental = localStorage.getItem('pendingRental');
+      if (pendingRental) {
+        localStorage.removeItem('pendingRental');
+        navigate(`/rent/${pendingRental}`);
+      } else {
+        navigate('/my-dashboard');
+      }
     } catch (err) {
       let errorMessage = 'Failed to log in';
       switch (err.code) {
@@ -92,8 +108,14 @@ function Login() {
         </form>
 
         <p className="login-footer">
-          Don’t have an account? <Link to="/register">Sign up</Link>
+          Don't have an account? <Link to="/register">Sign up</Link>
         </p>
+        
+        <div className="mt-4 text-center">
+          <Link to="/" className="text-blue-600 hover:text-blue-500">
+            ← Back to Browse Equipment
+          </Link>
+        </div>
       </div>
     </div>
   );

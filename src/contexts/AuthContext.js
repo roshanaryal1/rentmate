@@ -1,73 +1,53 @@
 import React, { useContext, useState, useEffect } from "react";
 import { 
-  GoogleAuthProvider, 
-  OAuthProvider,
-  signInWithPopup,
   onAuthStateChanged,
-  signOut
+  signOut,
+  createUserWithEmailAndPassword,
+  signInWithEmailAndPassword
 } from "firebase/auth";
-import { auth, db } from "../firebase";
-import { doc, setDoc } from "firebase/firestore";
+import { auth } from "../firebase";
 
 const AuthContext = React.createContext();
 
 export function useAuth() {
-  return useContext(AuthContext);
+  const context = useContext(AuthContext);
+  if (!context) {
+    throw new Error('useAuth must be used within an AuthProvider');
+  }
+  return context;
 }
 
 export function AuthProvider({ children }) {
   const [currentUser, setCurrentUser] = useState(null);
   const [loading, setLoading] = useState(true);
 
-  // Google Sign In Implementation
-  async function signInWithGoogle() {
-    try {
-      const provider = new GoogleAuthProvider();
-      const result = await signInWithPopup(auth, provider);
-      
-      // Create/update user document in Firestore
-      await setDoc(doc(db, "users", result.user.uid), {
-        uid: result.user.uid,
-        email: result.user.email,
-        displayName: result.user.displayName,
-        photoURL: result.user.photoURL,
-        authProvider: "google",
-        lastLogin: new Date().toISOString()
-      }, { merge: true });
+  console.log('AuthProvider rendering...');
 
+  // Simple signup function
+  async function signup(email, password) {
+    try {
+      console.log('Signup attempt:', email);
+      const result = await createUserWithEmailAndPassword(auth, email, password);
+      console.log('Signup successful:', result.user.uid);
       return result;
     } catch (error) {
-      console.error("Google Sign In Error:", error);
+      console.error("Signup Error:", error);
       throw error;
     }
   }
 
-  // Apple Sign In Implementation
-  async function signInWithApple() {
+  // Simple login function
+  async function login(email, password) {
     try {
-      const provider = new OAuthProvider('apple.com');
-      provider.addScope('email');
-      provider.addScope('name');
-      
-      const result = await signInWithPopup(auth, provider);
-      
-      await setDoc(doc(db, "users", result.user.uid), {
-        uid: result.user.uid,
-        email: result.user.email,
-        displayName: result.user.displayName || 'Apple User',
-        photoURL: result.user.photoURL,
-        authProvider: "apple",
-        lastLogin: new Date().toISOString()
-      }, { merge: true });
-
+      const result = await signInWithEmailAndPassword(auth, email, password);
       return result;
     } catch (error) {
-      console.error("Apple Sign In Error:", error);
+      console.error("Login Error:", error);
       throw error;
     }
   }
 
-  // Logout Implementation
+  // Logout function
   async function logout() {
     try {
       await signOut(auth);
@@ -79,19 +59,11 @@ export function AuthProvider({ children }) {
 
   // Auth State Observer
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, async (user) => {
-      try {
-        if (user) {
-          await setDoc(doc(db, "users", user.uid), {
-            lastLogin: new Date().toISOString()
-          }, { merge: true });
-        }
-        setCurrentUser(user);
-      } catch (error) {
-        console.error("Auth State Change Error:", error);
-      } finally {
-        setLoading(false);
-      }
+    console.log('Setting up auth state listener...');
+    const unsubscribe = onAuthStateChanged(auth, (user) => {
+      console.log('Auth state changed:', user ? user.email : 'No user');
+      setCurrentUser(user);
+      setLoading(false);
     });
 
     return unsubscribe;
@@ -100,10 +72,12 @@ export function AuthProvider({ children }) {
   const value = {
     currentUser,
     loading,
-    signInWithGoogle,
-    signInWithApple,
+    signup,
+    login,
     logout
   };
+
+  console.log('AuthProvider value:', value);
 
   return (
     <AuthContext.Provider value={value}>
