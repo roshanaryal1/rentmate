@@ -1,48 +1,69 @@
-import React, { useContext, useState, useEffect } from "react";
+import React, { createContext, useContext, useState, useEffect } from 'react';
 import { 
-  onAuthStateChanged,
-  signOut,
+  auth, 
+  db 
+} from '../firebase';
+import { 
   createUserWithEmailAndPassword,
-  signInWithEmailAndPassword
-} from "firebase/auth";
-import { auth } from "../firebase";
+  signInWithEmailAndPassword,
+  sendPasswordResetEmail,
+  signOut,
+  onAuthStateChanged
+} from 'firebase/auth';
+import { 
+  doc, 
+  getDoc, 
+  setDoc, 
+  serverTimestamp 
+} from 'firebase/firestore';
 
-const AuthContext = React.createContext();
+const AuthContext = createContext();
 
 export function useAuth() {
-  const context = useContext(AuthContext);
-  if (!context) {
-    throw new Error('useAuth must be used within an AuthProvider');
-  }
-  return context;
+  return useContext(AuthContext);
 }
 
 export function AuthProvider({ children }) {
   const [currentUser, setCurrentUser] = useState(null);
+  const [userRole, setUserRole] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
 
-  console.log('AuthProvider rendering...');
-
-  // Simple signup function
-  async function signup(email, password) {
+  // Signup function
+  async function signup(email, password, role = 'renter') {
     try {
-      console.log('Signup attempt:', email);
-      const result = await createUserWithEmailAndPassword(auth, email, password);
-      console.log('Signup successful:', result.user.uid);
-      return result;
+      const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+      const user = userCredential.user;
+
+      // Create user document in Firestore
+      await setDoc(doc(db, 'users', user.uid), {
+        email: user.email,
+        role: role,
+        createdAt: serverTimestamp(),
+        lastLogin: serverTimestamp()
+      });
+
+      return user;
     } catch (error) {
-      console.error("Signup Error:", error);
+      setError(error.message);
       throw error;
     }
   }
 
-  // Simple login function
+  // Login function
   async function login(email, password) {
     try {
-      const result = await signInWithEmailAndPassword(auth, email, password);
-      return result;
+      const userCredential = await signInWithEmailAndPassword(auth, email, password);
+      const user = userCredential.user;
+
+      // Update last login
+      await setDoc(doc(db, 'users', user.uid), {
+        lastLogin: serverTimestamp()
+      }, { merge: true });
+
+      return user;
     } catch (error) {
-      console.error("Login Error:", error);
+      setError(error.message);
       throw error;
     }
   }
@@ -51,19 +72,41 @@ export function AuthProvider({ children }) {
   async function logout() {
     try {
       await signOut(auth);
+      setUserRole(null);
     } catch (error) {
-      console.error("Logout Error:", error);
+      setError(error.message);
       throw error;
     }
   }
 
-  // Auth State Observer
+  // Password reset function
+  function resetPassword(email) {
+    return sendPasswordResetEmail(auth, email);
+  }
+
+  // Effect to handle auth state changes
   useEffect(() => {
-    console.log('Setting up auth state listener...');
-    const unsubscribe = onAuthStateChanged(auth, (user) => {
-      console.log('Auth state changed:', user ? user.email : 'No user');
-      setCurrentUser(user);
-      setLoading(false);
+    const unsubscribe = onAuthStateChanged(auth, async (user) => {
+      try {
+        if (user) {
+          // Get user data from Firestore
+          const userDoc = await getDoc(doc(db, 'users', user.uid));
+          if (userDoc.exists()) {
+            setUserRole(userDoc.data().role);
+          } else {
+            // Set default role if document doesn't exist
+            setUserRole('renter');
+          }
+        } else {
+          setUserRole(null);
+        }
+        setCurrentUser(user);
+      } catch (error) {
+        console.error('Error fetching user data:', error);
+        setError(error.message);
+      } finally {
+        setLoading(false);
+      }
     });
 
     return unsubscribe;
@@ -71,17 +114,19 @@ export function AuthProvider({ children }) {
 
   const value = {
     currentUser,
+    userRole,
+    error,
     loading,
-    signup,
     login,
-    logout
+    signup,
+    logout,
+    resetPassword,
+    setError
   };
-
-  console.log('AuthProvider value:', value);
 
   return (
     <AuthContext.Provider value={value}>
-      {children}
+      {!loading && children}
     </AuthContext.Provider>
   );
 }
