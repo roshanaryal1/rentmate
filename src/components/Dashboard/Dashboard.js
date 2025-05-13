@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { Link, Navigate, useNavigate } from 'react-router-dom';
-import { useAuth } from '../../contexts/AuthContext'; // Ensure this is correct
+import { useAuth } from '../../contexts/AuthContext';
 import RenterDashboard from './RenterDashboard';
 import OwnerDashboard from './OwnerDashboard';
 import AdminDashboard from './AdminDashboard';
@@ -9,11 +9,17 @@ function Dashboard() {
   const { currentUser, userRole, logout } = useAuth();
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [authLoading, setAuthLoading] = useState(true);
   const navigate = useNavigate();
 
   useEffect(() => {
-    if (currentUser && !currentUser.emailVerified) {
-      setError('Please verify your email to access all features.');
+    // Set auth loading to false once we know we have user data
+    if (currentUser !== undefined) {
+      setAuthLoading(false);
+      
+      if (currentUser && !currentUser.emailVerified) {
+        setError('Please verify your email to access all features.');
+      }
     }
   }, [currentUser]);
   
@@ -32,6 +38,19 @@ function Dashboard() {
     setLoading(false);
   };
 
+  // If auth is still loading, show a loading indicator
+  if (authLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-100">
+        <div className="text-center">
+          <div className="w-16 h-16 border-4 border-blue-600 border-t-transparent rounded-full animate-spin mx-auto"></div>
+          <p className="mt-4 text-gray-700">Loading...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Redirect to login if no user
   if (!currentUser) {
     return <Navigate to="/login" />;
   }
@@ -47,6 +66,7 @@ function Dashboard() {
               </div>
             </div>
             <div className="flex items-center">
+              {/* Desktop menu */}
               <div className="hidden md:ml-4 md:flex-shrink-0 md:flex md:items-center">
                 <div className="ml-3 relative">
                   <div className="flex items-center space-x-4">
@@ -61,6 +81,22 @@ function Dashboard() {
                       {loading ? 'Logging out...' : 'Log Out'}
                     </button>
                   </div>
+                </div>
+              </div>
+              
+              {/* Mobile menu */}
+              <div className="flex items-center md:hidden">
+                <div className="flex items-center space-x-2">
+                  <span className="text-sm font-medium text-gray-700 truncate max-w-[120px]">
+                    {currentUser.displayName || currentUser.email}
+                  </span>
+                  <button
+                    onClick={handleLogout}
+                    disabled={loading}
+                    className="px-2 py-1 border border-transparent text-xs font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700"
+                  >
+                    {loading ? '...' : 'Log Out'}
+                  </button>
                 </div>
               </div>
             </div>
@@ -89,7 +125,7 @@ function Dashboard() {
                     <div className="ml-3">
                       <p className="text-sm text-yellow-700">
                         {error}{' '}
-                        {!currentUser.emailVerified && (
+                        {currentUser && !currentUser.emailVerified && (
                           <Link to="/verify-email" className="font-medium underline text-yellow-700 hover:text-yellow-600">
                             Verify now
                           </Link>
@@ -101,10 +137,17 @@ function Dashboard() {
               )}
               
               <div className="bg-white shadow rounded-lg p-6">
-                {userRole === 'renter' && <RenterDashboard />}
-                {userRole === 'owner' && <OwnerDashboard />}
-                {userRole === 'admin' && <AdminDashboard />}
-                {!userRole && <div>Loading dashboard...</div>}
+                {userRole === 'renter' && <RenterDashboard user={currentUser} />}
+                {userRole === 'owner' && <OwnerDashboard user={currentUser} />}
+                {userRole === 'admin' && <AdminDashboard user={currentUser} />}
+                {!userRole && (
+                  <div className="text-center py-8">
+                    <svg className="w-12 h-12 mx-auto text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                    <p className="mt-2 text-gray-600">Loading dashboard information...</p>
+                  </div>
+                )}
               </div>
             </div>
           </div>
