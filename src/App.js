@@ -3,6 +3,17 @@ import { BrowserRouter as Router, Routes, Route, Navigate, Link, useNavigate } f
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import LoadingSpinner from './components/common/LoadingSpinner';
 import AuthDebug from './components/AuthDebug';
+import RentalHistory from './components/Rental/RentalHistory';
+
+
+
+
+
+<Routes>
+  {/* Other routes */}
+  <Route path="/rental-history" element={<RentalHistory />} />
+</Routes>
+
 
 // Lazy load components for better performance
 const Signup = React.lazy(() => import('./components/auth/Signup'));

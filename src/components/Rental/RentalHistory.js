@@ -1,258 +1,237 @@
-// TODO: Implement Rental/RentalHistory.js component
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { collection, query, where, orderBy, getDocs } from 'firebase/firestore';
 import { useAuth } from '../../contexts/AuthContext';
+import { collection, query, where, getDocs } from 'firebase/firestore';
 import { db } from '../../firebase';
+import { sampleEquipment } from '../../data/sampleEquipment';
 
-function RentalHistory() {
-  const { currentUser, userRole } = useAuth();
-  const [rentals, setRentals] = useState([]);
+function RenterDashboard() {
+  const { currentUser } = useAuth();
+  const [rentedItems, setRentedItems] = useState([]);
+  const [favoriteItems, setFavoriteItems] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState('as-renter');
+  const [showAllEquipment, setShowAllEquipment] = useState(false);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [selectedCategory, setSelectedCategory] = useState('all');
+  const [equipmentList, setEquipmentList] = useState([]);
 
   useEffect(() => {
-    const fetchRentals = async () => {
-      if (!currentUser) return;
-
-      try {
-        let rentalQuery;
-        
-        if (activeTab === 'as-renter') {
-          // Get rentals where current user is the renter
-          rentalQuery = query(
+    const fetchRenterData = async () => {
+      if (currentUser) {
+        try {
+          const rentalsQuery = query(
             collection(db, 'rentals'),
             where('renterId', '==', currentUser.uid),
-            orderBy('createdAt', 'desc')
+            where('status', '==', 'active')
           );
-        } else {
-          // Get rentals where current user is the owner
-          rentalQuery = query(
-            collection(db, 'rentals'),
-            where('ownerId', '==', currentUser.uid),
-            orderBy('createdAt', 'desc')
-          );
-        }
 
-        const rentalSnapshot = await getDocs(rentalQuery);
-        const rentalData = [];
-        
-        rentalSnapshot.forEach((doc) => {
-          rentalData.push({
-            id: doc.id,
-            ...doc.data()
-          });
-        });
-        
-        setRentals(rentalData);
-      } catch (error) {
-        console.error('Error fetching rentals:', error);
-      } finally {
-        setLoading(false);
+          const rentalsSnapshot = await getDocs(rentalsQuery);
+          const rentals = rentalsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+          setRentedItems(rentals);
+
+          const favoritesQuery = query(
+            collection(db, 'favorites'),
+            where('userId', '==', currentUser.uid)
+          );
+
+          const favoritesSnapshot = await getDocs(favoritesQuery);
+          const favorites = favoritesSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+          setFavoriteItems(favorites);
+        } catch (error) {
+          console.error('Error fetching renter data:', error);
+        } finally {
+          setLoading(false);
+        }
       }
     };
 
-    fetchRentals();
-  }, [currentUser, activeTab]);
+    const fetchEquipmentList = async () => {
+      try {
+        const querySnapshot = await getDocs(collection(db, 'equipment'));
+        const equipment = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+        setEquipmentList(equipment.length ? equipment : sampleEquipment);
+      } catch (error) {
+        console.error('Error fetching equipment:', error);
+        setEquipmentList(sampleEquipment);
+      }
+    };
 
-  const formatDate = (date) => {
-    if (!date) return 'N/A';
-    const dateObj = date.toDate ? date.toDate() : new Date(date);
-    return dateObj.toLocaleDateString();
-  };
+    fetchRenterData();
+    fetchEquipmentList();
+  }, [currentUser]);
 
-  const getStatusColor = (status) => {
-    switch (status) {
-      case 'active':
-        return 'bg-green-100 text-green-800';
-      case 'completed':
-        return 'bg-blue-100 text-blue-800';
-      case 'pending':
-        return 'bg-yellow-100 text-yellow-800';
-      case 'cancelled':
-        return 'bg-red-100 text-red-800';
-      default:
-        return 'bg-gray-100 text-gray-800';
-    }
-  };
+  const filteredEquipment = equipmentList.filter(item => {
+    const matchesSearch = item.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                          item.description?.toLowerCase().includes(searchTerm.toLowerCase());
+    const matchesCategory = selectedCategory === 'all' || item.category === selectedCategory;
+    return item.available && matchesSearch && matchesCategory;
+  });
 
-  if (loading) {
-    return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-blue-600 mx-auto"></div>
-          <p className="mt-4 text-gray-600">Loading rental history...</p>
-        </div>
-      </div>
-    );
-  }
+  const categories = [...new Set(equipmentList.map(item => item.category))];
+
+  const totalSpent = rentedItems.reduce((sum, rental) => sum + (rental.totalPrice || 0), 0);
+  const activeRentals = rentedItems.length;
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      {/* Navigation */}
-      <nav className="bg-white shadow-sm">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between h-16">
-            <div className="flex items-center">
-              <Link to="/" className="text-xl font-bold text-blue-600">RentMate</Link>
-            </div>
-            <div className="flex items-center space-x-4">
-              <Link
-                to="/my-dashboard"
-                className="text-gray-700 hover:text-blue-600"
-              >
-                Dashboard
-              </Link>
-            </div>
-          </div>
+    <div className="px-6 py-8 max-w-7xl mx-auto">
+      <div className="mb-6 flex justify-between items-center">
+        <div>
+          <h2 className="text-3xl font-bold text-gray-800">Welcome to Your Dashboard</h2>
+          <p className="text-gray-500 mt-1">Manage your rentals and explore available equipment.</p>
         </div>
-      </nav>
+        <Link
+          to="/rental-history"
+          className="text-sm bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700"
+        >
+          View Rental History
+        </Link>
+      </div>
 
-      {/* Main Content */}
-      <div className="py-12 px-4 sm:px-6 lg:px-8">
-        <div className="max-w-7xl mx-auto">
-          <div className="mb-8">
-            <h1 className="text-3xl font-bold text-gray-900">Rental History</h1>
-            <p className="mt-2 text-gray-600">View your rental history and track your equipment transactions</p>
-          </div>
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-10">
+        <StatCard title="Active Rentals" value={activeRentals} icon="📦" />
+        <StatCard title="Total Spent" value={`$${totalSpent}`} icon="💰" />
+        <StatCard title="Favorites" value={favoriteItems.length} icon="❤️" />
+      </div>
 
-          {/* Tabs */}
-          <div className="border-b border-gray-200 mb-6">
-            <nav className="-mb-px flex space-x-8">
-              <button
-                onClick={() => setActiveTab('as-renter')}
-                className={`py-2 px-1 border-b-2 font-medium text-sm ${
-                  activeTab === 'as-renter'
-                    ? 'border-blue-500 text-blue-600'
-                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-                }`}
-              >
-                As Renter
-              </button>
-              {(userRole === 'owner' || userRole === 'admin') && (
-                <button
-                  onClick={() => setActiveTab('as-owner')}
-                  className={`py-2 px-1 border-b-2 font-medium text-sm ${
-                    activeTab === 'as-owner'
-                      ? 'border-blue-500 text-blue-600'
-                      : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-                  }`}
-                >
-                  As Owner
-                </button>
-              )}
-            </nav>
-          </div>
-
-          {/* Rentals List */}
-          {rentals.length > 0 ? (
-            <div className="bg-white shadow rounded-lg overflow-hidden">
-              <div className="overflow-x-auto">
-                <table className="min-w-full divide-y divide-gray-200">
-                  <thead className="bg-gray-50">
-                    <tr>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Equipment
-                      </th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        {activeTab === 'as-renter' ? 'Owner' : 'Renter'}
-                      </th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Period
-                      </th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Total
-                      </th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Status
-                      </th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Actions
-                      </th>
-                    </tr>
-                  </thead>
-                  <tbody className="bg-white divide-y divide-gray-200">
-                    {rentals.map((rental) => (
-                      <tr key={rental.id} className="hover:bg-gray-50">
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <div>
-                            <div className="text-sm font-medium text-gray-900">
-                              {rental.equipmentName}
-                            </div>
-                            <div className="text-sm text-gray-500">
-                              ID: {rental.equipmentId}
-                            </div>
-                          </div>
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                          {activeTab === 'as-renter' ? rental.ownerName : rental.renterName}
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                          <div>
-                            <div>{formatDate(rental.startDate)} - {formatDate(rental.endDate)}</div>
-                            <div className="text-xs text-gray-500">
-                              {Math.ceil((rental.endDate.toDate() - rental.startDate.toDate()) / (1000 * 60 * 60 * 24))} days
-                            </div>
-                          </div>
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                          ${rental.totalPrice?.toFixed(2) || '0.00'}
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${getStatusColor(rental.status)}`}>
-                            {rental.status}
-                          </span>
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                          <Link
-                            to={`/equipment/${rental.equipmentId}`}
-                            className="text-blue-600 hover:text-blue-900"
-                          >
-                            View Equipment
-                          </Link>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-          ) : (
-            <div className="bg-white shadow rounded-lg p-12 text-center">
-              <div className="text-gray-500">
-                <svg className="mx-auto h-12 w-12 text-gray-400" stroke="currentColor" fill="none" viewBox="0 0 48 48">
-                  <path d="M28 8H12a4 4 0 00-4 4v20m32-12v8m0 0v8a4 4 0 01-4 4H12a4 4 0 01-4-4v-4m32-4l-3.172-3.172a4 4 0 00-5.656 0L28 28M8 32l9.172-9.172a4 4 0 015.656 0L28 28m0 0l4 4m4-24h8m-4-4v8m-12 4h.02" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
-                </svg>
-                <h3 className="mt-2 text-lg font-medium text-gray-900">No rental history</h3>
-                <p className="mt-1 text-gray-500">
-                  {activeTab === 'as-renter' 
-                    ? "You haven't rented any equipment yet." 
-                    : "You haven't had any rentals of your equipment yet."}
-                </p>
-                <div className="mt-6">
-                  {activeTab === 'as-renter' ? (
-                    <Link
-                      to="/"
-                      className="inline-flex items-center px-4 py-2 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700"
-                    >
-                      Browse Equipment
-                    </Link>
-                  ) : (
-                    <Link
-                      to="/add-equipment"
-                      className="inline-flex items-center px-4 py-2 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700"
-                    >
-                      Add Equipment
-                    </Link>
-                  )}
+      <Section title="Your Active Rentals" linkText="Browse Equipment" linkHref="/browse-equipment">
+        {loading ? (
+          <div className="text-center py-6 text-gray-500">Loading your rentals...</div>
+        ) : rentedItems.length > 0 ? (
+          <ul className="divide-y divide-gray-200 bg-white rounded-lg shadow overflow-hidden">
+            {rentedItems.map(item => (
+              <li key={item.id} className="p-4">
+                <div className="flex justify-between items-center">
+                  <div>
+                    <p className="font-medium text-blue-600">{item.equipmentName}</p>
+                    <p className="text-sm text-gray-500">Rented from: {item.ownerName || 'Unknown'}</p>
+                  </div>
+                  <div className="text-right text-sm text-gray-600">
+                    <p>${item.totalPrice || 0} • {item.status}</p>
+                    <p>Until {item.endDate ? new Date(item.endDate.toDate()).toLocaleDateString() : 'N/A'}</p>
+                  </div>
                 </div>
-              </div>
-            </div>
-          )}
+              </li>
+            ))}
+          </ul>
+        ) : (
+          <div className="text-center text-gray-500 py-6">No active rentals found.</div>
+        )}
+      </Section>
+
+      <Section title="Browse Equipment">
+        <div className="mb-4 grid grid-cols-1 md:grid-cols-2 gap-4">
+          <SearchFilter
+            searchTerm={searchTerm}
+            onSearchChange={setSearchTerm}
+            selectedCategory={selectedCategory}
+            onCategoryChange={setSelectedCategory}
+            categories={categories}
+          />
         </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+          {(showAllEquipment ? filteredEquipment : filteredEquipment.slice(0, 6)).map(item => (
+            <EquipmentCard key={item.id} item={item} />
+          ))}
+        </div>
+
+        {filteredEquipment.length > 6 && (
+          <div className="text-center mt-6">
+            <button
+              onClick={() => setShowAllEquipment(!showAllEquipment)}
+              className="text-blue-600 hover:underline"
+            >
+              {showAllEquipment ? 'Show Less' : `View All ${filteredEquipment.length} Items`}
+            </button>
+          </div>
+        )}
+      </Section>
+    </div>
+  );
+}
+
+function StatCard({ title, value, icon }) {
+  return (
+    <div className="bg-white shadow rounded-lg p-5 flex items-center space-x-4">
+      <div className="text-3xl">{icon}</div>
+      <div>
+        <p className="text-sm text-gray-500">{title}</p>
+        <p className="text-xl font-semibold text-gray-800">{value}</p>
       </div>
     </div>
   );
 }
 
-export default RentalHistory;
+function Section({ title, linkText, linkHref, children }) {
+  return (
+    <div className="mb-10">
+      <div className="flex justify-between items-center mb-4">
+        <h3 className="text-xl font-semibold text-gray-800">{title}</h3>
+        {linkText && linkHref && (
+          <Link to={linkHref} className="text-sm text-blue-600 hover:underline">
+            {linkText}
+          </Link>
+        )}
+      </div>
+      {children}
+    </div>
+  );
+}
+
+function SearchFilter({ searchTerm, onSearchChange, selectedCategory, onCategoryChange, categories }) {
+  return (
+    <>
+      <input
+        type="text"
+        placeholder="Search by name or description..."
+        value={searchTerm}
+        onChange={e => onSearchChange(e.target.value)}
+        className="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring focus:ring-blue-300"
+      />
+      <select
+        value={selectedCategory}
+        onChange={e => onCategoryChange(e.target.value)}
+        className="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring focus:ring-blue-300"
+      >
+        <option value="all">All Categories</option>
+        {categories.map(category => (
+          <option key={category} value={category}>{category}</option>
+        ))}
+      </select>
+    </>
+  );
+}
+
+function EquipmentCard({ item }) {
+  return (
+    <div className="bg-white rounded-lg shadow hover:shadow-lg transition p-4">
+      <h4 className="text-lg font-medium text-gray-800 mb-1">{item.name}</h4>
+      <p className="text-sm text-blue-600 mb-1">{item.category}</p>
+      <p className="text-sm text-gray-600 mb-2">{item.description?.substring(0, 100)}...</p>
+      {item.features && item.features.length > 0 && (
+        <div className="flex flex-wrap gap-1 text-xs text-blue-800 mb-2">
+          {item.features.slice(0, 2).map((feature, index) => (
+            <span key={index} className="bg-blue-100 px-2 py-1 rounded-full">{feature}</span>
+          ))}
+          {item.features.length > 2 && (
+            <span className="text-gray-400">+{item.features.length - 2} more</span>
+          )}
+        </div>
+      )}
+      <div className="flex justify-between items-center mt-3">
+        <p className="text-green-600 font-semibold">${item.ratePerDay}/day</p>
+        <Link
+          to={`/rent/${item.id}/fill-details`}
+          className="text-sm bg-blue-600 text-white px-3 py-1 rounded hover:bg-blue-700"
+        >
+          Rent Now
+        </Link>
+      </div>
+      <div className="text-xs text-gray-500 mt-1">
+        📍 {item.location} • Owner: {item.ownerName}
+      </div>
+    </div>
+  );
+}
+
+export default RenterDashboard;
