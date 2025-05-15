@@ -4,6 +4,8 @@ import { db } from '../../firebase';
 import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
 import { useNavigate } from 'react-router-dom';
 import { Container, Row, Col, Card, Form, Button, Alert, Spinner } from 'react-bootstrap';
+import './AddEquipment.css';
+
 
 // Complete equipment list with all 40 items
 const equipmentList = [
@@ -382,4 +384,4 @@ function AddEquipment() {
   );
 }
 
-export default AddEquipment;
+export default AddEquipment; 
