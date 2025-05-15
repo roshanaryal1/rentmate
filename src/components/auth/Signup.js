@@ -3,7 +3,7 @@ import React, { useState, useEffect } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import { useAuth } from "../../contexts/AuthContext";
 import "./Signup.css";
-import { FaApple, FaGoogle } from "react-icons/fa";
+import { FaGoogle } from "react-icons/fa";
 
 const Signup = () => {
   const [email, setEmail] = useState('');
@@ -13,7 +13,7 @@ const Signup = () => {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   
-  const { signInWithGoogle, signInWithApple, signup } = useAuth();
+  const { signInWithGoogle, signup } = useAuth();
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -129,29 +129,6 @@ const Signup = () => {
     }
   };
 
-  const handleAppleSignup = async () => {
-    setError('');
-    setLoading(true);
-    
-    try {
-      await signInWithApple(selectedRole);
-      
-      // Check if there was a pending rental
-      const pendingRental = localStorage.getItem('pendingRental');
-      if (pendingRental) {
-        localStorage.removeItem('pendingRental');
-        navigate(`/rent/${pendingRental}`);
-      } else {
-        navigate('/my-dashboard');
-      }
-    } catch (error) {
-      setError('Failed to sign up with Apple');
-      console.error(error);
-    } finally {
-      setLoading(false);
-    }
-  };
-
   return (
     <div className="signup-container">
       <div className="signup-card">
@@ -223,25 +200,49 @@ const Signup = () => {
         </div>
 
         <button 
-          className="signup-btn apple" 
-          onClick={handleAppleSignup}
-          disabled={loading}
-        >
-          <FaApple className="icon" />
-          Continue with Apple
-        </button>
-
-        <button 
           className="signup-btn google" 
           onClick={handleGoogleSignup}
           disabled={loading}
+          style={{
+            width: '100%',
+            padding: '12px',
+            border: '1px solid #ddd',
+            borderRadius: '8px',
+            backgroundColor: '#fff',
+            cursor: 'pointer',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: '8px',
+            marginBottom: '16px',
+            fontSize: '14px',
+            fontWeight: '500'
+          }}
         >
           <FaGoogle className="icon" />
           Continue with Google
         </button>
 
-        <div className="divider">
-          <span>or</span>
+        <div className="divider" style={{
+          textAlign: 'center',
+          margin: '20px 0',
+          position: 'relative'
+        }}>
+          <span style={{
+            backgroundColor: '#fff',
+            padding: '0 16px',
+            color: '#666',
+            fontSize: '14px'
+          }}>or</span>
+          <div style={{
+            position: 'absolute',
+            top: '50%',
+            left: 0,
+            right: 0,
+            height: '1px',
+            backgroundColor: '#ddd',
+            zIndex: -1
+          }}></div>
         </div>
 
         <form className="signup-form" onSubmit={handleSubmit}>
@@ -251,6 +252,14 @@ const Signup = () => {
             value={fullName}
             onChange={(e) => setFullName(e.target.value)}
             required 
+            style={{
+              width: '100%',
+              padding: '12px',
+              border: '1px solid #ddd',
+              borderRadius: '8px',
+              marginBottom: '16px',
+              fontSize: '14px'
+            }}
           />
           <input 
             type="email" 
@@ -258,6 +267,14 @@ const Signup = () => {
             value={email}
             onChange={(e) => setEmail(e.target.value)}
             required 
+            style={{
+              width: '100%',
+              padding: '12px',
+              border: '1px solid #ddd',
+              borderRadius: '8px',
+              marginBottom: '16px',
+              fontSize: '14px'
+            }}
           />
           <input 
             type="password" 
@@ -265,22 +282,46 @@ const Signup = () => {
             value={password}
             onChange={(e) => setPassword(e.target.value)}
             required 
+            style={{
+              width: '100%',
+              padding: '12px',
+              border: '1px solid #ddd',
+              borderRadius: '8px',
+              marginBottom: '16px',
+              fontSize: '14px'
+            }}
           />
           <button 
             type="submit" 
             className="signup-btn primary"
             disabled={loading}
+            style={{
+              width: '100%',
+              padding: '12px',
+              backgroundColor: '#4f46e5',
+              color: '#fff',
+              border: 'none',
+              borderRadius: '8px',
+              cursor: 'pointer',
+              fontSize: '14px',
+              fontWeight: '500'
+            }}
           >
             {loading ? 'Signing Up...' : `Sign Up as ${selectedRole === 'renter' ? 'Renter' : selectedRole === 'owner' ? 'Equipment Owner' : 'Admin'}`}
           </button>
         </form>
 
-        <p className="login-link">
-          Already have an account? <Link to="/login">Log in</Link>
+        <p className="login-link" style={{
+          textAlign: 'center',
+          marginTop: '20px',
+          fontSize: '14px',
+          color: '#666'
+        }}>
+          Already have an account? <Link to="/login" style={{ color: '#4f46e5', textDecoration: 'none' }}>Log in</Link>
         </p>
         
-        <div className="mt-4 text-center">
-          <Link to="/" className="text-blue-600 hover:text-blue-500">
+        <div className="mt-4 text-center" style={{ marginTop: '16px', textAlign: 'center' }}>
+          <Link to="/" className="text-blue-600 hover:text-blue-500" style={{ color: '#4f46e5', textDecoration: 'none', fontSize: '14px' }}>
             ← Back to Browse Equipment
           </Link>
         </div>
