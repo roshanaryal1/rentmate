@@ -1,723 +1,392 @@
-import React, { useState, useEffect, useMemo } from 'react';
-import { useAuth } from '../../contexts/AuthContext';
-import { db } from '../../firebase';
-import { 
-  collection, 
-  getDocs, 
-  doc, 
-  updateDoc, 
-  deleteDoc, 
-  query, 
-  where, 
-  orderBy,
-  serverTimestamp 
-} from 'firebase/firestore';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
+import {
+  HomeIcon,
+  LibraryIcon,
+  UserGroupIcon,
+  AdjustmentsIcon,
+  ClipboardCheckIcon,
+  ChartBarIcon,
+  CogIcon,
+  BellIcon,
+  XIcon,
+  CheckCircleIcon,
+  ExclamationIcon,
+  InboxIcon
+} from '@heroicons/react/outline';
 
 export default function AdminDashboard() {
-  const [users, setUsers] = useState([]);
-  const [equipment, setEquipment] = useState([]);
-  const [rentals, setRentals] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const [equipment, setEquipment] = useState([
+    { id: 1, status: 'approved' },
+    { id: 2, status: 'pending' },
+    { id: 3, status: 'approved' }
+  ]);
+  const [rentals, setRentals] = useState([
+    { id: 1, status: 'active' },
+    { id: 2, status: 'inactive' },
+    { id: 3, status: 'active' }
+  ]);
+  const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
-  const [selectedTab, setSelectedTab] = useState('overview');
-  const [searchTerm, setSearchTerm] = useState('');
-  const [filterStatus, setFilterStatus] = useState('all');
-  const [sortBy, setSortBy] = useState('createdAt');
-  const [sortOrder, setSortOrder] = useState('desc');
-  const { currentUser } = useAuth();
+  const [notifications] = useState([
+    { id: 1, type: 'approval', text: 'Pending approvals', time: '2h ago' },
+    { id: 2, type: 'inventory', text: 'Low inventory alert', time: '3h ago' },
+    { id: 3, type: 'ticket', text: 'New support ticket', time: '1d ago' }
+  ]);
+  const [showNotifications, setShowNotifications] = useState(false);
+  const dropdownRef = useRef(null);
 
-  // Fetch all data
-  useEffect(() => {
-    async function fetchData() {
-      try {
-        setLoading(true);
-        
-        // Fetch users
-        const usersCollection = collection(db, "users");
-        const userSnapshot = await getDocs(usersCollection);
-        const usersList = userSnapshot.docs.map(doc => ({
-          id: doc.id,
-          ...doc.data()
-        }));
-        setUsers(usersList.filter(user => user.id !== currentUser.uid));
-        
-        // Fetch equipment
-        const equipmentCollection = collection(db, "equipment");
-        const equipmentSnapshot = await getDocs(equipmentCollection);
-        const equipmentList = equipmentSnapshot.docs.map(doc => ({
-          id: doc.id,
-          ...doc.data()
-        }));
-        setEquipment(equipmentList);
-        
-        // Fetch rentals
-        const rentalsCollection = collection(db, "rentals");
-        const rentalsSnapshot = await getDocs(rentalsCollection);
-        const rentalsList = rentalsSnapshot.docs.map(doc => ({
-          id: doc.id,
-          ...doc.data()
-        }));
-        setRentals(rentalsList);
-        
-        setLoading(false);
-      } catch (err) {
-        setError('Failed to load dashboard data');
-        setLoading(false);
-        console.error(err);
-      }
-    }
-    
-    fetchData();
-  }, [currentUser]);
-
-  // Calculate analytics
+  // Analytics
   const analytics = useMemo(() => {
-    const totalRevenue = rentals.reduce((sum, rental) => sum + (rental.totalPrice || 0), 0);
-    const activeRentals = rentals.filter(rental => rental.status === 'active').length;
-    const pendingEquipment = equipment.filter(item => item.status === 'pending').length;
-    const approvedEquipment = equipment.filter(item => item.status === 'approved').length;
-    const totalUsers = users.length;
-    const ownerCount = users.filter(user => user.role === 'owner').length;
-    const renterCount = users.filter(user => user.role === 'renter').length;
-    
-    // Revenue by category
-    const revenueByCategory = {};
-    rentals.forEach(rental => {
-      const equipmentItem = equipment.find(eq => eq.id === rental.equipmentId);
-      if (equipmentItem) {
-        const category = equipmentItem.category || 'Other';
-        revenueByCategory[category] = (revenueByCategory[category] || 0) + (rental.totalPrice || 0);
-      }
-    });
+    const totalEquipment = equipment.length;
+    const activeRentals = rentals.filter(r => r.status === 'active').length;
+    const pendingEquipment = equipment.filter(e => e.status === 'pending').length;
+    const approvedEquipment = equipment.filter(e => e.status === 'approved').length;
+    return { totalEquipment, activeRentals, pendingEquipment, approvedEquipment };
+  }, [equipment, rentals]);
 
-    return {
-      totalRevenue,
-      activeRentals,
-      pendingEquipment,
-      approvedEquipment,
-      totalUsers,
-      ownerCount,
-      renterCount,
-      revenueByCategory
-    };
-  }, [users, equipment, rentals]);
-
-  // Handle equipment actions
-  async function handleApproveEquipment(equipmentId) {
-    try {
-      const equipmentRef = doc(db, "equipment", equipmentId);
-      await updateDoc(equipmentRef, {
-        status: "approved",
-        updatedAt: serverTimestamp()
-      });
-      
-      setEquipment(prevEquipment => 
-        prevEquipment.map(item => 
-          item.id === equipmentId 
-            ? { ...item, status: "approved" } 
-            : item
-        )
-      );
-    } catch (err) {
-      setError('Failed to approve equipment');
-      console.error(err);
-    }
-  }
-
-  async function handleRejectEquipment(equipmentId) {
-    try {
-      const equipmentRef = doc(db, "equipment", equipmentId);
-      await updateDoc(equipmentRef, {
-        status: "rejected",
-        updatedAt: serverTimestamp()
-      });
-      
-      setEquipment(prevEquipment => 
-        prevEquipment.map(item => 
-          item.id === equipmentId 
-            ? { ...item, status: "rejected" } 
-            : item
-        )
-      );
-    } catch (err) {
-      setError('Failed to reject equipment');
-      console.error(err);
-    }
-  }
-
-  async function handleDeleteEquipment(equipmentId) {
-    if (window.confirm("Are you sure you want to delete this equipment?")) {
-      try {
-        await deleteDoc(doc(db, "equipment", equipmentId));
-        setEquipment(prevEquipment => 
-          prevEquipment.filter(item => item.id !== equipmentId)
-        );
-      } catch (err) {
-        setError('Failed to delete equipment');
-        console.error(err);
+  // Close notifications on outside click
+  useEffect(() => {
+    function handleClickOutside(e) {
+      if (dropdownRef.current && !dropdownRef.current.contains(e.target)) {
+        setShowNotifications(false);
       }
     }
-  }
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
 
-  // Handle user role changes
-  async function handleChangeUserRole(userId, newRole) {
-    try {
-      const userRef = doc(db, "users", userId);
-      await updateDoc(userRef, {
-        role: newRole,
-        updatedAt: serverTimestamp()
-      });
-      
-      setUsers(prevUsers => 
-        prevUsers.map(user => 
-          user.id === userId 
-            ? { ...user, role: newRole } 
-            : user
-        )
-      );
-    } catch (err) {
-      setError('Failed to update user role');
-      console.error(err);
-    }
-  }
-
-  // Filter and sort functions
-  const filteredEquipment = useMemo(() => {
-    let filtered = equipment.filter(item => {
-      const matchesSearch = item.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                           item.category?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                           item.ownerName?.toLowerCase().includes(searchTerm.toLowerCase());
-      const matchesFilter = filterStatus === 'all' || item.status === filterStatus;
-      return matchesSearch && matchesFilter;
-    });
-
-    // Sort
-    filtered.sort((a, b) => {
-      let aVal = a[sortBy];
-      let bVal = b[sortBy];
-      
-      if (sortBy === 'createdAt' && aVal && bVal) {
-        aVal = aVal.toDate ? aVal.toDate() : new Date(aVal);
-        bVal = bVal.toDate ? bVal.toDate() : new Date(bVal);
-      }
-      
-      if (sortOrder === 'asc') {
-        return aVal > bVal ? 1 : -1;
-      } else {
-        return aVal < bVal ? 1 : -1;
-      }
-    });
-
-    return filtered;
-  }, [equipment, searchTerm, filterStatus, sortBy, sortOrder]);
-
-  const formatDate = (date) => {
-    if (!date) return 'N/A';
-    const dateObj = date.toDate ? date.toDate() : new Date(date);
-    return dateObj.toLocaleDateString();
-  };
-
-  const formatCurrency = (amount) => {
-    return new Intl.NumberFormat('en-NZ', { 
-      style: 'currency', 
-      currency: 'NZD' 
-    }).format(amount || 0);
-  };
-
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center min-h-screen">
-        <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-blue-600"></div>
-      </div>
-    );
-  }
+  if (loading) return <FullScreenSpinner />;
 
   return (
-    <div className="space-y-6">
-      {/* Header */}
-      <div className="pb-5 border-b border-gray-200">
-        <h3 className="text-lg leading-6 font-medium text-gray-900">Admin Dashboard</h3>
-        <p className="mt-2 max-w-4xl text-sm text-gray-500">
-          Manage users, equipment, and platform settings.
-        </p>
-      </div>
+    <div className="flex bg-gradient-to-br from-gray-50 to-gray-100 min-h-screen">
+      <Sidebar />
+      <main className="flex-1 p-6 overflow-auto">
+        {error && <Alert message={error} type="error" />}
 
-      {/* Error Display */}
-      {error && (
-        <div className="bg-red-50 border-l-4 border-red-400 p-4">
-          <div className="flex">
-            <div className="flex-shrink-0">
-              <svg className="h-5 w-5 text-red-400" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
-                <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
-              </svg>
-            </div>
-            <div className="ml-3">
-              <p className="text-sm text-red-800">{error}</p>
-            </div>
+        {/* Header with improved styling */}
+        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-8 bg-white rounded-xl shadow-sm p-6">
+          <div>
+            <h1 className="text-3xl font-bold text-gray-900 bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
+              Admin Dashboard
+            </h1>
+            <p className="text-gray-500 mt-1">Overview & Management Tools</p>
           </div>
-        </div>
-      )}
-
-      {/* Navigation Tabs */}
-      <div className="border-b border-gray-200">
-        <nav className="-mb-px flex space-x-8">
-          {[
-            { key: 'overview', label: 'Overview' },
-            { key: 'equipment', label: 'Equipment Management' },
-            { key: 'users', label: 'User Management' },
-            { key: 'rentals', label: 'Rental Management' },
-            { key: 'analytics', label: 'Analytics' }
-          ].map(tab => (
-            <button
-              key={tab.key}
-              onClick={() => setSelectedTab(tab.key)}
-              className={`py-2 px-1 border-b-2 font-medium text-sm ${
-                selectedTab === tab.key
-                  ? 'border-blue-500 text-blue-600'
-                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-              }`}
-            >
-              {tab.label}
-            </button>
-          ))}
-        </nav>
-      </div>
-
-      {/* Tab Content */}
-      {selectedTab === 'overview' && (
-        <div className="space-y-6">
-          {/* Statistics Cards */}
-          <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4">
-            <StatCard
-              title="Total Users"
-              value={analytics.totalUsers}
-              subtitle={`${analytics.ownerCount} owners, ${analytics.renterCount} renters`}
-              icon="👥"
-              color="blue"
-            />
-            <StatCard
-              title="Total Equipment"
-              value={equipment.length}
-              subtitle={`${analytics.pendingEquipment} pending approval`}
-              icon="🔧"
-              color="green"
-            />
-            <StatCard
-              title="Active Rentals"
-              value={analytics.activeRentals}
-              subtitle="Currently ongoing"
-              icon="📋"
-              color="yellow"
-            />
-            <StatCard
-              title="Total Revenue"
-              value={formatCurrency(analytics.totalRevenue)}
-              subtitle="All time"
-              icon="💰"
-              color="purple"
-            />
-          </div>
-
-          {/* Quick Actions */}
-          <div className="bg-white shadow rounded-lg p-6">
-            <h4 className="text-lg font-medium text-gray-900 mb-4">Quick Actions</h4>
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+          <div className="flex items-center space-x-4 mt-4 sm:mt-0">
+            {/* Enhanced Notifications */}
+            <div className="relative" ref={dropdownRef}>
               <button
-                onClick={() => setSelectedTab('equipment')}
-                className="p-4 border border-gray-300 rounded-lg hover:bg-gray-50 text-left"
+                onClick={() => setShowNotifications(v => !v)}
+                className="relative p-2 rounded-full hover:bg-gray-100 transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
               >
-                <div className="font-medium text-blue-600">Review Pending Equipment</div>
-                <div className="text-sm text-gray-500">{analytics.pendingEquipment} items waiting</div>
+                <BellIcon className="h-6 w-6 text-gray-600" />
+                {notifications.length > 0 && (
+                  <span className="absolute -top-1 -right-1 bg-red-500 text-white rounded-full text-xs w-5 h-5 flex items-center justify-center animate-pulse">
+                    {notifications.length}
+                  </span>
+                )}
               </button>
-              <button
-                onClick={() => setSelectedTab('users')}
-                className="p-4 border border-gray-300 rounded-lg hover:bg-gray-50 text-left"
-              >
-                <div className="font-medium text-blue-600">Manage Users</div>
-                <div className="text-sm text-gray-500">{analytics.totalUsers} total users</div>
-              </button>
-              <button
-                onClick={() => setSelectedTab('analytics')}
-                className="p-4 border border-gray-300 rounded-lg hover:bg-gray-50 text-left"
-              >
-                <div className="font-medium text-blue-600">View Analytics</div>
-                <div className="text-sm text-gray-500">Platform insights</div>
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {selectedTab === 'equipment' && (
-        <div className="space-y-4">
-          {/* Equipment Controls */}
-          <div className="bg-white shadow rounded-lg p-4">
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700">Search</label>
-                <input
-                  type="text"
-                  placeholder="Search equipment..."
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  className="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700">Status Filter</label>
-                <select
-                  value={filterStatus}
-                  onChange={(e) => setFilterStatus(e.target.value)}
-                  className="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2"
-                >
-                  <option value="all">All Status</option>
-                  <option value="approved">Approved</option>
-                  <option value="pending">Pending</option>
-                  <option value="rejected">Rejected</option>
-                </select>
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700">Sort By</label>
-                <select
-                  value={sortBy}
-                  onChange={(e) => setSortBy(e.target.value)}
-                  className="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2"
-                >
-                  <option value="createdAt">Created Date</option>
-                  <option value="name">Name</option>
-                  <option value="ratePerDay">Rate per Day</option>
-                  <option value="category">Category</option>
-                </select>
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700">Order</label>
-                <select
-                  value={sortOrder}
-                  onChange={(e) => setSortOrder(e.target.value)}
-                  className="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2"
-                >
-                  <option value="desc">Descending</option>
-                  <option value="asc">Ascending</option>
-                </select>
-              </div>
-            </div>
-          </div>
-
-          {/* Equipment Table */}
-          <div className="bg-white shadow overflow-hidden sm:rounded-lg">
-            <div className="overflow-x-auto">
-              <table className="min-w-full divide-y divide-gray-200">
-                <thead className="bg-gray-50">
-                  <tr>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Equipment
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Owner
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Category
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Status
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Rate
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Actions
-                    </th>
-                  </tr>
-                </thead>
-                <tbody className="bg-white divide-y divide-gray-200">
-                  {filteredEquipment.map((item) => (
-                    <tr key={item.id} className="hover:bg-gray-50">
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <div>
-                          <div className="text-sm font-medium text-gray-900">{item.name}</div>
-                          <div className="text-sm text-gray-500">ID: {item.id.substring(0, 8)}...</div>
-                        </div>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                        {item.ownerName || 'N/A'}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                        {item.category}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
-                          item.status === 'approved' ? 'bg-green-100 text-green-800' :
-                          item.status === 'pending' ? 'bg-yellow-100 text-yellow-800' :
-                          'bg-red-100 text-red-800'
-                        }`}>
-                          {item.status || 'pending'}
-                        </span>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                        {formatCurrency(item.ratePerDay)}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium space-x-2">
-                        {item.status === 'pending' && (
-                          <>
-                            <button 
-                              onClick={() => handleApproveEquipment(item.id)}
-                              className="text-green-600 hover:text-green-900"
-                            >
-                              Approve
-                            </button>
-                            <button 
-                              onClick={() => handleRejectEquipment(item.id)}
-                              className="text-red-600 hover:text-red-900"
-                            >
-                              Reject
-                            </button>
-                          </>
-                        )}
-                        <button 
-                          onClick={() => handleDeleteEquipment(item.id)}
-                          className="text-red-600 hover:text-red-900"
-                        >
-                          Delete
-                        </button>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {selectedTab === 'users' && (
-        <div className="bg-white shadow overflow-hidden sm:rounded-lg">
-          <div className="overflow-x-auto">
-            <table className="min-w-full divide-y divide-gray-200">
-              <thead className="bg-gray-50">
-                <tr>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    User
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Email
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Role
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Joined
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Actions
-                  </th>
-                </tr>
-              </thead>
-              <tbody className="bg-white divide-y divide-gray-200">
-                {users.map((user) => (
-                  <tr key={user.id} className="hover:bg-gray-50">
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="text-sm font-medium text-gray-900">
-                        {user.fullName || user.displayName || 'N/A'}
-                      </div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="text-sm text-gray-900">{user.email}</div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <select
-                        value={user.role || 'renter'}
-                        onChange={(e) => handleChangeUserRole(user.id, e.target.value)}
-                        className={`text-xs px-2 py-1 rounded-full font-semibold ${
-                          user.role === 'admin' ? 'bg-purple-100 text-purple-800' :
-                          user.role === 'owner' ? 'bg-blue-100 text-blue-800' :
-                          'bg-green-100 text-green-800'
-                        }`}
-                      >
-                        <option value="renter">Renter</option>
-                        <option value="owner">Owner</option>
-                        <option value="admin">Admin</option>
-                      </select>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                      {formatDate(user.createdAt)}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                      <button className="text-blue-600 hover:text-blue-900">
-                        View Details
-                      </button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      )}
-
-      {selectedTab === 'rentals' && (
-        <div className="bg-white shadow overflow-hidden sm:rounded-lg">
-          <div className="overflow-x-auto">
-            <table className="min-w-full divide-y divide-gray-200">
-              <thead className="bg-gray-50">
-                <tr>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Equipment
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Renter
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Owner
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Period
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Total
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Status
-                  </th>
-                </tr>
-              </thead>
-              <tbody className="bg-white divide-y divide-gray-200">
-                {rentals.map((rental) => (
-                  <tr key={rental.id} className="hover:bg-gray-50">
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="text-sm font-medium text-gray-900">
-                        {rental.equipmentName}
-                      </div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                      {rental.renterName}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                      {rental.ownerName}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                      {formatDate(rental.startDate)} - {formatDate(rental.endDate)}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                      {formatCurrency(rental.totalPrice)}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
-                        rental.status === 'active' ? 'bg-green-100 text-green-800' :
-                        rental.status === 'completed' ? 'bg-blue-100 text-blue-800' :
-                        rental.status === 'pending' ? 'bg-yellow-100 text-yellow-800' :
-                        'bg-gray-100 text-gray-800'
-                      }`}>
-                        {rental.status}
-                      </span>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      )}
-
-      {selectedTab === 'analytics' && (
-        <div className="space-y-6">
-          {/* Revenue Analytics */}
-          <div className="bg-white shadow rounded-lg p-6">
-            <h4 className="text-lg font-medium text-gray-900 mb-4">Revenue by Category</h4>
-            <div className="space-y-3">
-              {Object.entries(analytics.revenueByCategory)
-                .sort(([,a], [,b]) => b - a)
-                .map(([category, revenue]) => (
-                  <div key={category} className="flex items-center justify-between">
-                    <span className="text-sm font-medium text-gray-700">{category}</span>
-                    <div className="flex items-center space-x-2">
-                      <div className="bg-blue-200 rounded-full h-2 w-24">
-                        <div 
-                          className="bg-blue-600 h-2 rounded-full" 
-                          style={{
-                            width: `${(revenue / Math.max(...Object.values(analytics.revenueByCategory))) * 100}%`
-                          }}
-                        ></div>
-                      </div>
-                      <span className="text-sm font-bold">{formatCurrency(revenue)}</span>
-                    </div>
+              {showNotifications && (
+                <div className="origin-top-right absolute right-0 mt-2 w-64 bg-white border border-gray-200 rounded-xl shadow-lg overflow-hidden z-10 animate-in slide-in-from-top-5 duration-200">
+                  <div className="flex justify-between items-center px-4 py-3 border-b bg-gray-50">
+                    <span className="font-semibold text-gray-800">Notifications</span>
+                    <button 
+                      onClick={() => setShowNotifications(false)}
+                      className="p-1 rounded-full hover:bg-gray-200 transition-colors"
+                    >
+                      <XIcon className="h-5 w-5 text-gray-500" />
+                    </button>
                   </div>
-                ))}
+                  <ul className="divide-y divide-gray-100">
+                    {notifications.map(n => (
+                      <li key={n.id} className="px-4 py-3 flex items-center space-x-3 hover:bg-blue-50 transition-colors cursor-pointer">
+                        {n.type === 'approval' && <CheckCircleIcon className="h-5 w-5 text-green-500" />}
+                        {n.type === 'inventory' && <ExclamationIcon className="h-5 w-5 text-yellow-500" />}
+                        {n.type === 'ticket' && <InboxIcon className="h-5 w-5 text-blue-500" />}
+                        <div className="flex-1">
+                          <span className="text-sm text-gray-700 block">{n.text}</span>
+                          <span className="text-xs text-gray-400">{n.time}</span>
+                        </div>
+                      </li>
+                    ))}
+                  </ul>
+                  <div className="text-center py-3 bg-gray-50">
+                    <button className="text-sm text-blue-600 hover:text-blue-800 font-medium transition-colors">
+                      View all notifications
+                    </button>
+                  </div>
+                </div>
+              )}
             </div>
-          </div>
-
-          {/* Platform Statistics */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div className="bg-white shadow rounded-lg p-6">
-              <h4 className="text-lg font-medium text-gray-900 mb-4">User Distribution</h4>
-              <div className="space-y-2">
-                <div className="flex justify-between">
-                  <span>Renters</span>
-                  <span className="font-semibold">{analytics.renterCount}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span>Owners</span>
-                  <span className="font-semibold">{analytics.ownerCount}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span>Total Users</span>
-                  <span className="font-semibold">{analytics.totalUsers}</span>
-                </div>
-              </div>
-            </div>
-
-            <div className="bg-white shadow rounded-lg p-6">
-              <h4 className="text-lg font-medium text-gray-900 mb-4">Equipment Status</h4>
-              <div className="space-y-2">
-                <div className="flex justify-between">
-                  <span>Approved</span>
-                  <span className="font-semibold text-green-600">{analytics.approvedEquipment}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span>Pending</span>
-                  <span className="font-semibold text-yellow-600">{analytics.pendingEquipment}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span>Total Equipment</span>
-                  <span className="font-semibold">{equipment.length}</span>
-                </div>
-              </div>
+            {/* Enhanced Avatar */}
+            <div className="relative">
+              <img
+                src="/api/placeholder/32/32"
+                alt="Admin Avatar"
+                className="h-10 w-10 rounded-full border-2 border-white shadow-md hover:shadow-lg transition-shadow cursor-pointer"
+              />
+              <div className="absolute -bottom-1 -right-1 h-4 w-4 bg-green-500 border-2 border-white rounded-full"></div>
             </div>
           </div>
         </div>
-      )}
+
+        {/* Enhanced Metrics */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+          <MetricCard 
+            title="Total Equipment" 
+            value={analytics.totalEquipment} 
+            icon={LibraryIcon}
+            color="blue"
+            trend="+12%"
+          />
+          <MetricCard 
+            title="Active Rentals" 
+            value={analytics.activeRentals} 
+            icon={CheckCircleIcon}
+            color="green"
+            trend="+8%"
+          />
+          <MetricCard 
+            title="Pending Approvals" 
+            value={analytics.pendingEquipment} 
+            icon={ClipboardCheckIcon}
+            color="yellow"
+            trend="-5%"
+          />
+          <MetricCard 
+            title="Approved Equipment" 
+            value={analytics.approvedEquipment} 
+            icon={ChartBarIcon}
+            color="purple"
+            trend="+15%"
+          />
+        </div>
+
+        {/* Enhanced Activity & Overview */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          <RecentActivity className="lg:col-span-2" />
+          <OverviewCard 
+            title="Rentals Overview" 
+            active={analytics.activeRentals} 
+            inactive={rentals.length - analytics.activeRentals} 
+          />
+        </div>
+      </main>
     </div>
   );
 }
 
-// Statistics Card Component
-function StatCard({ title, value, subtitle, icon, color }) {
+function Sidebar() {
+  const [activeMenu, setActiveMenu] = useState('Dashboard');
+  const menus = [
+    { name: 'Dashboard', icon: HomeIcon, color: 'blue' },
+    { name: 'Equipment', icon: LibraryIcon, color: 'green' },
+    { name: 'Users', icon: UserGroupIcon, color: 'purple' },
+    { name: 'Maintenance', icon: AdjustmentsIcon, color: 'yellow' },
+    { name: 'Approvals', icon: ClipboardCheckIcon, color: 'red' },
+    { name: 'Reports', icon: ChartBarIcon, color: 'indigo' },
+    { name: 'Settings', icon: CogIcon, color: 'gray' }
+  ];
+
+  return (
+    <aside className="w-64 bg-white shadow-xl border-r border-gray-200 flex-shrink-0">
+      <div className="p-6">
+        <h1 className="text-2xl font-bold text-gray-800">
+          <span className="text-blue-600">Rent</span>Mate
+        </h1>
+        <p className="text-sm text-gray-500 mt-1">Admin Portal</p>
+      </div>
+      <nav className="mt-4 px-4">
+        {menus.map(m => (
+          <button
+            key={m.name}
+            onClick={() => setActiveMenu(m.name)}
+            className={`w-full px-4 py-3 mb-2 text-left rounded-lg transition-all duration-200 flex items-center space-x-3 group ${
+              activeMenu === m.name
+                ? 'bg-blue-50 text-blue-700 border-r-4 border-blue-600'
+                : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
+            }`}
+          >
+            <m.icon className={`h-5 w-5 transition-colors ${
+              activeMenu === m.name ? 'text-blue-600' : 'text-gray-400 group-hover:text-gray-600'
+            }`} />
+            <span className="font-medium">{m.name}</span>
+            {activeMenu === m.name && (
+              <div className="ml-auto w-2 h-2 bg-blue-600 rounded-full"></div>
+            )}
+          </button>
+        ))}
+      </nav>
+      
+      {/* Sidebar Footer */}
+      <div className="absolute bottom-6 left-6 right-6">
+        <div className="bg-gradient-to-r from-blue-500 to-purple-600 rounded-lg p-4 text-white">
+          <h3 className="font-semibold text-sm">Upgrade to Pro</h3>
+          <p className="text-xs opacity-90 mt-1">Get advanced analytics</p>
+          <button className="mt-3 w-full bg-white text-blue-600 text-sm font-medium py-2 rounded-lg hover:bg-gray-100 transition-colors">
+            Learn More
+          </button>
+        </div>
+      </div>
+    </aside>
+  );
+}
+
+function MetricCard({ title, value, icon: Icon, color, trend }) {
   const colorClasses = {
-    blue: 'bg-blue-50 text-blue-700',
-    green: 'bg-green-50 text-green-700',
-    yellow: 'bg-yellow-50 text-yellow-700',
-    purple: 'bg-purple-50 text-purple-700'
+    blue: 'bg-blue-50 text-blue-600 border-blue-200',
+    green: 'bg-green-50 text-green-600 border-green-200',
+    yellow: 'bg-yellow-50 text-yellow-600 border-yellow-200',
+    purple: 'bg-purple-50 text-purple-600 border-purple-200'
+  };
+
+  const trendColor = trend?.startsWith('+') ? 'text-green-600' : 'text-red-600';
+
+  return (
+    <div className="bg-white shadow-sm rounded-xl p-6 border border-gray-100 hover:shadow-md transition-shadow duration-200">
+      <div className="flex items-center justify-between">
+        <div>
+          <p className="text-sm font-medium text-gray-500">{title}</p>
+          <p className="mt-2 text-3xl font-bold text-gray-900">{value}</p>
+          {trend && (
+            <p className={`mt-1 text-sm ${trendColor} font-medium`}>
+              {trend} from last month
+            </p>
+          )}
+        </div>
+        <div className={`p-3 rounded-xl border ${colorClasses[color]}`}>
+          <Icon className="h-6 w-6" />
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function RecentActivity({ className = '' }) {
+  const activities = [
+    { text: 'New renter added', time: '2 minutes ago', type: 'user' },
+    { text: 'Maintenance request created', time: '1 hour ago', type: 'maintenance' },
+    { text: 'Lease approved', time: '3 hours ago', type: 'approval' },
+    { text: 'Property marked as occupied', time: '5 hours ago', type: 'property' },
+    { text: 'Lease agreement sent', time: '1 day ago', type: 'document' }
+  ];
+
+  const getActivityIcon = (type) => {
+    switch (type) {
+      case 'user': return <UserGroupIcon className="h-5 w-5 text-blue-500" />;
+      case 'maintenance': return <AdjustmentsIcon className="h-5 w-5 text-yellow-500" />;
+      case 'approval': return <CheckCircleIcon className="h-5 w-5 text-green-500" />;
+      case 'property': return <HomeIcon className="h-5 w-5 text-purple-500" />;
+      case 'document': return <ClipboardCheckIcon className="h-5 w-5 text-indigo-500" />;
+      default: return <div className="w-5 h-5 bg-gray-400 rounded-full" />;
+    }
   };
 
   return (
-    <div className="bg-white overflow-hidden shadow rounded-lg">
-      <div className="p-5">
-        <div className="flex items-center">
-          <div className="flex-shrink-0">
-            <div className={`w-8 h-8 rounded-md ${colorClasses[color]} flex items-center justify-center`}>
-              <span className="text-xl">{icon}</span>
+    <div className={`bg-white shadow-sm rounded-xl p-6 border border-gray-100 ${className}`}>
+      <div className="flex justify-between items-center mb-6">
+        <h2 className="text-lg font-semibold text-gray-900">Recent Activity</h2>
+        <button className="text-sm text-blue-600 hover:text-blue-800 font-medium">
+          View All
+        </button>
+      </div>
+      <div className="space-y-4">
+        {activities.map((activity, index) => (
+          <div key={index} className="flex items-start space-x-3 p-3 rounded-lg hover:bg-gray-50 transition-colors">
+            <div className="flex-shrink-0 p-2 bg-gray-50 rounded-lg">
+              {getActivityIcon(activity.type)}
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-medium text-gray-900">{activity.text}</p>
+              <p className="text-xs text-gray-500 mt-1">{activity.time}</p>
             </div>
           </div>
-          <div className="ml-5 w-0 flex-1">
-            <dl>
-              <dt className="text-sm font-medium text-gray-500 truncate">{title}</dt>
-              <dd className="text-lg font-medium text-gray-900">{value}</dd>
-              {subtitle && (
-                <dd className="text-sm text-gray-600">{subtitle}</dd>
-              )}
-            </dl>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function OverviewCard({ title, active, inactive }) {
+  const total = active + inactive;
+  const pctActive = total > 0 ? Math.round((active / total) * 100) : 0;
+  const pctInactive = 100 - pctActive;
+
+  return (
+    <div className="bg-white shadow-sm rounded-xl p-6 border border-gray-100">
+      <h2 className="text-lg font-semibold text-gray-900 mb-6">{title}</h2>
+      <div className="space-y-6">
+        <div>
+          <div className="flex justify-between items-center mb-2">
+            <span className="text-sm font-medium text-gray-700">Active Rentals</span>
+            <span className="text-sm font-bold text-green-600">{active}</span>
           </div>
+          <div className="w-full bg-gray-200 rounded-full h-3">
+            <div 
+              className="h-3 rounded-full bg-gradient-to-r from-green-500 to-green-600 transition-all duration-500" 
+              style={{ width: `${pctActive}%` }}
+            />
+          </div>
+          <p className="text-xs text-gray-500 mt-1">{pctActive}% of total</p>
+        </div>
+        <div>
+          <div className="flex justify-between items-center mb-2">
+            <span className="text-sm font-medium text-gray-700">Inactive Rentals</span>
+            <span className="text-sm font-bold text-gray-600">{inactive}</span>
+          </div>
+          <div className="w-full bg-gray-200 rounded-full h-3">
+            <div 
+              className="h-3 rounded-full bg-gradient-to-r from-gray-400 to-gray-500 transition-all duration-500" 
+              style={{ width: `${pctInactive}%` }}
+            />
+          </div>
+          <p className="text-xs text-gray-500 mt-1">{pctInactive}% of total</p>
         </div>
       </div>
+    </div>
+  );
+}
+
+function FullScreenSpinner() {
+  return (
+    <div className="flex items-center justify-center h-screen bg-gray-50">
+      <div className="relative">
+        <div className="animate-spin rounded-full border-4 border-blue-200 border-t-blue-600 h-16 w-16" />
+        <div className="mt-4 text-center">
+          <p className="text-gray-600 text-sm">Loading dashboard...</p>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function Alert({ message, type }) {
+  const styles = {
+    error: {
+      bg: 'bg-red-50',
+      border: 'border-red-200',
+      text: 'text-red-800',
+      icon: 'text-red-500'
+    },
+    success: {
+      bg: 'bg-green-50',
+      border: 'border-green-200',
+      text: 'text-green-800',
+      icon: 'text-green-500'
+    }
+  };
+
+  const style = styles[type] || styles.error;
+
+  return (
+    <div className={`${style.bg} border ${style.border} rounded-lg p-4 mb-6 flex items-center space-x-3`}>
+      <div className={`${style.icon}`}>
+        {type === 'error' ? (
+          <ExclamationIcon className="h-5 w-5" />
+        ) : (
+          <CheckCircleIcon className="h-5 w-5" />
+        )}
+      </div>
+      <p className={`${style.text} font-medium`}>{message}</p>
     </div>
   );
 }
