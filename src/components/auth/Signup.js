@@ -3,17 +3,17 @@ import React, { useState, useEffect } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import { useAuth } from "../../contexts/AuthContext";
 import "./Signup.css";
+import { FaApple, FaGoogle } from "react-icons/fa";
 
 const Signup = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [confirmPassword, setConfirmPassword] = useState('');
   const [fullName, setFullName] = useState('');
-  const [role, setRole] = useState('');
+  const [selectedRole, setSelectedRole] = useState('renter'); // Default to renter
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   
-  const { signup } = useAuth();
+  const { signInWithGoogle, signInWithApple, signup } = useAuth();
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -48,33 +48,15 @@ const Signup = () => {
       return;
     }
 
-    if (!confirmPassword.trim()) {
-      setError('Please confirm your password');
-      setLoading(false);
-      return;
-    }
-
-    if (password !== confirmPassword) {
-      setError('Passwords do not match');
-      setLoading(false);
-      return;
-    }
-
     if (password.length < 6) {
       setError('Password should be at least 6 characters');
       setLoading(false);
       return;
     }
 
-    if (!role) {
-      setError('Please select a role');
-      setLoading(false);
-      return;
-    }
-
     try {
-      console.log('Attempting to create account with:', { email, fullName, role });
-      await signup(email, password, fullName);
+      console.log('Attempting to create account with:', { email, fullName, role: selectedRole });
+      await signup(email, password, fullName, selectedRole);
       console.log('Account created successfully!');
       
       // Wait a bit for auth state to update
@@ -86,6 +68,7 @@ const Signup = () => {
           localStorage.removeItem('pendingRental');
           navigate(`/rent/${pendingRental}`);
         } else {
+          // Redirect based on selected role
           navigate('/my-dashboard');
         }
       }, 1000);
@@ -123,108 +106,183 @@ const Signup = () => {
     }
   };
 
+  const handleGoogleSignup = async () => {
+    setError('');
+    setLoading(true);
+    
+    try {
+      await signInWithGoogle(selectedRole);
+      
+      // Check if there was a pending rental
+      const pendingRental = localStorage.getItem('pendingRental');
+      if (pendingRental) {
+        localStorage.removeItem('pendingRental');
+        navigate(`/rent/${pendingRental}`);
+      } else {
+        navigate('/my-dashboard');
+      }
+    } catch (error) {
+      setError('Failed to sign up with Google');
+      console.error(error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleAppleSignup = async () => {
+    setError('');
+    setLoading(true);
+    
+    try {
+      await signInWithApple(selectedRole);
+      
+      // Check if there was a pending rental
+      const pendingRental = localStorage.getItem('pendingRental');
+      if (pendingRental) {
+        localStorage.removeItem('pendingRental');
+        navigate(`/rent/${pendingRental}`);
+      } else {
+        navigate('/my-dashboard');
+      }
+    } catch (error) {
+      setError('Failed to sign up with Apple');
+      console.error(error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return (
     <div className="signup-container">
       <div className="signup-card">
-        <div className="logo-section">
-          <div className="logo">
-            <div className="house-icon">
-              <svg width="32" height="32" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
-                <path d="M16 2L26 12V26H20V18H12V26H6V12L16 2Z" fill="#4285F4"/>
-                <circle cx="8" cy="10" r="2" fill="#4285F4"/>
-                <rect x="7" y="8" width="2" height="2" fill="white"/>
-              </svg>
-            </div>
-            <h1>RentMate</h1>
-          </div>
-        </div>
-
-        <h2 className="signup-title">Sign up</h2>
+        <h2 className="signup-title">Create your RentMate Account</h2>
 
         {error && (
-          <div className="signup-error">
+          <div className="signup-error" style={{
+            backgroundColor: '#fdecea',
+            color: '#d32f2f',
+            border: '1px solid #f5c2c7',
+            padding: '10px',
+            borderRadius: '8px',
+            marginBottom: '16px',
+            fontSize: '14px'
+          }}>
             {error}
           </div>
         )}
 
-        <form className="signup-form" onSubmit={handleSubmit}>
-          <div className="form-group">
-            <label htmlFor="fullName">Full name</label>
-            <input 
-              id="fullName"
-              type="text" 
-              value={fullName}
-              onChange={(e) => setFullName(e.target.value)}
-              required 
-            />
-          </div>
-
-          <div className="form-group">
-            <label htmlFor="email">Email address</label>
-            <input 
-              id="email"
-              type="email" 
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              required 
-            />
-          </div>
-
-          <div className="form-row">
-            <div className="form-group">
-              <label htmlFor="password">Password</label>
-              <input 
-                id="password"
-                type="password" 
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                required 
-              />
-            </div>
-
-            <div className="form-group">
-              <label htmlFor="confirmPassword">Confirm password</label>
-              <input 
-                id="confirmPassword"
-                type="password" 
-                value={confirmPassword}
-                onChange={(e) => setConfirmPassword(e.target.value)}
-                required 
-              />
-            </div>
-          </div>
-
-          <div className="form-group">
-            <label htmlFor="role">Role</label>
-            <div className="select-wrapper">
-              <select 
-                id="role"
-                value={role}
-                onChange={(e) => setRole(e.target.value)}
-                required
+        {/* Role Selection */}
+        <div className="role-selection" style={{ marginBottom: '20px' }}>
+          <label className="role-label" style={{ 
+            display: 'block', 
+            fontSize: '14px', 
+            fontWeight: '500', 
+            marginBottom: '8px',
+            color: '#374151'
+          }}>
+            What would you like to do on RentMate?
+          </label>
+          <div className="role-options" style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+            {[
+              { value: 'renter', label: 'Rent Equipment', description: 'Browse and rent equipment from others' },
+              { value: 'owner', label: 'List My Equipment', description: 'List your equipment for others to rent' },
+              { value: 'admin', label: 'Admin Access', description: 'Manage the platform and users' }
+            ].map((role) => (
+              <label 
+                key={role.value}
+                className="role-option" 
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  padding: '12px',
+                  border: selectedRole === role.value ? '2px solid #4f46e5' : '1px solid #d1d5db',
+                  borderRadius: '8px',
+                  cursor: 'pointer',
+                  backgroundColor: selectedRole === role.value ? '#f0f9ff' : '#ffffff',
+                  transition: 'all 0.2s ease'
+                }}
               >
-                <option value="">Select role</option>
-                <option value="renter">Renter</option>
-                <option value="owner">Equipment Owner</option>
-                <option value="both">Both</option>
-              </select>
-              <svg className="select-arrow" width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
-                <path d="M4 6L8 10L12 6" stroke="#666" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-              </svg>
-            </div>
+                <input
+                  type="radio"
+                  value={role.value}
+                  checked={selectedRole === role.value}
+                  onChange={(e) => setSelectedRole(e.target.value)}
+                  style={{ marginRight: '12px' }}
+                />
+                <div>
+                  <div style={{ fontWeight: '500', fontSize: '14px', color: '#111827' }}>
+                    {role.label}
+                  </div>
+                  <div style={{ fontSize: '12px', color: '#6b7280', marginTop: '2px' }}>
+                    {role.description}
+                  </div>
+                </div>
+              </label>
+            ))}
           </div>
+        </div>
 
+        <button 
+          className="signup-btn apple" 
+          onClick={handleAppleSignup}
+          disabled={loading}
+        >
+          <FaApple className="icon" />
+          Continue with Apple
+        </button>
+
+        <button 
+          className="signup-btn google" 
+          onClick={handleGoogleSignup}
+          disabled={loading}
+        >
+          <FaGoogle className="icon" />
+          Continue with Google
+        </button>
+
+        <div className="divider">
+          <span>or</span>
+        </div>
+
+        <form className="signup-form" onSubmit={handleSubmit}>
+          <input 
+            type="text" 
+            placeholder="Full Name" 
+            value={fullName}
+            onChange={(e) => setFullName(e.target.value)}
+            required 
+          />
+          <input 
+            type="email" 
+            placeholder="Email address" 
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            required 
+          />
+          <input 
+            type="password" 
+            placeholder="Password" 
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            required 
+          />
           <button 
             type="submit" 
             className="signup-btn primary"
             disabled={loading}
           >
-            {loading ? 'Signing Up...' : 'Sign up'}
+            {loading ? 'Signing Up...' : `Sign Up as ${selectedRole === 'renter' ? 'Renter' : selectedRole === 'owner' ? 'Equipment Owner' : 'Admin'}`}
           </button>
         </form>
 
-        <div className="login-link">
+        <p className="login-link">
           Already have an account? <Link to="/login">Log in</Link>
+        </p>
+        
+        <div className="mt-4 text-center">
+          <Link to="/" className="text-blue-600 hover:text-blue-500">
+            ← Back to Browse Equipment
+          </Link>
         </div>
       </div>
     </div>

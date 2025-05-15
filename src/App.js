@@ -1,4 +1,3 @@
-// src/App.js
 import React from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
@@ -6,52 +5,79 @@ import Signup from './components/auth/Signup';
 import Login from './components/auth/Login';
 import ForgotPassword from './components/auth/ForgotPassword';
 import Dashboard from './components/Dashboard/Dashboard';
-import AdminDashboard from './components/Dashboard/AdminDashboard';
-import OwnerDashboard from './components/Dashboard/OwnerDashboard';
-import RenterDashboard from './components/Dashboard/RenterDashboard';
-import ErrorBoundary from './components/ErrorBoundary';
-import LoadingSpinner from './components/common/LoadingSpinner';
+// import AuthDebug from './components/AuthDebug'; // Uncomment this line and add the component
 
 function App() {
   return (
     <Router>
-      <ErrorBoundary>
-        <AuthProvider>
-          <AppContent />
-        </AuthProvider>
-      </ErrorBoundary>
+      <AuthProvider>
+        <AppContent />
+        {/* <AuthDebug /> */} {/* Uncomment this to see auth status */}
+      </AuthProvider>
     </Router>
   );
 }
 
 function AppContent() {
-  const { currentUser, loading, role } = useAuth(); // `role` must be provided by your AuthContext
+  const { currentUser, userRole, loading } = useAuth();
 
-  if (loading) return <LoadingSpinner />;
+  console.log('AppContent render:', { currentUser, userRole, loading }); // Add debug logging
 
-  const renderDashboard = () => {
-    if (role === 'admin') return <AdminDashboard />;
-    if (role === 'owner') return <OwnerDashboard />;
-    if (role === 'renter') return <RenterDashboard />;
-    return <Dashboard />; // fallback or shared dashboard
-  };
+  if (loading) {
+    return <div style={{
+      display: 'flex',
+      justifyContent: 'center',
+      alignItems: 'center',
+      height: '100vh',
+      fontSize: '1.5rem'
+    }}>
+      Loading...
+    </div>;
+  }
 
   return (
     <Routes>
-      {/* Auth Routes */}
-      <Route path="/login" element={!currentUser ? <Login /> : <Navigate to="/dashboard" />} />
-      <Route path="/signup" element={!currentUser ? <Signup /> : <Navigate to="/dashboard" />} />
-      <Route path="/register" element={!currentUser ? <Signup /> : <Navigate to="/dashboard" />} />
+      {/* Redirect to login as default for non-authenticated users */}
+      <Route path="/" element={currentUser ? <Navigate to="/my-dashboard" /> : <Navigate to="/login" />} />
+      <Route path="/dashboard" element={currentUser ? <Navigate to="/my-dashboard" /> : <Navigate to="/login" />} />
+      
+      {/* Authentication routes */}
+      <Route path="/login" element={!currentUser ? <Login /> : <Navigate to="/my-dashboard" />} />
+      <Route path="/signup" element={!currentUser ? <Signup /> : <Navigate to="/my-dashboard" />} />
+      <Route path="/register" element={!currentUser ? <Signup /> : <Navigate to="/my-dashboard" />} />
       <Route path="/forgot-password" element={<ForgotPassword />} />
-
-      {/* Dashboard - Protected */}
-      <Route
-        path="/dashboard"
-        element={currentUser ? renderDashboard() : <Navigate to="/login" />}
+      
+      {/* Protected dashboard for authenticated users - will automatically show the right dashboard based on role */}
+      <Route path="/my-dashboard" element={currentUser ? <Dashboard /> : <Navigate to="/login" />} />
+      
+      {/* Role-specific routes for direct access */}
+      <Route 
+        path="/renter-dashboard" 
+        element={
+          currentUser && userRole === 'renter' ? <Dashboard /> : 
+          currentUser ? <Navigate to="/my-dashboard" /> : 
+          <Navigate to="/login" />
+        } 
       />
-
-      {/* Fallback */}
-      <Route path="*" element={<Navigate to="/dashboard" />} />
+      <Route 
+        path="/owner-dashboard" 
+        element={
+          currentUser && userRole === 'owner' ? <Dashboard /> : 
+          currentUser ? <Navigate to="/my-dashboard" /> : 
+          <Navigate to="/login" />
+        } 
+      />
+      <Route 
+        path="/admin-dashboard" 
+        element={
+          currentUser && userRole === 'admin' ? <Dashboard /> : 
+          currentUser ? <Navigate to="/my-dashboard" /> : 
+          <Navigate to="/login" />
+        } 
+      />
+      
+      {/* Catch-all route to handle any undefined paths */}
+      <Route path="*" element={<Navigate to="/" />} />
     </Routes>
   );
 }
