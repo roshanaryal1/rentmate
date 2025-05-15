@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import { collection, query, where, getDocs } from 'firebase/firestore';
 import { db } from '../../firebase';
+import './OwnerDashboard.css'; // ✅ Link the custom CSS
 
 function OwnerDashboard() {
   const { currentUser } = useAuth();
@@ -32,72 +33,47 @@ function OwnerDashboard() {
   }, [currentUser]);
 
   return (
-    <div className="max-w-5xl mx-auto mt-8 px-4">
-      <div className="mb-6">
-        <h2 className="text-2xl font-bold text-gray-800">Owner Dashboard</h2>
-        <p className="text-gray-600">Manage your listed equipment and track availability.</p>
+    <div className="dashboard-container">
+      <div className="dashboard-header">
+        <h2>Owner Dashboard</h2>
+        <p>Manage your listed equipment and track availability.</p>
       </div>
 
-      {/* Action Buttons */}
-      <div className="flex gap-4 mb-6">
-        <Link
-          to="/add-equipment"
-          className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 text-sm font-medium"
-        >
-          + Add New Equipment
-        </Link>
-        <Link
-          to="/equipment-analytics"
-          className="px-4 py-2 bg-gray-200 text-gray-800 rounded hover:bg-gray-300 text-sm font-medium"
-        >
-          View Analytics
-        </Link>
+      <div className="dashboard-actions">
+        <Link to="/add-equipment" className="add-btn">+ Add New Equipment</Link>
+        <Link to="/equipment-analytics" className="analytics-btn">View Analytics</Link>
       </div>
 
-      {/* Equipment List */}
       <div>
-        <h3 className="text-lg font-semibold text-gray-700 mb-4">Your Equipment</h3>
+        <h3 className="text-xl font-semibold text-gray-700 mb-4">Your Equipment</h3>
         {loading ? (
-          <p>Loading equipment...</p>
+          <p className="text-gray-500">Loading equipment...</p>
         ) : equipmentItems.length > 0 ? (
-          <ul className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+          <ul className="equipment-list">
             {equipmentItems.map(item => (
-              <li key={item.id} className="bg-white shadow rounded-lg overflow-hidden">
+              <li key={item.id} className="equipment-card">
                 <img
-                  src={item.imageUrl || '/placeholder-image.png'}
+                  src={item.imageUrl || 'https://via.placeholder.com/400x250.png?text=No+Image'}
                   alt={item.name}
-                  className="w-full h-40 object-cover"
                 />
-                <div className="p-4">
-                  <h4 className="text-lg font-semibold text-blue-600">{item.name}</h4>
-                  <p className="text-sm text-gray-500">{item.category}</p>
-                  <p className="text-sm text-gray-500 mt-1">
-                    {item.available ? (
-                      <span className="text-green-600">Available</span>
-                    ) : (
-                      <span className="text-red-600">Rented Out</span>
-                    )}
-                  </p>
-                  <p className="mt-2 text-green-600 font-medium">${item.ratePerDay}/day</p>
-                  <Link
-                    to={`/equipment/${item.id}`}
-                    className="block mt-3 text-sm text-blue-500 hover:underline"
-                  >
-                    View Details
+                <div className="equipment-info">
+                  <h4>{item.name}</h4>
+                  <p>{item.category}</p>
+                  <span className={`status-badge ${item.available ? 'available' : 'unavailable'}`}>
+                    {item.available ? 'Available' : 'Rented Out'}
+                  </span>
+                  <p className="rate">${item.ratePerDay}/day</p>
+                  <Link to={`/equipment/${item.id}`} className="details-link">
+                    View Details →
                   </Link>
                 </div>
               </li>
             ))}
           </ul>
         ) : (
-          <div className="text-gray-500 text-center py-10">
+          <div className="no-equipment">
             <p>You haven’t listed any equipment yet.</p>
-            <Link
-              to="/add-equipment"
-              className="mt-4 inline-block px-4 py-2 bg-blue-100 text-blue-700 rounded hover:bg-blue-200 text-sm font-medium"
-            >
-              Add Your First Equipment
-            </Link>
+            <Link to="/add-equipment">Add Your First Equipment</Link>
           </div>
         )}
       </div>
