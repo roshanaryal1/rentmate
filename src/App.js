@@ -1,70 +1,86 @@
-import React, { useState } from 'react';
+import React, { useState, Suspense } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate, Link, useNavigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
-import Signup from './components/auth/Signup';
-import Login from './components/auth/Login';
-import ForgotPassword from './components/auth/ForgotPassword';
-import RenterDashboard from './components/Dashboard/RenterDashboard';
-import OwnerDashboard from './components/Dashboard/OwnerDashboard';
-import AdminDashboard from './components/Dashboard/AdminDashboard';
-import AddEquipment from './components/Dashboard/AddEquipment';
+import LoadingSpinner from './components/common/LoadingSpinner';
+import AuthDebug from './components/AuthDebug';
+
+// Lazy load components for better performance
+const Signup = React.lazy(() => import('./components/auth/Signup'));
+const Login = React.lazy(() => import('./components/auth/Login'));
+const ForgotPassword = React.lazy(() => import('./components/auth/ForgotPassword'));
+const RenterDashboard = React.lazy(() => import('./components/Dashboard/RenterDashboard'));
+const OwnerDashboard = React.lazy(() => import('./components/Dashboard/OwnerDashboard'));
+const AdminDashboard = React.lazy(() => import('./components/Dashboard/AdminDashboard'));
+const AddEquipment = React.lazy(() => import('./components/Dashboard/AddEquipment'));
 
 function App() {
   return (
     <Router>
       <AuthProvider>
-        <AppContent />
+        <AuthDebug />
+        <Suspense fallback={<LoadingSpinner message="Loading RentMate..." />}>
+          <AppContent />
+        </Suspense>
       </AuthProvider>
     </Router>
   );
 }
 
 function AppContent() {
-  const { currentUser, userRole, loading } = useAuth();
+  const { currentUser, userRole, loading, authChecked } = useAuth();
 
-  console.log('AppContent render:', { currentUser, userRole, loading });
+  console.log('AppContent render:', { 
+    currentUser: currentUser?.email, 
+    userRole, 
+    loading, 
+    authChecked,
+    timestamp: new Date().toISOString()
+  });
 
-  if (loading) {
-    return <div style={{
-      display: 'flex',
-      justifyContent: 'center',
-      alignItems: 'center',
-      height: '100vh',
-      fontSize: '1.5rem'
-    }}>
-      Loading...
-    </div>;
+  // Show loading while checking authentication
+  if (!authChecked || loading) {
+    return <LoadingSpinner 
+      message={
+        !authChecked ? "Checking authentication..." : 
+        loading ? "Loading user data..." : 
+        "Loading..."
+      } 
+    />;
+  }
+
+  // Show error boundary if auth fails after timeout
+  if (!authChecked && !loading) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center">
+          <h2 className="text-2xl font-bold text-gray-900 mb-4">Connection Issue</h2>
+          <p className="text-gray-600 mb-6">Having trouble connecting. Please check your internet connection.</p>
+          <button 
+            onClick={() => window.location.reload()} 
+            className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
+          >
+            Retry
+          </button>
+        </div>
+      </div>
+    );
   }
 
   return (
     <Routes>
       {/* Redirect to role-specific dashboard based on user role */}
       <Route path="/" element={
-        currentUser 
-          ? userRole === 'renter' 
-            ? <Navigate to="/renter-dashboard" />
-            : userRole === 'owner'
-            ? <Navigate to="/owner-dashboard" />
-            : userRole === 'admin'
-            ? <Navigate to="/admin-dashboard" />
-            : <Navigate to="/renter-dashboard" /> // Default fallback
-          : <Navigate to="/login" />
+        <RoleBasedRedirect currentUser={currentUser} userRole={userRole} />
       } />
       
       {/* Authentication routes */}
       <Route path="/login" element={
         !currentUser ? <Login /> : 
-        userRole === 'renter' ? <Navigate to="/renter-dashboard" /> :
-        userRole === 'owner' ? <Navigate to="/owner-dashboard" /> :
-        userRole === 'admin' ? <Navigate to="/admin-dashboard" /> :
-        <Navigate to="/renter-dashboard" />
+        <RoleBasedRedirect currentUser={currentUser} userRole={userRole} />
       } />
       <Route path="/signup" element={
         !currentUser ? <Signup /> : 
-        userRole === 'renter' ? <Navigate to="/renter-dashboard" /> :
-        userRole === 'owner' ? <Navigate to="/owner-dashboard" /> :
-        userRole === 'admin' ? <Navigate to="/admin-dashboard" /> :
-        <Navigate to="/renter-dashboard" />
+        <RoleBasedRedirect currentUser={currentUser} userRole={userRole} />
       } />
       <Route path="/register" element={<Navigate to="/signup" />} />
       <Route path="/forgot-password" element={<ForgotPassword />} />
@@ -73,37 +89,31 @@ function AppContent() {
       <Route 
         path="/renter-dashboard" 
         element={
-          currentUser && userRole === 'renter' 
-            ? <DashboardLayout title="Renter Dashboard"><RenterDashboard /></DashboardLayout>
-            : !currentUser 
-            ? <Navigate to="/login" />
-            : userRole === 'owner'
-            ? <Navigate to="/owner-dashboard" />
-            : <Navigate to="/admin-dashboard" />
+          <ProtectedRoute role="renter" currentUser={currentUser} userRole={userRole}>
+            <DashboardLayout title="Renter Dashboard">
+              <RenterDashboard />
+            </DashboardLayout>
+          </ProtectedRoute>
         } 
       />
       <Route 
         path="/owner-dashboard" 
         element={
-          currentUser && userRole === 'owner' 
-            ? <DashboardLayout title="Equipment Owner Dashboard"><OwnerDashboard /></DashboardLayout>
-            : !currentUser 
-            ? <Navigate to="/login" />
-            : userRole === 'renter'
-            ? <Navigate to="/renter-dashboard" />
-            : <Navigate to="/admin-dashboard" />
+          <ProtectedRoute role="owner" currentUser={currentUser} userRole={userRole}>
+            <DashboardLayout title="Equipment Owner Dashboard">
+              <OwnerDashboard />
+            </DashboardLayout>
+          </ProtectedRoute>
         } 
       />
       <Route 
         path="/admin-dashboard" 
         element={
-          currentUser && userRole === 'admin' 
-            ? <DashboardLayout title="Admin Dashboard"><AdminDashboard /></DashboardLayout>
-            : !currentUser 
-            ? <Navigate to="/login" />
-            : userRole === 'renter'
-            ? <Navigate to="/renter-dashboard" />
-            : <Navigate to="/owner-dashboard" />
+          <ProtectedRoute role="admin" currentUser={currentUser} userRole={userRole}>
+            <DashboardLayout title="Admin Dashboard">
+              <AdminDashboard />
+            </DashboardLayout>
+          </ProtectedRoute>
         } 
       />
       
@@ -111,9 +121,11 @@ function AppContent() {
       <Route 
         path="/add-equipment" 
         element={
-          currentUser && userRole === 'owner' 
-            ? <DashboardLayout title="Add Equipment"><AddEquipment /></DashboardLayout>
-            : <Navigate to="/login" />
+          <ProtectedRoute role="owner" currentUser={currentUser} userRole={userRole}>
+            <DashboardLayout title="Add Equipment">
+              <AddEquipment />
+            </DashboardLayout>
+          </ProtectedRoute>
         } 
       />
       
@@ -125,6 +137,65 @@ function AppContent() {
       <Route path="*" element={<Navigate to="/" />} />
     </Routes>
   );
+}
+
+// Helper component for role-based redirects
+function RoleBasedRedirect({ currentUser, userRole }) {
+  console.log('RoleBasedRedirect:', { currentUser: currentUser?.email, userRole });
+  
+  if (!currentUser) {
+    return <Navigate to="/login" />;
+  }
+
+  // Wait for userRole to be loaded
+  if (!userRole) {
+    return <LoadingSpinner message="Loading user data..." />;
+  }
+
+  switch (userRole) {
+    case 'admin':
+      console.log('Redirecting to admin dashboard');
+      return <Navigate to="/admin-dashboard" />;
+    case 'owner':
+      console.log('Redirecting to owner dashboard');
+      return <Navigate to="/owner-dashboard" />;
+    case 'renter':
+    default:
+      console.log('Redirecting to renter dashboard (default)');
+      return <Navigate to="/renter-dashboard" />;
+  }
+}
+
+// Helper component for protected routes
+function ProtectedRoute({ role, currentUser, userRole, children }) {
+  console.log('ProtectedRoute check:', { 
+    requiredRole: role, 
+    currentUser: currentUser?.email, 
+    userRole,
+    hasAccess: currentUser && (userRole === role || userRole === 'admin')
+  });
+
+  if (!currentUser) {
+    return <Navigate to="/login" />;
+  }
+
+  // Wait for userRole to be loaded
+  if (!userRole) {
+    return <LoadingSpinner message="Loading user data..." />;
+  }
+
+  // Admin can access everything
+  if (userRole === 'admin') {
+    return children;
+  }
+
+  // Check if user has the required role
+  if (userRole === role) {
+    return children;
+  }
+
+  // Redirect to appropriate dashboard if user doesn't have access
+  return <RoleBasedRedirect currentUser={currentUser} userRole={userRole} />;
 }
 
 // Layout component for dashboards
@@ -164,15 +235,21 @@ function DashboardLayout({ children, title }) {
                 <div className="ml-3 relative">
                   <div className="flex items-center space-x-4">
                     <span className="text-sm font-medium text-gray-700">
-                      {currentUser.displayName || currentUser.email}
+                      {currentUser?.displayName || currentUser?.email}
                     </span>
-                    <span className="text-xs px-2 py-1 bg-blue-100 text-blue-800 rounded-full">
-                      {userRole === 'renter' ? 'Renter' : userRole === 'owner' ? 'Equipment Owner' : 'Admin'}
+                    <span className={`text-xs px-2 py-1 rounded-full ${
+                      userRole === 'admin' ? 'bg-red-100 text-red-800' :
+                      userRole === 'owner' ? 'bg-blue-100 text-blue-800' :
+                      'bg-green-100 text-green-800'
+                    }`}>
+                      {userRole === 'renter' ? 'Renter' : 
+                       userRole === 'owner' ? 'Equipment Owner' : 
+                       userRole === 'admin' ? 'Admin' : 'Unknown'}
                     </span>
                     <button
                       onClick={handleLogout}
                       disabled={loading}
-                      className="px-3 py-1 border border-transparent text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700"
+                      className="px-3 py-1 border border-transparent text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 disabled:opacity-50"
                     >
                       {loading ? 'Logging out...' : 'Log Out'}
                     </button>
@@ -197,15 +274,15 @@ function DashboardLayout({ children, title }) {
           <div className="max-w-7xl mx-auto sm:px-6 lg:px-8">
             <div className="px-4 py-8 sm:px-0">
               {error && (
-                <div className="mb-4 bg-yellow-50 border-l-4 border-yellow-400 p-4">
+                <div className="mb-4 bg-red-50 border-l-4 border-red-400 p-4">
                   <div className="flex">
                     <div className="flex-shrink-0">
-                      <svg className="h-5 w-5 text-yellow-400" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
-                        <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+                      <svg className="h-5 w-5 text-red-400" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+                        <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
                       </svg>
                     </div>
                     <div className="ml-3">
-                      <p className="text-sm text-yellow-700">{error}</p>
+                      <p className="text-sm text-red-800">{error}</p>
                     </div>
                   </div>
                 </div>

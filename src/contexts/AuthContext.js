@@ -1,5 +1,5 @@
 import React, { useContext, useState, useEffect } from "react";
-import {
+import { 
   onAuthStateChanged,
   signOut,
   createUserWithEmailAndPassword,
@@ -7,110 +7,281 @@ import {
   GoogleAuthProvider,
   signInWithPopup,
   updateProfile,
-  sendPasswordResetEmail,
+  sendPasswordResetEmail
 } from "firebase/auth";
-import { doc, setDoc, getDoc, serverTimestamp } from "firebase/firestore";
+import { 
+  doc, 
+  setDoc, 
+  getDoc,
+  serverTimestamp 
+} from "firebase/firestore";
 import { auth, db } from "../firebase";
 
 const AuthContext = React.createContext();
+
 export function useAuth() {
-  return useContext(AuthContext);
+  const context = useContext(AuthContext);
+  if (!context) {
+    throw new Error('useAuth must be used within an AuthProvider');
+  }
+  return context;
 }
 
 export function AuthProvider({ children }) {
   const [currentUser, setCurrentUser] = useState(null);
   const [userRole, setUserRole] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [authChecked, setAuthChecked] = useState(false);
 
-  async function createUserDocument(user, additionalData = {}) {
-    const ref = doc(db, "users", user.uid);
-    const snap = await getDoc(ref);
-    if (!snap.exists()) {
-      const data = {
-        displayName: user.displayName,
-        email: user.email,
-        createdAt: serverTimestamp(),
-        ...additionalData,
-      };
-      await setDoc(ref, data);
-      return data;
+  console.log('AuthProvider rendering...', { currentUser: currentUser?.email, userRole, loading });
+
+  // Create user document in Firestore with retry logic
+  async function createUserDocument(user, additionalData = {}, retries = 3) {
+    const userDocRef = doc(db, "users", user.uid);
+    
+    for (let i = 0; i < retries; i++) {
+      try {
+        console.log('Checking if user document exists...');
+        const userDoc = await getDoc(userDocRef);
+        
+        if (!userDoc.exists()) {
+          const { displayName, email } = user;
+          const userData = {
+            displayName,
+            email,
+            createdAt: serverTimestamp(),
+            ...additionalData
+          };
+          
+          console.log('Creating user document with data:', userData);
+          await setDoc(userDocRef, userData);
+          console.log("User document created successfully:", userData);
+          return userData;
+        } else {
+          const existingData = userDoc.data();
+          console.log("User document already exists:", existingData);
+          return existingData;
+        }
+      } catch (error) {
+        console.error(`Error creating user document (attempt ${i + 1}):`, error);
+        if (i === retries - 1) throw error;
+        // Wait before retry
+        await new Promise(resolve => setTimeout(resolve, 1000 * (i + 1)));
+      }
     }
-    return snap.data();
   }
 
+  // Get user role from Firestore with caching
   async function getUserRole(uid) {
     try {
-      const snap = await getDoc(doc(db, "users", uid));
-      return snap.exists() ? snap.data().role : "renter";
-    } catch {
-      return "renter";
+      console.log('Getting user role for UID:', uid);
+      
+      const userDocRef = doc(db, "users", uid);
+      const userDoc = await getDoc(userDocRef);
+      
+      if (userDoc.exists()) {
+        const userData = userDoc.data();
+        const role = userData.role || 'renter';
+        console.log('User data from Firestore:', userData);
+        console.log('Extracted role:', role);
+        
+        // Cache the role
+        localStorage.setItem(`userRole_${uid}`, role);
+        return role;
+      } else {
+        console.log('User document does not exist, defaulting to renter');
+        return 'renter';
+      }
+    } catch (error) {
+      console.error("Error getting user role:", error);
+      // Return cached role if available
+      const cachedRole = localStorage.getItem(`userRole_${uid}`);
+      console.log('Returning cached role:', cachedRole);
+      return cachedRole || 'renter';
     }
   }
 
-  // ——— SIGNUP ———
-  async function signup(email, password, fullName, role = "renter") {
-    const result = await createUserWithEmailAndPassword(auth, email, password);
-    await updateProfile(result.user, { displayName: fullName });
-    await createUserDocument(result.user, { role, fullName });
-    setUserRole(role);
-    return { user: result.user, role };
+  // Simple signup function with role
+  async function signup(email, password, fullName, role = 'renter') {
+    try {
+      console.log('Signup attempt with role:', { email, fullName, role });
+      setLoading(true);
+      
+      const result = await createUserWithEmailAndPassword(auth, email, password);
+      console.log('Firebase user created:', result.user.uid);
+      
+      // Update the display name
+      await updateProfile(result.user, {
+        displayName: fullName
+      });
+      console.log('Display name updated');
+      
+      // Create user document with role
+      await createUserDocument(result.user, {
+        role: role,
+        fullName: fullName
+      });
+      
+      console.log('User document created, setting role to:', role);
+      setUserRole(role);
+      
+      // Cache the role
+      localStorage.setItem(`userRole_${result.user.uid}`, role);
+      console.log('Role cached:', role);
+      
+      return result;
+    } catch (error) {
+      console.error("Signup Error:", error);
+      throw error;
+    } finally {
+      setLoading(false);
+    }
   }
 
-  // ——— GOOGLE ———
-  async function signInWithGoogle(role = "renter") {
-    const provider = new GoogleAuthProvider();
-    const result = await signInWithPopup(auth, provider);
-    await createUserDocument(result.user, { role });
-    const resolvedRole = await getUserRole(result.user.uid);
-    setUserRole(resolvedRole);
-    return { user: result.user, role: resolvedRole };
+  // Google sign-in with role
+  async function signInWithGoogle(role = 'renter') {
+    try {
+      console.log('Google signin with role:', role);
+      setLoading(true);
+      const provider = new GoogleAuthProvider();
+      // Add prompt to force account selection
+      provider.setCustomParameters({
+        prompt: 'select_account'
+      });
+      
+      const result = await signInWithPopup(auth, provider);
+      console.log('Google signin successful:', result.user.uid);
+      
+      // Create or update user document with role
+      await createUserDocument(result.user, { role });
+      
+      const userRole = await getUserRole(result.user.uid);
+      setUserRole(userRole);
+      console.log('Final role set after Google signin:', userRole);
+      
+      return result;
+    } catch (error) {
+      console.error("Google Sign-in Error:", error);
+      throw error;
+    } finally {
+      setLoading(false);
+    }
   }
 
-  // ——— LOGIN ———
+  // Simple login function
   async function login(email, password) {
-    const result = await signInWithEmailAndPassword(auth, email, password);
-    const role = await getUserRole(result.user.uid);
-    setUserRole(role);
-    return { user: result.user, role };
+    try {
+      console.log('Login attempt for:', email);
+      setLoading(true);
+      const result = await signInWithEmailAndPassword(auth, email, password);
+      console.log('Login successful:', result.user.uid);
+      
+      // Get user role after login
+      const role = await getUserRole(result.user.uid);
+      setUserRole(role);
+      console.log('Role set after login:', role);
+      
+      return result;
+    } catch (error) {
+      console.error("Login Error:", error);
+      throw error;
+    } finally {
+      setLoading(false);
+    }
   }
 
-  // ——— LOGOUT / RESET ———
-  async function logout() {
-    await signOut(auth);
-    setUserRole(null);
-  }
+  // Reset password function
   async function resetPassword(email) {
-    await sendPasswordResetEmail(auth, email);
+    try {
+      await sendPasswordResetEmail(auth, email);
+    } catch (error) {
+      console.error("Reset Password Error:", error);
+      throw error;
+    }
   }
 
+  // Logout function
+  async function logout() {
+    try {
+      await signOut(auth);
+      setUserRole(null);
+      // Clear cached role
+      if (currentUser) {
+        localStorage.removeItem(`userRole_${currentUser.uid}`);
+      }
+    } catch (error) {
+      console.error("Logout Error:", error);
+      throw error;
+    }
+  }
+
+  // Auth State Observer with timeout
   useEffect(() => {
-    const unsub = onAuthStateChanged(auth, async (user) => {
+    console.log('Setting up auth state listener...');
+    
+    // Set a timeout for auth initialization
+    const authTimeout = setTimeout(() => {
+      if (!authChecked) {
+        console.log('Auth check timeout - proceeding without auth');
+        setLoading(false);
+        setAuthChecked(true);
+      }
+    }, 5000); // 5 second timeout
+
+    const unsubscribe = onAuthStateChanged(auth, async (user) => {
+      console.log('Auth state changed:', user ? user.email : 'No user');
+      
+      clearTimeout(authTimeout);
       setCurrentUser(user);
+      
       if (user) {
-        const role = await getUserRole(user.uid);
-        setUserRole(role);
+        try {
+          // Get user role when user is authenticated
+          console.log('User authenticated, getting role...');
+          const role = await getUserRole(user.uid);
+          setUserRole(role);
+          console.log('User role set in auth state observer:', role);
+        } catch (error) {
+          console.error('Error getting user role:', error);
+          setUserRole('renter'); // Fallback role
+        }
       } else {
         setUserRole(null);
+        console.log('No user, role set to null');
       }
+      
       setLoading(false);
+      setAuthChecked(true);
     });
-    return unsub;
+
+    return () => {
+      clearTimeout(authTimeout);
+      unsubscribe();
+    };
   }, []);
 
   const value = {
     currentUser,
     userRole,
     loading,
+    authChecked,
     signup,
-    signInWithGoogle,
     login,
     logout,
-    resetPassword,
+    signInWithGoogle,
+    resetPassword
   };
+
+  console.log('AuthProvider final state:', { 
+    currentUser: currentUser?.email, 
+    userRole, 
+    loading, 
+    authChecked 
+  });
 
   return (
     <AuthContext.Provider value={value}>
-      {!loading && children}
+      {children}
     </AuthContext.Provider>
   );
 }

@@ -1,7 +1,9 @@
-// firebase.js
+// src/firebase.js
+
+// Import all necessary modules first
 import { initializeApp } from "firebase/app";
-import { getAuth } from "firebase/auth";
-import { getFirestore } from "firebase/firestore";
+import { getAuth, connectAuthEmulator } from "firebase/auth";
+import { getFirestore, connectFirestoreEmulator, enableNetwork } from "firebase/firestore";
 
 // Your Firebase configuration
 const firebaseConfig = {
@@ -14,12 +16,29 @@ const firebaseConfig = {
   measurementId: "G-8W0V0Y8MJX"
 };
 
-// Initialize Firebase
-const app = initializeApp(firebaseConfig);
+// Initialize Firebase app
+let app;
+try {
+  app = initializeApp(firebaseConfig);
+  console.log('Firebase initialized successfully');
+} catch (error) {
+  console.error('Firebase initialization error:', error);
+}
 
-// Initialize Firebase services
+// Initialize Firebase services with offline support
 const auth = getAuth(app);
 const db = getFirestore(app);
+
+// Enable offline persistence for Firestore (optional)
+// This can help with loading times
+enableNetwork(db);
+
+// Optional: Connect to emulators in development
+if (process.env.NODE_ENV === 'development' && window.location.hostname === 'localhost') {
+  // Uncomment these lines if you're using Firebase emulators
+  // connectAuthEmulator(auth, "http://localhost:9099");
+  // connectFirestoreEmulator(db, 'localhost', 8080);
+}
 
 export { app, auth, db };
 export default app;
