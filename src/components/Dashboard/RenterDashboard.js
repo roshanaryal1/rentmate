@@ -1,50 +1,19 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
-import { collection, query, where, getDocs } from 'firebase/firestore';
+import { collection, getDocs } from 'firebase/firestore';
 import { db } from '../../firebase';
 import { sampleEquipment } from '../../data/sampleEquipment';
 
 function RenterDashboard() {
   const { currentUser } = useAuth();
-  const [rentedItems, setRentedItems] = useState([]);
-  const [favoriteItems, setFavoriteItems] = useState([]);
+  const [equipmentList, setEquipmentList] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showAllEquipment, setShowAllEquipment] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('all');
-  const [equipmentList, setEquipmentList] = useState([]);
 
   useEffect(() => {
-    const fetchRenterData = async () => {
-      if (currentUser) {
-        try {
-          const rentalsQuery = query(
-            collection(db, 'rentals'),
-            where('renterId', '==', currentUser.uid),
-            where('status', '==', 'active')
-          );
-
-          const rentalsSnapshot = await getDocs(rentalsQuery);
-          const rentals = rentalsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-          setRentedItems(rentals);
-
-          const favoritesQuery = query(
-            collection(db, 'favorites'),
-            where('userId', '==', currentUser.uid)
-          );
-
-          const favoritesSnapshot = await getDocs(favoritesQuery);
-          const favorites = favoritesSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-          setFavoriteItems(favorites);
-        } catch (error) {
-          console.error('Error fetching renter data:', error);
-        } finally {
-          setLoading(false);
-        }
-      }
-    };
-
     const fetchEquipmentList = async () => {
       try {
         const querySnapshot = await getDocs(collection(db, 'equipment'));
@@ -53,12 +22,13 @@ function RenterDashboard() {
       } catch (error) {
         console.error('Error fetching equipment:', error);
         setEquipmentList(sampleEquipment);
+      } finally {
+        setLoading(false);
       }
     };
 
-    fetchRenterData();
     fetchEquipmentList();
-  }, [currentUser]);
+  }, []);
 
   const filteredEquipment = equipmentList.filter(item => {
     const matchesSearch = item.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -69,50 +39,21 @@ function RenterDashboard() {
 
   const categories = [...new Set(equipmentList.map(item => item.category))];
 
-  const totalSpent = rentedItems.reduce((sum, rental) => sum + (rental.totalPrice || 0), 0);
-  const activeRentals = rentedItems.length;
-
   return (
     <div className="px-6 py-8 max-w-7xl mx-auto">
-      <div className="mb-6">
-        <h2 className="text-3xl font-bold text-gray-800">Welcome to Your Dashboard</h2>
-        <p className="text-gray-500 mt-1">Manage your rentals and explore available equipment.</p>
+      <div className="mb-6 flex justify-between items-center">
+        <div>
+          <h2 className="text-3xl font-bold text-gray-800">Welcome to Your Dashboard</h2>
+          <p className="text-gray-500 mt-1">Explore and rent available equipment easily.</p>
+        </div>
+        <Link
+          to="/rental-history"
+          className="text-sm bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700"
+        >
+          View Rental History
+        </Link>
       </div>
 
-      {/* Stats Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-10">
-        <StatCard title="Active Rentals" value={activeRentals} icon="📦" />
-        <StatCard title="Total Spent" value={`$${totalSpent}`} icon="💰" />
-        <StatCard title="Favorites" value={favoriteItems.length} icon="❤️" />
-      </div>
-
-      {/* Rentals Section */}
-      <Section title="Your Active Rentals" linkText="Browse Equipment" linkHref="/browse-equipment">
-        {loading ? (
-          <div className="text-center py-6 text-gray-500">Loading your rentals...</div>
-        ) : rentedItems.length > 0 ? (
-          <ul className="divide-y divide-gray-200 bg-white rounded-lg shadow overflow-hidden">
-            {rentedItems.map(item => (
-              <li key={item.id} className="p-4">
-                <div className="flex justify-between items-center">
-                  <div>
-                    <p className="font-medium text-blue-600">{item.equipmentName}</p>
-                    <p className="text-sm text-gray-500">Rented from: {item.ownerName || 'Unknown'}</p>
-                  </div>
-                  <div className="text-right text-sm text-gray-600">
-                    <p>${item.totalPrice || 0} • {item.status}</p>
-                    <p>Until {item.endDate ? new Date(item.endDate.toDate()).toLocaleDateString() : 'N/A'}</p>
-                  </div>
-                </div>
-              </li>
-            ))}
-          </ul>
-        ) : (
-          <div className="text-center text-gray-500 py-6">No active rentals found.</div>
-        )}
-      </Section>
-
-      {/* Browse Equipment Section */}
       <Section title="Browse Equipment">
         <div className="mb-4 grid grid-cols-1 md:grid-cols-2 gap-4">
           <SearchFilter
@@ -124,11 +65,15 @@ function RenterDashboard() {
           />
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-          {(showAllEquipment ? filteredEquipment : filteredEquipment.slice(0, 6)).map(item => (
-            <EquipmentCard key={item.id} item={item} />
-          ))}
-        </div>
+        {loading ? (
+          <div className="text-center text-gray-500 py-6">Loading equipment...</div>
+        ) : (
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+            {(showAllEquipment ? filteredEquipment : filteredEquipment.slice(0, 6)).map(item => (
+              <EquipmentCard key={item.id} item={item} />
+            ))}
+          </div>
+        )}
 
         {filteredEquipment.length > 6 && (
           <div className="text-center mt-6">
@@ -145,31 +90,11 @@ function RenterDashboard() {
   );
 }
 
-function StatCard({ title, value, icon }) {
-  return (
-    <div className="bg-white shadow rounded-lg p-5 flex items-center space-x-4">
-      <div className="text-3xl">{icon}</div>
-      <div>
-        <p className="text-sm text-gray-500">{title}</p>
-        <p className="text-xl font-semibold text-gray-800">{value}</p>
-      </div>
-    </div>
-  );
-}
-
-function Section({ title, linkText, linkHref, children }) {
+function Section({ title, children }) {
   return (
     <div className="mb-10">
       <div className="flex justify-between items-center mb-4">
         <h3 className="text-xl font-semibold text-gray-800">{title}</h3>
-        {linkText && linkHref && (
-          <Link
-            to={linkHref}
-            className="text-sm text-blue-600 hover:underline"
-          >
-            {linkText}
-          </Link>
-        )}
       </div>
       {children}
     </div>
@@ -219,7 +144,7 @@ function EquipmentCard({ item }) {
       <div className="flex justify-between items-center mt-3">
         <p className="text-green-600 font-semibold">${item.ratePerDay}/day</p>
         <Link
-          to={`/rent/${item.id}`}
+          to={`/rent/${item.id}/fill-details`}
           className="text-sm bg-blue-600 text-white px-3 py-1 rounded hover:bg-blue-700"
         >
           Rent Now
