@@ -5,11 +5,6 @@ import { collection, query, where, getDocs } from 'firebase/firestore';
 import { db } from '../../firebase';
 import { sampleEquipment } from '../../data/sampleEquipment';
 
-<Link to="/renter-dashboard" className="text-sm text-blue-600 hover:underline mb-4 inline-block">
-  ← Back to Dashboard
-</Link>
-
-
 function RenterDashboard() {
   const { currentUser } = useAuth();
   const [rentedItems, setRentedItems] = useState([]);
