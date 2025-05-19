@@ -6,6 +6,9 @@ import AuthDebug from './components/AuthDebug';
 import RentalHistory from './components/Rental/RentalHistory';
 
 
+
+
+
 <Route 
   path="/rental-history" 
   element={
@@ -16,6 +19,8 @@ import RentalHistory from './components/Rental/RentalHistory';
     </ProtectedRoute>
   } 
 />
+
+
 
 
 
