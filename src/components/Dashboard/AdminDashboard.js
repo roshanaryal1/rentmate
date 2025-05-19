@@ -1,392 +1,626 @@
-import React, { useState, useEffect, useMemo, useRef } from 'react';
+// src/components/Dashboard/AdminDashboard.js
+import React, { useState, useEffect } from 'react';
+import {
+  collection,
+  query,
+  getDocs,
+  where,
+  limit,
+  orderBy,
+  getDoc,
+  doc
+} from 'firebase/firestore';
+import { db } from '../../firebase';
+// ← Changed this to default import:
+import ThemeProvider from '../../theme/ThemeContext';
 import {
   HomeIcon,
   LibraryIcon,
   UserGroupIcon,
-  AdjustmentsIcon,
   ClipboardCheckIcon,
   ChartBarIcon,
   CogIcon,
   BellIcon,
   XIcon,
-  CheckCircleIcon,
-  ExclamationIcon,
-  InboxIcon
+  CheckCircleIcon
 } from '@heroicons/react/outline';
+import { ExclamationIcon } from '@heroicons/react/solid';
 
-export default function AdminDashboard() {
-  const [equipment, setEquipment] = useState([
-    { id: 1, status: 'approved' },
-    { id: 2, status: 'pending' },
-    { id: 3, status: 'approved' }
-  ]);
-  const [rentals, setRentals] = useState([
-    { id: 1, status: 'active' },
-    { id: 2, status: 'inactive' },
-    { id: 3, status: 'active' }
-  ]);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState('');
-  const [notifications] = useState([
-    { id: 1, type: 'approval', text: 'Pending approvals', time: '2h ago' },
-    { id: 2, type: 'inventory', text: 'Low inventory alert', time: '3h ago' },
-    { id: 3, type: 'ticket', text: 'New support ticket', time: '1d ago' }
-  ]);
-  const [showNotifications, setShowNotifications] = useState(false);
-  const dropdownRef = useRef(null);
-
-  // Analytics
-  const analytics = useMemo(() => {
-    const totalEquipment = equipment.length;
-    const activeRentals = rentals.filter(r => r.status === 'active').length;
-    const pendingEquipment = equipment.filter(e => e.status === 'pending').length;
-    const approvedEquipment = equipment.filter(e => e.status === 'approved').length;
-    return { totalEquipment, activeRentals, pendingEquipment, approvedEquipment };
-  }, [equipment, rentals]);
-
-  // Close notifications on outside click
-  useEffect(() => {
-    function handleClickOutside(e) {
-      if (dropdownRef.current && !dropdownRef.current.contains(e.target)) {
-        setShowNotifications(false);
-      }
-    }
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, []);
-
-  if (loading) return <FullScreenSpinner />;
-
+// Define chart components directly instead of importing
+// RentalStatisticsChart component
+const RentalStatisticsChart = ({ data }) => {
+  // Simple placeholder implementation for the chart
   return (
-    <div className="flex bg-gradient-to-br from-gray-50 to-gray-100 min-h-screen">
-      <Sidebar />
-      <main className="flex-1 p-6 overflow-auto">
-        {error && <Alert message={error} type="error" />}
-
-        {/* Header with improved styling */}
-        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-8 bg-white rounded-xl shadow-sm p-6">
-          <div>
-            <h1 className="text-3xl font-bold text-gray-900 bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
-              Admin Dashboard
-            </h1>
-            <p className="text-gray-500 mt-1">Overview & Management Tools</p>
-          </div>
-          <div className="flex items-center space-x-4 mt-4 sm:mt-0">
-            {/* Enhanced Notifications */}
-            <div className="relative" ref={dropdownRef}>
-              <button
-                onClick={() => setShowNotifications(v => !v)}
-                className="relative p-2 rounded-full hover:bg-gray-100 transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
-              >
-                <BellIcon className="h-6 w-6 text-gray-600" />
-                {notifications.length > 0 && (
-                  <span className="absolute -top-1 -right-1 bg-red-500 text-white rounded-full text-xs w-5 h-5 flex items-center justify-center animate-pulse">
-                    {notifications.length}
-                  </span>
-                )}
-              </button>
-              {showNotifications && (
-                <div className="origin-top-right absolute right-0 mt-2 w-64 bg-white border border-gray-200 rounded-xl shadow-lg overflow-hidden z-10 animate-in slide-in-from-top-5 duration-200">
-                  <div className="flex justify-between items-center px-4 py-3 border-b bg-gray-50">
-                    <span className="font-semibold text-gray-800">Notifications</span>
-                    <button 
-                      onClick={() => setShowNotifications(false)}
-                      className="p-1 rounded-full hover:bg-gray-200 transition-colors"
-                    >
-                      <XIcon className="h-5 w-5 text-gray-500" />
-                    </button>
-                  </div>
-                  <ul className="divide-y divide-gray-100">
-                    {notifications.map(n => (
-                      <li key={n.id} className="px-4 py-3 flex items-center space-x-3 hover:bg-blue-50 transition-colors cursor-pointer">
-                        {n.type === 'approval' && <CheckCircleIcon className="h-5 w-5 text-green-500" />}
-                        {n.type === 'inventory' && <ExclamationIcon className="h-5 w-5 text-yellow-500" />}
-                        {n.type === 'ticket' && <InboxIcon className="h-5 w-5 text-blue-500" />}
-                        <div className="flex-1">
-                          <span className="text-sm text-gray-700 block">{n.text}</span>
-                          <span className="text-xs text-gray-400">{n.time}</span>
-                        </div>
-                      </li>
-                    ))}
-                  </ul>
-                  <div className="text-center py-3 bg-gray-50">
-                    <button className="text-sm text-blue-600 hover:text-blue-800 font-medium transition-colors">
-                      View all notifications
-                    </button>
-                  </div>
-                </div>
-              )}
-            </div>
-            {/* Enhanced Avatar */}
-            <div className="relative">
-              <img
-                src="/api/placeholder/32/32"
-                alt="Admin Avatar"
-                className="h-10 w-10 rounded-full border-2 border-white shadow-md hover:shadow-lg transition-shadow cursor-pointer"
-              />
-              <div className="absolute -bottom-1 -right-1 h-4 w-4 bg-green-500 border-2 border-white rounded-full"></div>
-            </div>
-          </div>
-        </div>
-
-        {/* Enhanced Metrics */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-          <MetricCard 
-            title="Total Equipment" 
-            value={analytics.totalEquipment} 
-            icon={LibraryIcon}
-            color="blue"
-            trend="+12%"
-          />
-          <MetricCard 
-            title="Active Rentals" 
-            value={analytics.activeRentals} 
-            icon={CheckCircleIcon}
-            color="green"
-            trend="+8%"
-          />
-          <MetricCard 
-            title="Pending Approvals" 
-            value={analytics.pendingEquipment} 
-            icon={ClipboardCheckIcon}
-            color="yellow"
-            trend="-5%"
-          />
-          <MetricCard 
-            title="Approved Equipment" 
-            value={analytics.approvedEquipment} 
-            icon={ChartBarIcon}
-            color="purple"
-            trend="+15%"
-          />
-        </div>
-
-        {/* Enhanced Activity & Overview */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          <RecentActivity className="lg:col-span-2" />
-          <OverviewCard 
-            title="Rentals Overview" 
-            active={analytics.activeRentals} 
-            inactive={rentals.length - analytics.activeRentals} 
-          />
-        </div>
-      </main>
+    <div className="flex items-center justify-center h-full">
+      <p className="text-gray-500 dark:text-gray-400">
+        {data && data.length 
+          ? `Chart showing ${data.length} data points for rental statistics` 
+          : "No rental data available"}
+      </p>
     </div>
   );
-}
+};
 
-function Sidebar() {
-  const [activeMenu, setActiveMenu] = useState('Dashboard');
-  const menus = [
-    { name: 'Dashboard', icon: HomeIcon, color: 'blue' },
-    { name: 'Equipment', icon: LibraryIcon, color: 'green' },
-    { name: 'Users', icon: UserGroupIcon, color: 'purple' },
-    { name: 'Maintenance', icon: AdjustmentsIcon, color: 'yellow' },
-    { name: 'Approvals', icon: ClipboardCheckIcon, color: 'red' },
-    { name: 'Reports', icon: ChartBarIcon, color: 'indigo' },
-    { name: 'Settings', icon: CogIcon, color: 'gray' }
-  ];
-
+// EquipmentDistributionChart component
+const EquipmentDistributionChart = ({ data }) => {
+  // Simple placeholder implementation for the chart
   return (
-    <aside className="w-64 bg-white shadow-xl border-r border-gray-200 flex-shrink-0">
-      <div className="p-6">
-        <h1 className="text-2xl font-bold text-gray-800">
-          <span className="text-blue-600">Rent</span>Mate
-        </h1>
-        <p className="text-sm text-gray-500 mt-1">Admin Portal</p>
-      </div>
-      <nav className="mt-4 px-4">
-        {menus.map(m => (
-          <button
-            key={m.name}
-            onClick={() => setActiveMenu(m.name)}
-            className={`w-full px-4 py-3 mb-2 text-left rounded-lg transition-all duration-200 flex items-center space-x-3 group ${
-              activeMenu === m.name
-                ? 'bg-blue-50 text-blue-700 border-r-4 border-blue-600'
-                : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
-            }`}
-          >
-            <m.icon className={`h-5 w-5 transition-colors ${
-              activeMenu === m.name ? 'text-blue-600' : 'text-gray-400 group-hover:text-gray-600'
-            }`} />
-            <span className="font-medium">{m.name}</span>
-            {activeMenu === m.name && (
-              <div className="ml-auto w-2 h-2 bg-blue-600 rounded-full"></div>
-            )}
-          </button>
-        ))}
-      </nav>
-      
-      {/* Sidebar Footer */}
-      <div className="absolute bottom-6 left-6 right-6">
-        <div className="bg-gradient-to-r from-blue-500 to-purple-600 rounded-lg p-4 text-white">
-          <h3 className="font-semibold text-sm">Upgrade to Pro</h3>
-          <p className="text-xs opacity-90 mt-1">Get advanced analytics</p>
-          <button className="mt-3 w-full bg-white text-blue-600 text-sm font-medium py-2 rounded-lg hover:bg-gray-100 transition-colors">
-            Learn More
-          </button>
+    <div className="flex items-center justify-center h-full">
+      <p className="text-gray-500 dark:text-gray-400">
+        {data && data.length 
+          ? `Chart showing distribution of ${data.length} equipment categories` 
+          : "No equipment data available"}
+      </p>
+    </div>
+  );
+};
+
+// RevenueChart component
+const RevenueChart = ({ data }) => {
+  // Simple placeholder implementation for the chart
+  return (
+    <div className="flex items-center justify-center h-full">
+      <p className="text-gray-500 dark:text-gray-400">
+        {data && data.length 
+          ? `Chart showing revenue data with ${data.length} data points` 
+          : "No revenue data available"}
+      </p>
+    </div>
+  );
+};
+
+// Define the Sidebar component
+const Sidebar = () => {
+  return (
+    <aside className="hidden md:flex md:flex-shrink-0">
+      <div className="flex flex-col w-64 bg-white dark:bg-gray-800 border-r dark:border-gray-700">
+        <div className="h-16 flex items-center justify-center border-b dark:border-gray-700">
+          <h2 className="text-xl font-semibold text-gray-800 dark:text-white">Admin Panel</h2>
+        </div>
+        <div className="flex-1 flex flex-col overflow-y-auto">
+          <nav className="flex-1 px-2 py-4 space-y-1">
+            <a href="#" className="flex items-center px-4 py-2 text-gray-600 dark:text-gray-300 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700">
+              <HomeIcon className="w-5 h-5 mr-3" />
+              <span>Dashboard</span>
+            </a>
+            <a href="#" className="flex items-center px-4 py-2 text-gray-600 dark:text-gray-300 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700">
+              <LibraryIcon className="w-5 h-5 mr-3" />
+              <span>Equipment</span>
+            </a>
+            <a href="#" className="flex items-center px-4 py-2 text-gray-600 dark:text-gray-300 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700">
+              <ClipboardCheckIcon className="w-5 h-5 mr-3" />
+              <span>Rentals</span>
+            </a>
+            <a href="#" className="flex items-center px-4 py-2 text-gray-600 dark:text-gray-300 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700">
+              <UserGroupIcon className="w-5 h-5 mr-3" />
+              <span>Users</span>
+            </a>
+            <a href="#" className="flex items-center px-4 py-2 text-gray-600 dark:text-gray-300 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700">
+              <ChartBarIcon className="w-5 h-5 mr-3" />
+              <span>Reports</span>
+            </a>
+            <a href="#" className="flex items-center px-4 py-2 text-gray-600 dark:text-gray-300 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700">
+              <CogIcon className="w-5 h-5 mr-3" />
+              <span>Settings</span>
+            </a>
+          </nav>
         </div>
       </div>
     </aside>
   );
-}
+};
 
-function MetricCard({ title, value, icon: Icon, color, trend }) {
-  const colorClasses = {
-    blue: 'bg-blue-50 text-blue-600 border-blue-200',
-    green: 'bg-green-50 text-green-600 border-green-200',
-    yellow: 'bg-yellow-50 text-yellow-600 border-yellow-200',
-    purple: 'bg-purple-50 text-purple-600 border-purple-200'
-  };
-
-  const trendColor = trend?.startsWith('+') ? 'text-green-600' : 'text-red-600';
-
+// Define the TopNavigation component
+const TopNavigation = ({ notifications, notificationsOpen, setNotificationsOpen }) => {
   return (
-    <div className="bg-white shadow-sm rounded-xl p-6 border border-gray-100 hover:shadow-md transition-shadow duration-200">
-      <div className="flex items-center justify-between">
+    <header className="bg-white dark:bg-gray-800 shadow">
+      <div className="px-4 py-3 flex items-center justify-between">
         <div>
-          <p className="text-sm font-medium text-gray-500">{title}</p>
-          <p className="mt-2 text-3xl font-bold text-gray-900">{value}</p>
-          {trend && (
-            <p className={`mt-1 text-sm ${trendColor} font-medium`}>
-              {trend} from last month
-            </p>
-          )}
+          <h1 className="text-xl font-semibold text-gray-800 dark:text-white">Dashboard</h1>
         </div>
-        <div className={`p-3 rounded-xl border ${colorClasses[color]}`}>
-          <Icon className="h-6 w-6" />
+        <div className="flex items-center">
+          <div className="relative">
+            <button
+              onClick={() => setNotificationsOpen(!notificationsOpen)}
+              className="p-1 rounded-full text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 focus:outline-none"
+            >
+              <BellIcon className="h-6 w-6" />
+              {notifications && notifications.length > 0 && (
+                <span className="absolute top-0 right-0 block h-2 w-2 rounded-full bg-red-500 ring-2 ring-white" />
+              )}
+            </button>
+            
+            {notificationsOpen && (
+              <div className="origin-top-right absolute right-0 mt-2 w-80 rounded-md shadow-lg bg-white dark:bg-gray-800 ring-1 ring-black ring-opacity-5">
+                <div className="py-1">
+                  <div className="px-4 py-2 border-b dark:border-gray-700 flex justify-between items-center">
+                    <h3 className="text-sm font-medium text-gray-900 dark:text-white">Notifications</h3>
+                    <button 
+                      onClick={() => setNotificationsOpen(false)}
+                      className="text-gray-400 hover:text-gray-500"
+                    >
+                      <XIcon className="h-4 w-4" />
+                    </button>
+                  </div>
+                  {notifications && notifications.length > 0 ? (
+                    <div className="max-h-60 overflow-y-auto">
+                      {notifications.map((notification) => (
+                        <div 
+                          key={notification.id} 
+                          className="px-4 py-2 border-b dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700"
+                        >
+                          <div className="flex items-start">
+                            <div className="flex-shrink-0 pt-0.5">
+                              {notification.read ? (
+                                <CheckCircleIcon className="h-5 w-5 text-green-500" />
+                              ) : (
+                                <ExclamationIcon className="h-5 w-5 text-yellow-500" />
+                              )}
+                            </div>
+                            <div className="ml-3 w-0 flex-1">
+                              <p className="text-sm font-medium text-gray-900 dark:text-white">
+                                {notification.title}
+                              </p>
+                              <p className="text-sm text-gray-500 dark:text-gray-400">
+                                {notification.message}
+                              </p>
+                              <p className="mt-1 text-xs text-gray-400">
+                                {notification.timestamp}
+                              </p>
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="px-4 py-2 text-sm text-gray-500 dark:text-gray-400">
+                      No new notifications
+                    </p>
+                  )}
+                </div>
+              </div>
+            )}
+          </div>
         </div>
       </div>
-    </div>
+    </header>
   );
-}
+};
 
-function RecentActivity({ className = '' }) {
-  const activities = [
-    { text: 'New renter added', time: '2 minutes ago', type: 'user' },
-    { text: 'Maintenance request created', time: '1 hour ago', type: 'maintenance' },
-    { text: 'Lease approved', time: '3 hours ago', type: 'approval' },
-    { text: 'Property marked as occupied', time: '5 hours ago', type: 'property' },
-    { text: 'Lease agreement sent', time: '1 day ago', type: 'document' }
-  ];
+// Activity components
+const ActivityIcon = ({ type }) => {
+  switch (type) {
+    case 'rental':
+      return <ClipboardCheckIcon className="h-5 w-5 text-blue-500" />;
+    case 'user':
+      return <UserGroupIcon className="h-5 w-5 text-green-500" />;
+    case 'equipment':
+      return <LibraryIcon className="h-5 w-5 text-purple-500" />;
+    default:
+      return <BellIcon className="h-5 w-5 text-gray-500" />;
+  }
+};
 
-  const getActivityIcon = (type) => {
-    switch (type) {
-      case 'user': return <UserGroupIcon className="h-5 w-5 text-blue-500" />;
-      case 'maintenance': return <AdjustmentsIcon className="h-5 w-5 text-yellow-500" />;
-      case 'approval': return <CheckCircleIcon className="h-5 w-5 text-green-500" />;
-      case 'property': return <HomeIcon className="h-5 w-5 text-purple-500" />;
-      case 'document': return <ClipboardCheckIcon className="h-5 w-5 text-indigo-500" />;
-      default: return <div className="w-5 h-5 bg-gray-400 rounded-full" />;
-    }
-  };
-
+const ActivityList = ({ activities }) => {
   return (
-    <div className={`bg-white shadow-sm rounded-xl p-6 border border-gray-100 ${className}`}>
-      <div className="flex justify-between items-center mb-6">
-        <h2 className="text-lg font-semibold text-gray-900">Recent Activity</h2>
-        <button className="text-sm text-blue-600 hover:text-blue-800 font-medium">
-          View All
-        </button>
-      </div>
-      <div className="space-y-4">
+    <div className="flow-root">
+      <ul className="-mb-8">
         {activities.map((activity, index) => (
-          <div key={index} className="flex items-start space-x-3 p-3 rounded-lg hover:bg-gray-50 transition-colors">
-            <div className="flex-shrink-0 p-2 bg-gray-50 rounded-lg">
-              {getActivityIcon(activity.type)}
+          <li key={activity.id}>
+            <div className="relative pb-8">
+              {index !== activities.length - 1 ? (
+                <span className="absolute top-5 left-5 -ml-px h-full w-0.5 bg-gray-200 dark:bg-gray-700" aria-hidden="true"></span>
+              ) : null}
+              <div className="relative flex items-start space-x-3">
+                <div className="relative">
+                  <div className="h-10 w-10 rounded-full bg-gray-100 dark:bg-gray-700 flex items-center justify-center ring-8 ring-white dark:ring-gray-900">
+                    <ActivityIcon type={activity.type} />
+                  </div>
+                </div>
+                <div className="min-w-0 flex-1">
+                  <div>
+                    <div className="text-sm font-medium text-gray-900 dark:text-white">
+                      {activity.title}
+                    </div>
+                    <p className="mt-0.5 text-sm text-gray-500 dark:text-gray-400">
+                      {activity.timestamp}
+                    </p>
+                  </div>
+                  <div className="mt-2 text-sm text-gray-700 dark:text-gray-300">
+                    <p>{activity.description}</p>
+                  </div>
+                </div>
+              </div>
             </div>
-            <div className="flex-1 min-w-0">
-              <p className="text-sm font-medium text-gray-900">{activity.text}</p>
-              <p className="text-xs text-gray-500 mt-1">{activity.time}</p>
-            </div>
-          </div>
+          </li>
         ))}
-      </div>
+      </ul>
     </div>
   );
-}
+};
 
-function OverviewCard({ title, active, inactive }) {
-  const total = active + inactive;
-  const pctActive = total > 0 ? Math.round((active / total) * 100) : 0;
-  const pctInactive = 100 - pctActive;
-
+const StatsCard = ({ title, value, subtitle, icon, change, isPositive }) => {
   return (
-    <div className="bg-white shadow-sm rounded-xl p-6 border border-gray-100">
-      <h2 className="text-lg font-semibold text-gray-900 mb-6">{title}</h2>
-      <div className="space-y-6">
-        <div>
-          <div className="flex justify-between items-center mb-2">
-            <span className="text-sm font-medium text-gray-700">Active Rentals</span>
-            <span className="text-sm font-bold text-green-600">{active}</span>
+    <div className="bg-white dark:bg-gray-800 overflow-hidden shadow rounded-lg">
+      <div className="p-5">
+        <div className="flex items-center">
+          <div className="flex-shrink-0">
+            <div className="p-3 rounded-md bg-blue-50 dark:bg-blue-900">{icon}</div>
           </div>
-          <div className="w-full bg-gray-200 rounded-full h-3">
-            <div 
-              className="h-3 rounded-full bg-gradient-to-r from-green-500 to-green-600 transition-all duration-500" 
-              style={{ width: `${pctActive}%` }}
-            />
+          <div className="ml-5 w-0 flex-1">
+            <dl>
+              <dt className="text-sm font-medium text-gray-500 dark:text-gray-400 truncate">{title}</dt>
+              <dd>
+                <div className="text-lg font-semibold text-gray-900 dark:text-white">{value}</div>
+              </dd>
+            </dl>
           </div>
-          <p className="text-xs text-gray-500 mt-1">{pctActive}% of total</p>
         </div>
-        <div>
-          <div className="flex justify-between items-center mb-2">
-            <span className="text-sm font-medium text-gray-700">Inactive Rentals</span>
-            <span className="text-sm font-bold text-gray-600">{inactive}</span>
+      </div>
+      <div className="bg-gray-50 dark:bg-gray-700 px-5 py-3">
+        <div className="text-sm">
+          <div className="flex items-center justify-between">
+            <span className="text-gray-500 dark:text-gray-400">{subtitle}</span>
+            {change && (
+              <span
+                className={`inline-flex items-center text-sm font-medium ${
+                  isPositive ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'
+                }`}
+              >
+                {isPositive ? '↑' : '↓'} {Math.abs(change)}%
+              </span>
+            )}
           </div>
-          <div className="w-full bg-gray-200 rounded-full h-3">
-            <div 
-              className="h-3 rounded-full bg-gradient-to-r from-gray-400 to-gray-500 transition-all duration-500" 
-              style={{ width: `${pctInactive}%` }}
-            />
-          </div>
-          <p className="text-xs text-gray-500 mt-1">{pctInactive}% of total</p>
         </div>
       </div>
     </div>
   );
-}
+};
 
-function FullScreenSpinner() {
+// Define the fetch functions
+const fetchEquipmentStats = async () => {
+  try {
+    const equipmentRef = collection(db, 'equipment');
+    const equipmentSnapshot = await getDocs(equipmentRef);
+    
+    let total = 0;
+    let available = 0;
+    let pending = 0;
+    let approved = 0;
+
+    equipmentSnapshot.forEach(doc => {
+      const data = doc.data();
+      total++;
+      
+      if (data.status === 'available') available++;
+      if (data.status === 'pending') pending++;
+      if (data.status === 'approved') approved++;
+    });
+
+    return { total, available, pending, approved };
+  } catch (error) {
+    console.error('Error fetching equipment stats:', error);
+    return { total: 0, available: 0, pending: 0, approved: 0 };
+  }
+};
+
+const fetchRentalStats = async () => {
+  try {
+    const rentalRef = collection(db, 'rentals');
+    const rentalSnapshot = await getDocs(rentalRef);
+    
+    let total = 0;
+    let active = 0;
+    let inactive = 0;
+    let revenue = 0;
+
+    rentalSnapshot.forEach(doc => {
+      const data = doc.data();
+      total++;
+      
+      if (data.status === 'active') {
+        active++;
+        revenue += data.amount || 0;
+      }
+      if (data.status === 'inactive' || data.status === 'completed') inactive++;
+    });
+
+    return { total, active, inactive, revenue };
+  } catch (error) {
+    console.error('Error fetching rental stats:', error);
+    return { total: 0, active: 0, inactive: 0, revenue: 0 };
+  }
+};
+
+const fetchUserStats = async () => {
+  try {
+    const userRef = collection(db, 'users');
+    const userSnapshot = await getDocs(userRef);
+    
+    let total = 0;
+    let owners = 0;
+    let renters = 0;
+
+    userSnapshot.forEach(doc => {
+      const data = doc.data();
+      total++;
+      
+      if (data.role === 'owner') owners++;
+      if (data.role === 'renter') renters++;
+    });
+
+    return { total, owners, renters };
+  } catch (error) {
+    console.error('Error fetching user stats:', error);
+    return { total: 0, owners: 0, renters: 0 };
+  }
+};
+
+const fetchRecentActivity = async () => {
+  try {
+    const activityRef = collection(db, 'activity');
+    const q = query(
+      activityRef,
+      orderBy('timestamp', 'desc'),
+      limit(10)
+    );
+    const activitySnapshot = await getDocs(q);
+    
+    const activities = [];
+    activitySnapshot.forEach(doc => {
+      activities.push({
+        id: doc.id,
+        ...doc.data()
+      });
+    });
+
+    return activities;
+  } catch (error) {
+    console.error('Error fetching recent activity:', error);
+    return [];
+  }
+};
+
+const fetchRentalChartData = async () => {
+  try {
+    const rentalRef = collection(db, 'rentals');
+    const rentalSnapshot = await getDocs(rentalRef);
+    
+    // Group rentals by month
+    const monthlyData = {};
+    
+    rentalSnapshot.forEach(doc => {
+      const data = doc.data();
+      if (data.createdAt) {
+        const date = data.createdAt.toDate ? data.createdAt.toDate() : new Date(data.createdAt);
+        const month = date.getMonth();
+        const year = date.getFullYear();
+        const key = `${year}-${month}`;
+        
+        if (!monthlyData[key]) {
+          monthlyData[key] = { month: new Date(year, month, 1), count: 0 };
+        }
+        
+        monthlyData[key].count++;
+      }
+    });
+    
+    // Convert to array and sort by date
+    return Object.values(monthlyData).sort((a, b) => a.month - b.month);
+  } catch (error) {
+    console.error('Error fetching rental chart data:', error);
+    return [];
+  }
+};
+
+const fetchEquipmentDistribution = async () => {
+  try {
+    const equipmentRef = collection(db, 'equipment');
+    const equipmentSnapshot = await getDocs(equipmentRef);
+    
+    // Group equipment by category
+    const categoryData = {};
+    
+    equipmentSnapshot.forEach(doc => {
+      const data = doc.data();
+      const category = data.category || 'Uncategorized';
+      
+      if (!categoryData[category]) {
+        categoryData[category] = { name: category, value: 0 };
+      }
+      
+      categoryData[category].value++;
+    });
+    
+    // Convert to array
+    return Object.values(categoryData);
+  } catch (error) {
+    console.error('Error fetching equipment distribution:', error);
+    return [];
+  }
+};
+
+const fetchNotifications = async () => {
+  try {
+    const notificationsRef = collection(db, 'notifications');
+    const q = query(
+      notificationsRef,
+      where('read', '==', false),
+      orderBy('timestamp', 'desc'),
+      limit(5)
+    );
+    const notificationsSnapshot = await getDocs(q);
+    
+    const notifications = [];
+    notificationsSnapshot.forEach(doc => {
+      notifications.push({
+        id: doc.id,
+        ...doc.data()
+      });
+    });
+
+    return notifications;
+  } catch (error) {
+    console.error('Error fetching notifications:', error);
+    return [];
+  }
+};
+
+// Main AdminDashboard component
+const AdminDashboard = () => {
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const [notificationsOpen, setNotificationsOpen] = useState(false);
+  const [dashboardData, setDashboardData] = useState({
+    equipment: { total: 0, available: 0, pending: 0, approved: 0 },
+    rentals: { total: 0, active: 0, inactive: 0, revenue: 0 },
+    users: { total: 0, owners: 0, renters: 0 },
+    recentActivity: [],
+    notifications: [],
+    rentalChartData: [],
+    equipmentDistribution: []
+  });
+
+  useEffect(() => {
+    const loadDashboardData = async () => {
+      setLoading(true);
+      setError(null);
+      try {
+        const [
+          equipmentStats,
+          rentalStats,
+          userStats,
+          recentActivity,
+          rentalChartData,
+          equipmentDistribution,
+          notifications
+        ] = await Promise.all([
+          fetchEquipmentStats(),
+          fetchRentalStats(),
+          fetchUserStats(),
+          fetchRecentActivity(),
+          fetchRentalChartData(),
+          fetchEquipmentDistribution(),
+          fetchNotifications()
+        ]);
+
+        setDashboardData({
+          equipment: equipmentStats,
+          rentals: rentalStats,
+          users: userStats,
+          recentActivity,
+          rentalChartData,
+          equipmentDistribution,
+          notifications
+        });
+      } catch (err) {
+        console.error('Error loading dashboard data:', err);
+        setError('Failed to load dashboard data. Please try again later.');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadDashboardData();
+    const refreshInterval = setInterval(loadDashboardData, 5 * 60 * 1000);
+    return () => clearInterval(refreshInterval);
+  }, []);
+
   return (
-    <div className="flex items-center justify-center h-screen bg-gray-50">
-      <div className="relative">
-        <div className="animate-spin rounded-full border-4 border-blue-200 border-t-blue-600 h-16 w-16" />
-        <div className="mt-4 text-center">
-          <p className="text-gray-600 text-sm">Loading dashboard...</p>
+    <ThemeProvider>
+      <div className="flex h-screen bg-gray-50 dark:bg-gray-900">
+        <Sidebar />
+        <div className="flex-1 flex flex-col overflow-hidden">
+          <TopNavigation
+            notifications={dashboardData.notifications}
+            notificationsOpen={notificationsOpen}
+            setNotificationsOpen={setNotificationsOpen}
+          />
+          <main className="flex-1 overflow-y-auto p-5">
+            {error && (
+              <div className="mb-6 bg-red-100 border-l-4 border-red-500 text-red-700 p-4 rounded shadow-sm">
+                <div className="flex items-center">
+                  <ExclamationIcon className="h-6 w-6 mr-2" />
+                  <span>{error}</span>
+                </div>
+              </div>
+            )}
+            {loading ? (
+              <div className="flex items-center justify-center h-full">
+                <div className="loader ease-linear rounded-full border-8 border-t-8 border-gray-200 h-24 w-24 border-t-blue-600 animate-spin"></div>
+              </div>
+            ) : (
+              <>
+                {/* Dashboard content */}
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5 mb-5">
+                  {/* Equipment Stats */}
+                  <StatsCard 
+                    title="Total Equipment" 
+                    value={dashboardData.equipment.total}
+                    subtitle={`${dashboardData.equipment.available} available`}
+                    icon={<LibraryIcon className="h-6 w-6 text-blue-600" />}
+                  />
+                  
+                  {/* Rental Stats */}
+                  <StatsCard 
+                    title="Active Rentals" 
+                    value={dashboardData.rentals.active}
+                    subtitle={`${dashboardData.rentals.total} total rentals`}
+                    icon={<ClipboardCheckIcon className="h-6 w-6 text-green-600" />}
+                  />
+                  
+                  {/* User Stats */}
+                  <StatsCard 
+                    title="Total Users" 
+                    value={dashboardData.users.total}
+                    subtitle={`${dashboardData.users.owners} owners, ${dashboardData.users.renters} renters`}
+                    icon={<UserGroupIcon className="h-6 w-6 text-purple-600" />}
+                  />
+                  
+                  {/* Revenue Stats */}
+                  <StatsCard 
+                    title="Total Revenue" 
+                    value={`$${dashboardData.rentals.revenue.toLocaleString()}`}
+                    subtitle="From active rentals"
+                    icon={<ChartBarIcon className="h-6 w-6 text-yellow-600" />}
+                    change={5.3}
+                    isPositive={true}
+                  />
+                </div>
+                
+                {/* Charts */}
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-5 mb-5">
+                  <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-5">
+                    <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-4">Rental Statistics</h3>
+                    <div className="h-64">
+                      <RentalStatisticsChart data={dashboardData.rentalChartData} />
+                    </div>
+                  </div>
+                  
+                  <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-5">
+                    <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-4">Equipment Distribution</h3>
+                    <div className="h-64">
+                      <EquipmentDistributionChart data={dashboardData.equipmentDistribution} />
+                    </div>
+                  </div>
+                </div>
+                
+                {/* Recent Activity */}
+                <div className="bg-white dark:bg-gray-800 rounded-lg shadow overflow-hidden">
+                  <div className="px-4 py-5 border-b dark:border-gray-700 sm:px-6">
+                    <h3 className="text-lg font-medium text-gray-900 dark:text-white">Recent Activity</h3>
+                  </div>
+                  <div className="px-4 py-5 sm:p-6">
+                    <ActivityList activities={dashboardData.recentActivity} />
+                  </div>
+                </div>
+              </>
+            )}
+          </main>
         </div>
       </div>
-    </div>
+    </ThemeProvider>
   );
-}
+};
 
-function Alert({ message, type }) {
-  const styles = {
-    error: {
-      bg: 'bg-red-50',
-      border: 'border-red-200',
-      text: 'text-red-800',
-      icon: 'text-red-500'
-    },
-    success: {
-      bg: 'bg-green-50',
-      border: 'border-green-200',
-      text: 'text-green-800',
-      icon: 'text-green-500'
-    }
-  };
-
-  const style = styles[type] || styles.error;
-
-  return (
-    <div className={`${style.bg} border ${style.border} rounded-lg p-4 mb-6 flex items-center space-x-3`}>
-      <div className={`${style.icon}`}>
-        {type === 'error' ? (
-          <ExclamationIcon className="h-5 w-5" />
-        ) : (
-          <CheckCircleIcon className="h-5 w-5" />
-        )}
-      </div>
-      <p className={`${style.text} font-medium`}>{message}</p>
-    </div>
-  );
-}
+export default AdminDashboard;
