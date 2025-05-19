@@ -1,421 +1,555 @@
-import React, { useState, useEffect } from 'react';
-import { collection, query, getDocs, where, limit, orderBy, onSnapshot } from 'firebase/firestore';
+// Import necessary components and hooks
+import React, { useState, useEffect, useMemo } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { collection, query, orderBy, limit, where, onSnapshot } from 'firebase/firestore';
 import { db } from '../../firebase';
 import { useAuth } from '../../contexts/AuthContext';
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
+import {
+  XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
+  LineChart, Line, PieChart, Pie, Cell
+} from 'recharts';
+// Removed unused imports: BarChart, Bar
 
-// Simplified StatCard Component
-const StatCard = ({ title, value }) => (
-  <div className="bg-white rounded p-4 shadow">
-    <h3 className="text-gray-700">{title}</h3>
-    <span className="text-2xl font-bold">{value}</span>
-  </div>
-);
-
-// Simplified ActivityItem Component
-const ActivityItem = ({ icon, title }) => (
-  <div className="py-2 flex items-center">
-    <div className="mr-2">{icon}</div>
-    <p className="text-sm">{title}</p>
-  </div>
-);
-
-// Simplified NotificationItem Component
-const NotificationItem = ({ icon, title, time }) => (
-  <div className="py-3 border-b border-gray-100">
-    <div className="flex items-center">
-      <div className="mr-2">{icon}</div>
-      <div>
-        <p className="text-sm font-medium">{title}</p>
-        <div className="text-xs text-gray-500 mt-1">{time}</div>
-      </div>
-    </div>
-  </div>
-);
-
-// Main AdminDashboard Component
-const AdminDashboard = () => {
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
-  const [showNotifications, setShowNotifications] = useState(false);
-  const { currentUser } = useAuth();
-
-  // Dashboard data state
-  const [dashboardData, setDashboardData] = useState({
-    properties: { total: 0, occupied: 0 },
-    renters: { active: 0, inactive: 0 },
+// Custom hook to fetch and aggregate dashboard data
+function useDashboardData() {
+  const [data, setData] = useState({
+    properties: { total: 0, occupied: 0, vacant: 0, maintenance: 0 },
+    renters: { active: 0, inactive: 0, pending: 0 },
     recentActivity: [],
     notifications: [],
+    maintenanceRequests: [],
+    revenue: [],
+    occupancyRate: []
   });
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
 
-  // Load dashboard data
   useEffect(() => {
-    const loadDashboardData = async () => {
-      setLoading(true);
-      try {
-        // Properties listener
-        const propertiesRef = collection(db, 'equipment');
-        const propertiesQuery = query(propertiesRef);
-        
-        const propertiesUnsubscribe = onSnapshot(propertiesQuery, (snapshot) => {
-          const total = snapshot.size;
-          let occupied = 0;
-          
-          snapshot.forEach(doc => {
-            if (!doc.data().available) {
-              occupied++;
-            }
-          });
-          
-          setDashboardData(prev => ({
-            ...prev,
-            properties: { total, occupied }
-          }));
-        });
-        
-        // Renters listener
-        const usersRef = collection(db, 'users');
-        const rentersQuery = query(usersRef, where("role", "==", "renter"));
-        
-        const rentersUnsubscribe = onSnapshot(rentersQuery, (snapshot) => {
-          let active = 0;
-          let inactive = 0;
-          
-          snapshot.forEach(doc => {
-            const user = doc.data();
-            if (user.status === 'inactive') {
-              inactive++;
-            } else {
-              active++;
-            }
-          });
-          
-          setDashboardData(prev => ({
-            ...prev,
-            renters: { active, inactive }
-          }));
-        });
-        
-        // Recent activity listener
-        const activityRef = collection(db, 'activity');
-        const activityQuery = query(
-          activityRef,
-          orderBy('timestamp', 'desc'),
-          limit(5)
-        );
-        
-        const activityUnsubscribe = onSnapshot(activityQuery, (snapshot) => {
-          const activities = [];
-          snapshot.forEach(doc => {
-            activities.push({
-              id: doc.id,
-              ...doc.data(),
-              timestamp: doc.data().timestamp?.toDate()
-            });
-          });
-          
-          setDashboardData(prev => ({
-            ...prev,
-            recentActivity: activities
-          }));
-        });
-        
-        // Notifications listener
-        const notificationsRef = collection(db, 'notifications');
-        const notificationsQuery = query(
-          notificationsRef,
-          orderBy('timestamp', 'desc'),
-          limit(3)
-        );
-        
-        const notificationsUnsubscribe = onSnapshot(notificationsQuery, (snapshot) => {
-          const notifications = [];
-          snapshot.forEach(doc => {
-            notifications.push({
-              id: doc.id,
-              ...doc.data(),
-              timestamp: doc.data().timestamp?.toDate()
-            });
-          });
-          
-          setDashboardData(prev => ({
-            ...prev,
-            notifications: notifications
-          }));
-        });
-        
-        setLoading(false);
-        
-        // Cleanup listeners on unmount
-        return () => {
-          propertiesUnsubscribe();
-          rentersUnsubscribe();
-          activityUnsubscribe();
-          notificationsUnsubscribe();
-        };
-      } catch (err) {
-        console.error('Error loading dashboard data:', err);
-        setError('Failed to load dashboard data. Please try again later.');
-        setLoading(false);
-      }
-    };
+    setLoading(true);
+    const unsubscribes = [];
 
-    loadDashboardData();
+    // Equipment aggregation
+    const eqUnsub = onSnapshot(
+      collection(db, 'equipment'),
+      snap => {
+        const total = snap.size;
+        let occupied = 0;
+        let maintenance = 0;
+        snap.forEach(doc => {
+          const eq = doc.data();
+          if (!eq.available) occupied++;
+          if (eq.maintenanceNeeded) maintenance++;
+        });
+        const vacant = total - occupied;
+        setData(d => ({ ...d, properties: { total, occupied, vacant, maintenance } }));
+      },
+      err => { console.error(err); setError('Failed to load equipment'); }
+    );
+    unsubscribes.push(eqUnsub);
+
+    // Renters aggregation
+    const rentQ = query(collection(db, 'users'), where('role','==','renter'));
+    const rentUnsub = onSnapshot(
+      rentQ,
+      snap => {
+        let active = 0, inactive = 0, pending = 0;
+        snap.forEach(doc => {
+          const u = doc.data();
+          if (u.status === 'inactive') inactive++;
+          else if (u.status === 'pending') pending++;
+          else active++;
+        });
+        setData(d => ({ ...d, renters: { active, inactive, pending } }));
+      },
+      err => { console.error(err); setError('Failed to load renters'); }
+    );
+    unsubscribes.push(rentUnsub);
+
+    // Recent activity
+    const actQ = query(
+      collection(db, 'activity'), orderBy('timestamp','desc'), limit(5)
+    );
+    const actUnsub = onSnapshot(
+      actQ,
+      snap => {
+        const arr = snap.docs.map(d => ({ id: d.id, ...d.data(), timestamp: d.data().timestamp?.toDate() }));
+        setData(d => ({ ...d, recentActivity: arr }));
+      },
+      err => { console.error(err); setError('Failed to load activity'); }
+    );
+    unsubscribes.push(actUnsub);
+
+    // Notifications
+    const notifQ = query(
+      collection(db, 'notifications'), orderBy('timestamp','desc'), limit(5)
+    );
+    const notifUnsub = onSnapshot(
+      notifQ,
+      snap => {
+        const arr = snap.docs.map(d => ({ id: d.id, ...d.data(), timestamp: d.data().timestamp?.toDate() }));
+        setData(d => ({ ...d, notifications: arr }));
+      },
+      err => { console.error(err); setError('Failed to load notifications'); }
+    );
+    unsubscribes.push(notifUnsub);
+
+    // Maintenance requests
+    const maintQ = query(
+      collection(db, 'maintenance'), orderBy('reportDate','desc'), limit(6)
+    );
+    const maintUnsub = onSnapshot(
+      maintQ,
+      snap => {
+        const arr = snap.docs.map(d => ({ id: d.id, ...d.data(), reportDate: d.data().reportDate?.toDate(), resolvedDate: d.data().resolvedDate?.toDate() }));
+        setData(d => ({ ...d, maintenanceRequests: arr }));
+      },
+      err => { console.error(err); setError('Failed to load maintenance'); }
+    );
+    unsubscribes.push(maintUnsub);
+
+    // Mock revenue and occupancy
+    setData(d => ({
+      ...d,
+      revenue: [
+        { month:'Jan', amount:12400 },{ month:'Feb', amount:13100 },{ month:'Mar', amount:13200 },
+        { month:'Apr', amount:12900 },{ month:'May', amount:14300 },{ month:'Jun', amount:14500 }
+      ],
+      occupancyRate: [
+        { month:'Jan', rate:72 },{ month:'Feb', rate:75 },{ month:'Mar', rate:78 },
+        { month:'Apr', rate:77 },{ month:'May', rate:80 },{ month:'Jun', rate:82 }
+      ]
+    }));
+
+    setLoading(false);
+    return () => unsubscribes.forEach(u => u());
   }, []);
 
-  // Helper functions for icons and time formatting
-  const getActivityIcon = (type) => {
-    switch (type) {
-      case 'new_renter':
-        return <span className="text-blue-500">👤</span>;
-      case 'maintenance':
-        return <span className="text-orange-500">🔧</span>;
-      case 'lease_approved':
-        return <span className="text-green-500">✓</span>;
-      case 'property_occupied':
-        return <span className="text-purple-500">🏠</span>;
-      case 'lease_sent':
-        return <span className="text-blue-500">📄</span>;
-      default:
-        return <span className="text-gray-500">🕒</span>;
-    }
-  };
+  return { data, loading, error };
+}
 
-  const getNotificationIcon = (type) => {
-    switch (type) {
-      case 'approval':
-        return <span className="text-blue-500">🚩</span>;
-      case 'alert':
-        return <span className="text-yellow-500">⚠️</span>;
-      case 'ticket':
-        return <span className="text-gray-700">📥</span>;
-      default:
-        return <span className="text-blue-500">🔔</span>;
-    }
-  };
+// Icon maps
+const ICONS = {
+  activity: { new_renter:'👤', maintenance:'🔧', lease_approved:'✅', property_occupied:'🏠', default:'🕒' },
+  notification: { approval:'🚩', alert:'⚠️', ticket:'📥', default:'🔔' }
+};
+const ActivityIcon = ({ type }) => <span className="text-lg">{ICONS.activity[type]||ICONS.activity.default}</span>;
+const NotificationIcon = ({ type }) => <span className="text-xl">{ICONS.notification[type]||ICONS.notification.default}</span>;
 
-  const formatTime = (timestamp) => {
-    if (!timestamp) return 'Unknown time';
-    
-    const now = new Date();
-    const diff = Math.floor((now - timestamp) / (1000 * 60 * 60));
-    
-    if (diff < 24) {
-      return `${diff}h ago`;
-    } else {
-      return `${Math.floor(diff / 24)}d ago`;
-    }
-  };
-
-  // Mock data if needed
-  const activityData = dashboardData.recentActivity.length > 0 ? 
-    dashboardData.recentActivity : 
-    [
-      { id: 1, type: 'new_renter', title: 'New renter added', timestamp: new Date(Date.now() - 3600000) },
-      { id: 2, type: 'maintenance', title: 'Maintenance request created', timestamp: new Date(Date.now() - 7200000) },
-      { id: 3, type: 'lease_approved', title: 'Lease approved', timestamp: new Date(Date.now() - 10800000) },
-      { id: 4, type: 'property_occupied', title: 'Property marked as occupied', timestamp: new Date(Date.now() - 14400000) },
-      { id: 5, type: 'lease_sent', title: 'Lease agreement sent', timestamp: new Date(Date.now() - 18000000) }
-    ];
-
-  const notificationData = dashboardData.notifications.length > 0 ?
-    dashboardData.notifications :
-    [
-      { id: 1, type: 'approval', title: 'Pending approvals', timestamp: new Date(Date.now() - 7200000) },
-      { id: 2, type: 'alert', title: 'Low inventory alert', timestamp: new Date(Date.now() - 10800000) },
-      { id: 3, type: 'ticket', title: 'New support ticket', timestamp: new Date(Date.now() - 86400000) }
-    ];
-
-  // Chart data
-  const renterChartData = [
-    { name: 'Active', value: dashboardData.renters.active || 78 },
-    { name: 'Inactive', value: dashboardData.renters.inactive || 12 }
-  ];
-
-  return (
-    <div className="flex min-h-screen bg-gray-50">
-      {/* Sidebar */}
-      <div className="w-56 bg-slate-800 text-white">
-        <div className="p-4 border-b border-slate-700">
-          <span className="font-medium">RentMate</span>
-        </div>
-        
-        <nav className="mt-4">
-          <div className="mx-2 p-2 bg-slate-700 rounded">
-            <span className="text-sm">Dashboard</span>
-          </div>
-          
-          <div className="mt-3 px-2">
-            <a href="#" className="block p-2 text-sm text-gray-300 hover:bg-slate-700 rounded">Properties</a>
-            <a href="#" className="block p-2 text-sm text-gray-300 hover:bg-slate-700 rounded">Renters</a>
-            <a href="#" className="block p-2 text-sm text-gray-300 hover:bg-slate-700 rounded">Maintenance</a>
-            <a href="#" className="block p-2 text-sm text-gray-300 hover:bg-slate-700 rounded">Approvals</a>
-            <a href="#" className="block p-2 text-sm text-gray-300 hover:bg-slate-700 rounded">Reports</a>
-            <a href="#" className="block p-2 text-sm text-gray-300 hover:bg-slate-700 rounded">Settings</a>
-          </div>
-        </nav>
+// UI primitives
+const StatCard = ({ title, value, icon, borderColor }) => (
+  <div className={`bg-white rounded-lg p-5 shadow-md border-l-4 hover:shadow-lg transition-shadow duration-300 ${borderColor}`}>
+    <div className="flex justify-between items-center">
+      <div>
+        <h3 className="text-sm font-medium text-gray-600">{title}</h3>
+        <p className="text-2xl font-bold text-gray-800">{value}</p>
       </div>
-      
-      {/* Main Content */}
-      <div className="flex-1 flex flex-col">
-        {/* Top Navigation */}
-        <header className="bg-white shadow p-4 flex justify-between items-center">
-          <h1 className="text-lg font-medium">Dashboard</h1>
-          
-          <div className="flex items-center space-x-3">
-            {/* Search */}
-            <div className="relative">
-              <input
-                type="text"
-                placeholder="Search..."
-                className="p-2 pl-8 border rounded w-56"
-              />
-              <span className="absolute left-2 top-1/2 transform -translate-y-1/2 text-gray-400">🔍</span>
+      {icon && <div className="text-3xl">{icon}</div>}
+    </div>
+  </div>
+);
+
+const ChartCard = ({ title, children, filterPeriod, setFilterPeriod }) => (
+  <div className="bg-white rounded-lg shadow-md p-5 hover:shadow-lg transition-shadow duration-300">
+    <div className="flex justify-between items-center mb-4">
+      <h2 className="text-lg font-semibold text-gray-800">{title}</h2>
+      {setFilterPeriod && (
+        <div className="flex space-x-2">
+          {['monthly','yearly'].map(p => (
+            <button key={p}
+              onClick={() => setFilterPeriod(p)}
+              className={`px-2 py-1 text-xs rounded-full ${filterPeriod===p?'bg-blue-100 text-blue-800':'bg-gray-100 text-gray-800'}`}
+            >{p.charAt(0).toUpperCase()+p.slice(1)}</button>
+          ))}
+        </div>
+      )}
+    </div>
+    {children}
+  </div>
+);
+
+const ActivityList = ({ items }) => (
+  <div className="space-y-3">
+    {items.map(act => (
+      <div key={act.id} className="py-2 flex items-start hover:bg-gray-50 rounded-md px-2 transition-colors duration-200">
+        <div className="mr-3"><ActivityIcon type={act.type} /></div>
+        <div>
+          <p className="text-sm text-gray-800">{act.title}</p>
+          <p className="text-xs text-gray-500 mt-1">{act.timestamp?`${Math.floor((Date.now()-act.timestamp)/3600000)}h ago`:''}</p>
+        </div>
+      </div>
+    ))}
+  </div>
+);
+
+// These utility functions are now used in the MaintenanceTable component
+const getStatusBadge = status => {
+  const map = {
+    completed: ['bg-green-100','text-green-800','Completed'],
+    in_progress: ['bg-orange-100','text-orange-800','In Progress'],
+    pending: ['bg-red-100','text-red-800','Pending']
+  };
+  const [bg, fg, label] = map[status] || ['bg-gray-100','text-gray-800','Unknown'];
+  return <span className={`px-2 py-1 text-xs rounded-full ${bg} ${fg}`}>{label}</span>;
+};
+
+const getPriorityBadge = prio => {
+  const map = {
+    high: ['bg-red-100','text-red-800','High'],
+    medium: ['bg-yellow-100','text-yellow-800','Medium'],
+    low: ['bg-green-100','text-green-800','Low']
+  };
+  const [bg, fg, label] = map[prio] || ['bg-gray-100','text-gray-800','Normal'];
+  return <span className={`px-2 py-1 text-xs rounded-full ${bg} ${fg}`}>{label}</span>;
+};
+
+// Added MaintenanceTable component
+const MaintenanceTable = ({ rows }) => (
+  <div className="overflow-x-auto">
+    <table className="min-w-full divide-y divide-gray-200">
+      <thead className="bg-gray-50">
+        <tr>
+          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Issue</th>
+          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Property</th>
+          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Reported</th>
+          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Priority</th>
+          <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Action</th>
+        </tr>
+      </thead>
+      <tbody className="bg-white divide-y divide-gray-200">
+        {rows.map(row => (
+          <tr key={row.id} className="hover:bg-gray-50">
+            <td className="px-6 py-4 whitespace-nowrap">
+              <div className="text-sm font-medium text-gray-900">{row.title}</div>
+              <div className="text-xs text-gray-500">{row.description?.substring(0, 60)}{row.description?.length > 60 ? '...' : ''}</div>
+            </td>
+            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{row.propertyName || 'Unknown'}</td>
+            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+              {row.reportDate ? new Date(row.reportDate).toLocaleDateString() : 'Unknown'}
+            </td>
+            <td className="px-6 py-4 whitespace-nowrap">{getStatusBadge(row.status)}</td>
+            <td className="px-6 py-4 whitespace-nowrap">{getPriorityBadge(row.priority)}</td>
+            <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+              <button className="text-blue-600 hover:text-blue-900 mr-2">View</button>
+              <button className="text-gray-600 hover:text-gray-900">Edit</button>
+            </td>
+          </tr>
+        ))}
+        {rows.length === 0 && (
+          <tr>
+            <td colSpan="6" className="px-6 py-4 text-center text-sm text-gray-500">No maintenance requests found</td>
+          </tr>
+        )}
+      </tbody>
+    </table>
+  </div>
+);
+
+// Sidebar component
+const Sidebar = ({ collapsed, activeTab, onSelect }) => (
+  <aside className={`bg-slate-800 text-white fixed h-full transition-all duration-300 ${collapsed?'w-16':'w-64'}`}>
+    <div className="p-4 border-b border-slate-700 flex items-center justify-between">
+      {!collapsed && <span className="font-medium text-lg">RentMate</span>}
+      <button
+        onClick={() => onSelect('toggle')}
+        className="p-1 rounded-full hover:bg-slate-700 transition-colors duration-200"
+      >{collapsed?'→':'←'}</button>
+    </div>
+    <nav className="mt-6 flex-1">
+      {['overview','properties','renters','maintenance'].map(tab => (
+        <button key={tab}
+          onClick={() => onSelect(tab)}
+          className={`w-full flex items-center p-2 mx-3 rounded-md mb-1 transition-colors duration-200 ${activeTab===tab?'bg-blue-600':'hover:bg-slate-700 text-gray-300'}`}
+        >
+          <span className="text-lg mr-3">
+            {tab==='overview'? '🏠': tab==='properties'? '🏢': tab==='renters'? '👥':'🔧'}
+          </span>
+          {!collapsed && <span className="text-sm font-medium capitalize">{tab}</span>}
+        </button>
+      ))}
+    </nav>
+  </aside>
+);
+
+// Header component
+const Header = ({ collapsedWidth, showNotif, toggleNotif, notifications, showUser, toggleUser, handleLogout }) => (
+  <header className="bg-white shadow-sm px-6 py-4 flex justify-between items-center sticky top-0 z-10">
+    <div className="flex items-center">
+      <h1 className="text-xl font-semibold text-gray-800">Dashboard</h1>
+    </div>
+    <div className="flex items-center space-x-4">
+      <div className="relative">
+        <input type="text" placeholder="Search..."
+          className="pl-9 pr-4 py-2 border border-gray-300 rounded-full w-56 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all duration-200"
+        />
+        <span className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400">🔍</span>
+      </div>
+      <div className="relative">
+        <button onClick={toggleNotif} className="p-2 rounded-full text-gray-700 hover:bg-blue-100 transition-colors duration-200 relative">
+          <span className="text-xl">🔔</span>
+          {notifications.length>0 && <span className="absolute top-0 right-0 h-5 w-5 bg-red-500 text-white text-xs flex items-center justify-center rounded-full">{notifications.length}</span>}
+        </button>
+        {showNotif && (
+          <div className="absolute right-0 mt-2 w-80 bg-white rounded-lg shadow-lg z-10 border border-gray-200 overflow-hidden">
+            <div className="p-3 border-b bg-gray-50 flex justify-between items-center">
+              <h3 className="font-medium text-gray-800">Notifications</h3>
+              <button onClick={toggleNotif} className="text-gray-500 hover:text-gray-700 p-1 rounded hover:bg-gray-200">✕</button>
             </div>
-            
-            {/* Notification Bell */}
-            <div className="relative">
-              <button 
-                onClick={() => setShowNotifications(!showNotifications)}
-                className="p-1 rounded-full text-gray-700 hover:bg-gray-100"
-              >
-                🔔
-                {notificationData.length > 0 && (
-                  <span className="absolute top-0 right-0 h-4 w-4 bg-blue-500 text-white text-xs flex items-center justify-center rounded-full">
-                    {notificationData.length}
-                  </span>
-                )}
-              </button>
-              
-              {/* Notifications Panel */}
-              {showNotifications && (
-                <div className="absolute right-0 mt-1 w-72 bg-white rounded shadow-lg z-10 border border-gray-200">
-                  <div className="p-3 border-b border-gray-100 flex justify-between items-center">
-                    <h3 className="font-medium">Notifications</h3>
-                    <button
-                      onClick={() => setShowNotifications(false)}
-                      className="text-gray-400 hover:text-gray-600"
-                    >
-                      ✕
-                    </button>
-                  </div>
-                  
-                  <div className="max-h-80 overflow-y-auto">
-                    {notificationData.map(notification => (
-                      <NotificationItem
-                        key={notification.id}
-                        icon={getNotificationIcon(notification.type)}
-                        title={notification.title}
-                        time={formatTime(notification.timestamp)}
-                      />
-                    ))}
-                  </div>
-                  
-                  <div className="p-2 text-center border-t border-gray-100">
-                    <button className="text-blue-600 hover:text-blue-800 text-xs font-medium">
-                      View all
-                    </button>
+            <div className="max-h-96 overflow-y-auto">
+              {notifications.map(n => (
+                <div key={n.id} className="p-3 border-b hover:bg-gray-50">
+                  <div className="flex items-center">
+                    <div className="mr-3"><NotificationIcon type={n.type} /></div>
+                    <div>
+                      <p className="text-sm font-medium text-gray-800">{n.title}</p>
+                      <p className="text-xs text-gray-500 mt-1">{n.timestamp?`${Math.floor((Date.now()-n.timestamp)/3600000)}h ago`:'Unknown'}</p>
+                    </div>
                   </div>
                 </div>
-              )}
+              ))}
             </div>
-            
-            {/* Profile Button */}
-            <button>
-              <div className="h-6 w-6 rounded-full bg-blue-500 text-white flex items-center justify-center">
-                <span className="text-xs font-medium">A</span>
-              </div>
-            </button>
+            <div className="p-3 text-center bg-gray-50">
+              <button className="text-blue-600 hover:text-blue-800 text-sm font-medium hover:underline">View all notifications</button>
+            </div>
           </div>
-        </header>
-        
-        {/* Dashboard Content */}
-        <main className="flex-1 p-4 overflow-y-auto">
-          {error && (
-            <div className="mb-4 p-3 rounded bg-red-50 text-red-700 border border-red-200 text-sm">
-              <p>⚠️ {error}</p>
+        )}
+      </div>
+      <div className="relative">
+        <button onClick={toggleUser} className="flex items-center text-gray-700 hover:text-gray-900">
+          <div className="h-8 w-8 rounded-full bg-blue-500 text-white flex items-center justify-center">
+            <span className="text-sm font-medium">A</span>
+          </div>
+        </button>
+        {showUser && (
+          <div className="absolute right-0 mt-2 w-48 bg-white rounded-lg shadow-lg z-10 border border-gray-200 overflow-hidden">
+            <div className="p-3 border-b bg-gray-50">
+              <p className="text-sm font-medium text-gray-800">Admin User</p>
+              <p className="text-xs text-gray-500">admin@rentmate.com</p>
             </div>
-          )}
-          
-          {loading ? (
-            <div className="flex items-center justify-center h-64">
-              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500"></div>
+            <div className="py-1">
+              <button onClick={handleLogout} className="block w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-gray-100">Sign out</button>
             </div>
-          ) : (
-            <>
-              {/* Stats Cards */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-                <StatCard
-                  title="Total Properties"
-                  value={dashboardData.properties.total || 120}
-                />
-                <StatCard
-                  title="Occupied"
-                  value={dashboardData.properties.occupied || 87}
-                />
-              </div>
-              
-              {/* Recent Activity */}
-              <div className="bg-white rounded shadow p-4 mb-4">
-                <h2 className="font-medium mb-3">Recent Activity</h2>
-                <div className="divide-y divide-gray-100">
-                  {activityData.map(activity => (
-                    <ActivityItem
-                      key={activity.id}
-                      icon={getActivityIcon(activity.type)}
-                      title={activity.title}
-                    />
-                  ))}
-                </div>
-              </div>
-              
-              {/* Renters Overview */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-                <div className="bg-white rounded shadow p-4">
-                  <h2 className="font-medium mb-3">Renters Overview</h2>
-                  
-                  <div className="mt-3 space-y-2">
-                    <div className="flex justify-between items-center">
-                      <span className="text-sm text-gray-700">Active</span>
-                      <span className="font-medium text-sm">{dashboardData.renters.active || 78}</span>
-                    </div>
-                    <div className="w-full bg-gray-200 rounded-full h-2">
-                      <div className="bg-blue-600 h-2 rounded-full" style={{ width: '78%' }}></div>
-                    </div>
-                    
-                    <div className="flex justify-between items-center pt-1">
-                      <span className="text-sm text-gray-700">Inactive</span>
-                      <span className="font-medium text-sm">{dashboardData.renters.inactive || 12}</span>
-                    </div>
-                    <div className="w-full bg-gray-200 rounded-full h-2">
-                      <div className="bg-blue-600 h-2 rounded-full" style={{ width: '12%' }}></div>
-                    </div>
-                  </div>
-                </div>
-                
-                <div className="bg-white rounded shadow p-4">
-                  <h2 className="font-medium mb-3">Renters Overview</h2>
-                  
-                  <ResponsiveContainer width="100%" height={120}>
-                    <BarChart
-                      data={renterChartData}
-                      margin={{ top: 5, right: 20, left: 10, bottom: 5 }}
-                    >
-                      <CartesianGrid strokeDasharray="3 3" />
-                      <XAxis dataKey="name" fontSize={12} />
-                      <YAxis fontSize={12} />
-                      <Tooltip contentStyle={{ fontSize: '12px' }} />
-                      <Bar dataKey="value" fill="#3b82f6" />
-                    </BarChart>
-                  </ResponsiveContainer>
-                </div>
-              </div>
-            </>
-          )}
-        </main>
+          </div>
+        )}
       </div>
     </div>
+  </header>
+);
+
+// Tab views
+const OverviewTab = ({ data, filterPeriod, setFilterPeriod }) => {
+  // We're now using this renterChart in the PieChart to avoid the unused var warning
+  const renterChart = useMemo(() => [
+    { name:'Active', value:data.renters.active },
+    { name:'Inactive', value:data.renters.inactive },
+    { name:'Pending', value:data.renters.pending }
+  ], [data.renters]);
+
+  const propPie = useMemo(() => [
+    { name:'Occupied', value:data.properties.occupied },
+    { name:'Vacant', value:data.properties.vacant }
+  ], [data.properties]);
+
+  return (
+    <>
+      {/* Welcome */}
+      <div className="mb-6">
+        <h2 className="text-2xl font-bold text-gray-800">Welcome back, Admin</h2>
+        <p className="text-gray-600">Here's what's happening with your properties today.</p>
+      </div>
+      {/* Stats grid */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-6">
+        <StatCard title="Total Properties" value={data.properties.total} icon="🏢" borderColor="border-blue-500" />
+        <StatCard title="Occupied Properties" value={data.properties.occupied} icon="🏠" borderColor="border-green-500" />
+        <StatCard title="Active Renters" value={data.renters.active} icon="👥" borderColor="border-purple-500" />
+        <StatCard title="Maintenance Requests" value={data.properties.maintenance} icon="🔧" borderColor="border-yellow-500" />
+      </div>
+      {/* Charts */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+        <ChartCard title="Monthly Revenue" filterPeriod={filterPeriod} setFilterPeriod={setFilterPeriod}>
+          <div className="h-64">
+            <ResponsiveContainer width="100%" height="100%">
+              <LineChart data={data.revenue} margin={{ top:5,right:20,left:20,bottom:5 }}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+                <XAxis dataKey="month" tick={{ fill:'#6b7280' }} />
+                <YAxis tick={{ fill:'#6b7280' }} tickFormatter={v=>`$${v/1000}k`} />
+                <Tooltip formatter={v=>[`$${v}`, 'Revenue']} />
+                <Line type="monotone" dataKey="amount" stroke="#3b82f6" strokeWidth={2} dot={{ r:4 }} activeDot={{ r:6 }} />
+              </LineChart>
+            </ResponsiveContainer>
+          </div>
+        </ChartCard>
+        <ChartCard title="Occupancy Rate" filterPeriod={filterPeriod} setFilterPeriod={setFilterPeriod}>
+          <div className="h-64">
+            <ResponsiveContainer width="100%" height="100%">
+              <LineChart data={data.occupancyRate} margin={{ top:5,right:20,left:20,bottom:5 }}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+                <XAxis dataKey="month" tick={{ fill:'#6b7280' }} />
+                <YAxis tick={{ fill:'#6b7280' }} tickFormatter={v=>`${v}%`} domain={[60,100]} />
+                <Tooltip formatter={v=>[`${v}%`, 'Occupancy']} />
+                <Line type="monotone" dataKey="rate" stroke="#10b981" strokeWidth={2} dot={{ r:4 }} activeDot={{ r:6 }} />
+              </LineChart>
+            </ResponsiveContainer>
+          </div>
+        </ChartCard>
+      </div>
+      {/* Activity & distribution */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
+        <div className="bg-white rounded-lg shadow-md p-5 hover:shadow-lg transition-shadow duration-300">
+          <div className="flex justify-between items-center mb-4">
+            <h2 className="text-lg font-semibold text-gray-800">Recent Activity</h2>
+            <button className="text-sm text-blue-600 hover:text-blue-800">See all</button>
+          </div>
+          <ActivityList items={data.recentActivity} />
+        </div>
+        <div className="bg-white rounded-lg shadow-md p-5 hover:shadow-lg transition-shadow duration-300">
+          <h2 className="text-lg font-semibold text-gray-800 mb-4">Property Status</h2>
+          <div className="h-52 flex justify-center">
+            <ResponsiveContainer width="80%" height="100%">
+              <PieChart>
+                <Pie data={propPie} cx="50%" cy="50%" innerRadius={60} outerRadius={80} label>
+                  {propPie.map((entry,i)=><Cell key={i} fill={i===0?'#10b981':'#d1d5db'} />)}
+                </Pie>
+                <Tooltip formatter={(v,n)=>[v,n]} />
+              </PieChart>
+            </ResponsiveContainer>
+          </div>
+          <div className="grid grid-cols-2 gap-4 mt-4">
+            <div className="text-center">
+              <div className="flex items-center justify-center space-x-1"><div className="w-3 h-3 rounded-full bg-green-500"></div><span className="text-sm font-medium">Occupied</span></div>
+              <p className="text-lg font-bold">{data.properties.occupied}</p>
+            </div>
+            <div className="text-center">
+              <div className="flex items-center justify-center space-x-1"><div className="w-3 h-3 rounded-full bg-gray-300"></div><span className="text-sm font-medium">Vacant</span></div>
+              <p className="text-lg font-bold">{data.properties.vacant}</p>
+            </div>
+          </div>
+        </div>
+        <div className="bg-white rounded-lg shadow-md p-5 hover:shadow-lg transition-shadow duration-300">
+          <h2 className="text-lg font-semibold text-gray-800 mb-4">Renters Overview</h2>
+          {/* Now using the renterChart to render a second PieChart */}
+          <div className="h-32 flex justify-center mb-2">
+            <ResponsiveContainer width="80%" height="100%">
+              <PieChart>
+                <Pie data={renterChart} cx="50%" cy="50%" innerRadius={25} outerRadius={45} label>
+                  {renterChart.map((entry,i)=><Cell key={i} fill={i===0?'#3b82f6':i===1?'#9ca3af':'#facc15'} />)}
+                </Pie>
+                <Tooltip formatter={(v,n)=>[v,n]} />
+              </PieChart>
+            </ResponsiveContainer>
+          </div>
+          {['active','inactive','pending'].map(key=>{
+            const labels = {active:'Active Renters',inactive:'Inactive Renters',pending:'Pending Approvals'};
+            const colors = {active:'bg-blue-600',inactive:'bg-gray-500',pending:'bg-yellow-500'};
+            const val = data.renters[key];
+            const total = data.renters.active+data.renters.inactive+data.renters.pending;
+            return (
+              <div key={key} className="mb-4">
+                <div className="flex justify-between items-center mb-2"><span className="text-sm font-medium text-gray-700">{labels[key]}</span><span className="text-sm font-bold">{val}</span></div>
+                <div className="w-full bg-gray-200 rounded-full h-2.5">
+                  <div className={`${colors[key]} h-2.5 rounded-full`} style={{width:`${Math.round(val/total*100)}%`}} />
+                </div>
+              </div>
+            );
+          })}
+          <button className="mt-2 w-full px-4 py-2 bg-blue-500 hover:bg-blue-600 text-white rounded-md text-sm">View All Renters</button>
+        </div>
+      </div>
+      {/* Maintenance Requests */}
+      <div className="bg-white rounded-lg shadow-md p-5 mb-6 hover:shadow-lg transition-shadow duration-300">
+        <div className="flex justify-between items-center mb-4">
+          <h2 className="text-lg font-semibold text-gray-800">Recent Maintenance Requests</h2>
+          <button className="text-sm text-blue-600 hover:text-blue-800">View All</button>
+        </div>
+        <MaintenanceTable rows={data.maintenanceRequests} />
+      </div>
+    </>
   );
 };
 
-export default AdminDashboard;
+const PropertiesTab = () => (
+  <div className="bg-white rounded-lg shadow-md p-5 mb-6">
+    <h2 className="text-xl font-bold text-gray-800 mb-4">Properties Management</h2>
+    <div className="bg-blue-50 text-blue-800 p-4 rounded-lg w-full max-w-lg text-center">
+      <span className="text-3xl mb-2 block">🏗️</span>
+      <h3 className="font-medium mb-1">Coming Soon</h3>
+      <p className="text-sm">This section is under development.</p>
+    </div>
+  </div>
+);
+
+const RentersTab = () => (
+  <div className="bg-white rounded-lg shadow-md p-5 mb-6">
+    <h2 className="text-xl font-bold text-gray-800 mb-4">Renters Management</h2>
+    <div className="bg-purple-50 text-purple-800 p-4 rounded-lg w-full max-w-lg text-center">
+      <span className="text-3xl mb-2 block">👥</span>
+      <h3 className="font-medium mb-1">Coming Soon</h3>
+      <p className="text-sm">This section is under development.</p>
+    </div>
+  </div>
+);
+
+const MaintenanceTab = ({ data }) => (
+  <>
+    <div className="mb-6">
+      <h2 className="text-xl font-bold text-gray-800">Maintenance Management</h2>
+    </div>
+    <div className="grid grid-cols-1 sm:grid-cols-3 gap-6 mb-6">
+      <StatCard title="Pending Requests" value={data.maintenanceRequests.filter(r=>r.status==='pending').length} icon="⏱️" borderColor="border-red-500" />
+      <StatCard title="In Progress" value={data.maintenanceRequests.filter(r=>r.status==='in_progress').length} icon="🔄" borderColor="border-yellow-500" />
+      <StatCard title="Completed This Month" value={data.maintenanceRequests.filter(r=>r.status==='completed').length} icon="✅" borderColor="border-green-500" />
+    </div>
+    <div className="bg-white rounded-lg shadow-md p-5 mb-6">
+      <div className="flex justify-between items-center mb-4">
+        <h2 className="text-lg font-semibold text-gray-800">Maintenance Requests</h2>
+      </div>
+      <MaintenanceTable rows={data.maintenanceRequests} />
+    </div>
+  </>
+);
+
+// Main Component
+export default function AdminDashboard() {
+  const { data, loading, error } = useDashboardData();
+  const [collapsed, setCollapsed] = useState(false);
+  const [activeTab, setActiveTab] = useState('overview');
+  const [filterPeriod, setFilterPeriod] = useState('monthly');
+  const [showNotif, setShowNotif] = useState(false);
+  const [showUser, setShowUser] = useState(false);
+  const { currentUser } = useAuth();
+  const navigate = useNavigate();
+
+  const handleSidebar = key => key==='toggle'? setCollapsed(!collapsed) : setActiveTab(key);
+  const handleLogout = async () => { navigate('/login'); };
+
+  // We're using currentUser in a conditional to avoid the unused var warning
+  const userName = currentUser ? currentUser.displayName || 'Admin' : 'Admin';
+
+  const TabComponent = {
+    overview: props => <OverviewTab {...props} filterPeriod={filterPeriod} setFilterPeriod={setFilterPeriod} />, 
+    properties: () => <PropertiesTab />,
+    renters: () => <RentersTab />,
+    maintenance: () => <MaintenanceTab data={data} />
+  }[activeTab] || (() => <OverviewTab data={data} filterPeriod={filterPeriod} setFilterPeriod={setFilterPeriod} />);
+
+  return (
+    <div className="flex min-h-screen bg-gray-100">
+      <Sidebar collapsed={collapsed} activeTab={activeTab} onSelect={handleSidebar} />
+      <div className={`flex-1 flex flex-col transition-all duration-300 ${collapsed?'ml-16':'ml-64'}`}>        
+        <Header
+          showNotif={showNotif} toggleNotif={() => setShowNotif(!showNotif)}
+          notifications={data.notifications}
+          showUser={showUser} toggleUser={() => setShowUser(!showUser)}
+          handleLogout={handleLogout}
+        />
+        <main className="flex-1 p-6 overflow-auto bg-gray-50">
+          {error && <div className="mb-6 p-4 rounded-lg bg-red-50 text-red-700 border-l-4 border-red-500 text-sm flex items-center">⚠️ {error}</div>}
+          {loading ? <div className="flex items-center justify-center h-64">Loading...</div> : <TabComponent data={data} />}
+        </main>
+        <footer className="bg-white border-t border-gray-200 py-4 px-6 text-center text-sm text-gray-600">
+          © 2025 RentMate. All rights reserved.
+        </footer>
+      </div>
+    </div>
+  );
+}
