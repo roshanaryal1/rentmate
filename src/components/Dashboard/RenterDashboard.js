@@ -157,4 +157,7 @@ function EquipmentCard({ item }) {
   );
 }
 
+
+
+
 export default RenterDashboard;
