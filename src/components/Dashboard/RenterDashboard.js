@@ -5,7 +5,9 @@ import { collection, getDocs } from 'firebase/firestore';
 import { db } from '../../firebase';
 import { sampleEquipment } from '../../data/sampleEquipment';
 
-function RenterDashboard() {
+function RenterDashboard(
+  
+) {
   const { currentUser } = useAuth();
   const [equipmentList, setEquipmentList] = useState([]);
   const [loading, setLoading] = useState(true);
