@@ -6,6 +6,7 @@ import AuthDebug from './components/AuthDebug';
 import RentalHistory from './components/Rental/RentalHistory';
 
 
+
 <Routes>
   {/* Other routes */}
   <Route path="/rental-history" element={<RentalHistory />} />
@@ -26,6 +27,9 @@ function App() {
     <Router>
       <AuthProvider>
         <AuthDebug />
+        
+
+
         <Suspense fallback={<LoadingSpinner message="Loading RentMate..." />}>
           <AppContent />
         </Suspense>
