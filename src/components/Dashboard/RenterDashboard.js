@@ -8,7 +8,9 @@ import { sampleEquipment } from '../../data/sampleEquipment';
 // Import Bootstrap CSS in your index.js or App.js file if not already imported
 // import 'bootstrap/dist/css/bootstrap.min.css';
 
-function RenterDashboard() {
+function RenterDashboard(
+  
+) {
   const { currentUser } = useAuth();
   const [rentedItems, setRentedItems] = useState([]);
   const [equipmentList, setEquipmentList] = useState([]);
