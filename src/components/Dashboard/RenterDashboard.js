@@ -215,7 +215,7 @@ function RenterDashboard(
                           ${item.ratePerDay}/day
                         </h5>
                         <Link to={`/rent/${item.id}/fill-details`} 
-                        className="btn btn-primary btn-sm">
+                         className="btn btn-primary btn-sm">
                           Rent Now
                         </Link>
 
