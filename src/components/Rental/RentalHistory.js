@@ -5,7 +5,9 @@ import { useAuth } from '../../contexts/AuthContext';
 import { collection, query, where, getDocs, orderBy } from 'firebase/firestore';
 import { db } from '../../firebase';
 
-function RentalHistory() {
+function RentalHistory(
+
+) {
   const { currentUser } = useAuth();
   const [rentals, setRentals] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -13,7 +15,9 @@ function RentalHistory() {
   const [sortOption, setSortOption] = useState('endDate-desc');
   const [searchTerm, setSearchTerm] = useState('');
 
-  useEffect(() => {
+  useEffect((
+
+  ) => {
     const fetchRentalHistory = async () => {
       if (!currentUser) return;
       
@@ -467,7 +471,9 @@ function RentalHistory() {
                             
                             const avg = ratings.reduce((sum, rating) => sum + rating, 0) / ratings.length;
                             return avg.toFixed(1);
-                          })()}
+                          })(
+                            
+                          )}
                         </div>
                       </div>
                     </div>
