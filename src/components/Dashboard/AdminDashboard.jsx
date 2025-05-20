@@ -240,15 +240,16 @@ export default function AdminDashboard() {
     equipment: 0, 
     users: 0, 
     revenue: 0,
-    loading: true
+    loading: true,
   });
   const [recentRentals, setRecentRentals] = useState([]);
   const [rentalsLoading, setRentalsLoading] = useState(true);
   const [error, setError] = useState(null);
   const [sidebarOpen, setSidebarOpen] = useState(window.innerWidth > 992);
   const { currentUser, logout } = useAuth();
-  const navigate = useNavigate();
+  const navigate = useNavigate(); // Use React Router's navigate hook
 
+  // Handle window resize
   useEffect(() => {
     const handleResize = () => {
       setSidebarOpen(window.innerWidth > 992);
@@ -310,16 +311,53 @@ export default function AdminDashboard() {
       );
       subscriptions.push(unsubRecent);
     } catch (err) {
-      errorHandler(err);
+      console.error('Error fetching dashboard data:', err);
+      setError('Failed to load dashboard data');
+      setMetrics((prev) => ({ ...prev, loading: false }));
+      setRentalsLoading(false);
     }
 
     return () => subscriptions.forEach(unsub => unsub());
   }, []);
 
+  // Format currency
+  const formattedRevenue = metrics.revenue.toLocaleString('en-US', {
+    style: 'currency',
+    currency: 'USD',
+    minimumFractionDigits: 0
+  });
+
+  // Generate chart data
+  const chartData = () => {
+    const revenueByMonth = {};
+    const now = new Date();
+    
+    // Initialize with last 6 months
+    for (let i = 6; i >= 1; i--) {
+      const date = new Date(now.getFullYear(), now.getMonth() - i, 1);
+      const monthKey = format(date, 'MMM yyyy');
+      revenueByMonth[monthKey] = 0;
+    }
+    
+    // Add data from rentals
+    recentRentals.forEach(rental => {
+      const date = new Date(rental.rentalDate);
+      const monthKey = format(date, 'MMM yyyy');
+      revenueByMonth[monthKey] = (revenueByMonth[monthKey] || 0) + rental.totalPrice;
+    });
+
+    // Convert to array and sort by date
+    const sortedData = Object.entries(revenueByMonth)
+      .map(([name, uv]) => ({ name, uv }))
+      .sort((a, b) => new Date(a.name) - new Date(b.name));
+      
+    return sortedData;
+  };
+
   const handleLogout = async () => {
     try {
       await logout();
-      navigate('/login');
+      navigate('/login'); // Use navigate instead of window.location
     } catch (err) {
       console.error("Logout failed:", err);
       setError("Logout failed. Please try again.");
@@ -350,43 +388,120 @@ export default function AdminDashboard() {
   }, [metrics.revenue]);
 
   return (
-    <div className="d-flex vh-100 bg-light">
-      <Sidebar 
-        activeTab={activeTab} 
-        setActiveTab={setActiveTab} 
-        show={sidebarOpen} 
-        handleClose={closeSidebar}
-      />
+    <div className="flex h-screen overflow-hidden bg-gray-100">
+      {/* Sidebar */}
+      <aside
+        className={`fixed inset-y-0 left-0 z-30 w-64 overflow-y-auto transition duration-300 transform bg-white shadow-lg md:translate-x-0 ${
+          sidebarOpen ? 'translate-x-0' : '-translate-x-full'
+        }`}
+      >
+        <div className="flex items-center justify-between px-6 py-4">
+          <div className="flex items-center space-x-2">
+            <svg className="w-6 h-6 text-blue-600" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+            </svg>
+            <span className="text-xl font-bold">RentMate</span>
+          </div>
+          <button
+            onClick={() => setSidebarOpen(false)}
+            className="md:hidden text-gray-500 focus:outline-none"
+          >
+            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
+        </div>
+
+        <nav className="mt-4 px-4">
+          {Object.keys(tabIcons).map((tab) => (
+            <button
+              key={tab}
+              onClick={() => setActiveTab(tab)}
+              className={`flex items-center w-full px-4 py-2 mt-2 rounded-md capitalize ${
+                activeTab === tab
+                  ? 'bg-blue-100 text-blue-700'
+                  : 'text-gray-600 hover:bg-gray-100'
+              }`}
+            >
+              {tabIcons[tab]}
+              {tab}
+            </button>
+          ))}
+        </nav>
+      </aside>
+
+      {/* Overlay for mobile */}
+      {sidebarOpen && (
+        <div
+          className="fixed inset-0 z-20 bg-black opacity-50 md:hidden"
+          onClick={() => setSidebarOpen(false)}
+        ></div>
+      )}
 
       {/* Main Content */}
-      <div className="flex-grow-1 d-flex flex-column overflow-hidden">
-        <DashboardHeader 
-          currentUser={currentUser} 
-          handleLogout={handleLogout} 
-          handleSearch={handleSearch}
-          toggleSidebar={toggleSidebar}
-        />
+      <div className="flex flex-col flex-1 overflow-hidden">
+        {/* Top Header */}
+        <header className="flex items-center justify-between px-6 py-4 bg-white border-b border-gray-200">
+          <div className="flex items-center">
+            <button
+              onClick={() => setSidebarOpen(!sidebarOpen)}
+              className="text-gray-500 focus:outline-none md:hidden"
+            >
+              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth="2"
+                  d="M4 6h16M4 12h16M4 18h16"
+                />
+              </svg>
+            </button>
+            <h1 className="ml-4 text-xl font-semibold text-gray-700">Admin Dashboard</h1>
+          </div>
 
-        {/* Tabs */}
-        <Nav
-          variant="tabs"
-          activeKey={activeTab}
-          onSelect={k => setActiveTab(k)}
-          className="px-3 mt-2"
-        >
-          {Object.keys(DASHBOARD_CONSTANTS.TAB_ICONS).map(tab => (
-            <Nav.Item key={tab}>
-              <Nav.Link eventKey={tab}>{tab}</Nav.Link>
-            </Nav.Item>
-          ))}
-        </Nav>
+          <div className="flex items-center space-x-4">
+            <div className="relative">
+              <input
+                type="text"
+                placeholder="Search..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="pl-10 pr-4 py-1 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-400"
+              />
+              <svg
+                className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth="2"
+                  d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
+                />
+              </svg>
+            </div>
+            <img
+              src={currentUser?.photoURL || 'https://i.pravatar.cc/60'}
+              alt="Profile"
+              className="w-8 h-8 rounded-full border border-gray-300"
+            />
+            <button
+              onClick={handleLogout}
+              className="px-3 py-1 text-sm text-white bg-red-500 rounded hover:bg-red-600 transition"
+            >
+              Logout
+            </button>
+          </div>
+        </header>
 
-        {/* Content */}
-        <Container fluid className="pt-4 overflow-auto">
+        {/* Page Content */}
+        <main className="flex-1 p-6 overflow-auto">
           {error && (
-            <Alert variant="danger" className="mb-4">
+            <div className="mb-4 p-3 text-sm text-red-700 bg-red-100 rounded">
               {error}
-            </Alert>
+            </div>
           )}
 
           {activeTab === 'Overview' && (
@@ -440,6 +555,84 @@ export default function AdminDashboard() {
   );
 }
 
-AdminDashboard.propTypes = {
-  // Add any props if needed
-};
+// RecentRentalsTable Component
+function RecentRentalsTable({ rentals, loading, statusColors }) {
+  if (loading) {
+    return (
+      <div className="flex justify-center py-6">
+        <div className="w-8 h-8 border-4 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
+      </div>
+    );
+  }
+
+  if (!rentals.length) {
+    return <p className="text-sm text-gray-500">No recent rentals found.</p>;
+  }
+
+  return (
+    <div className="overflow-x-auto">
+      <table className="min-w-full divide-y divide-gray-200">
+        <thead className="bg-gray-50">
+          <tr>
+            <th className="px-4 py-3 text-xs font-medium tracking-wider text-left text-gray-500 uppercase">Equipment</th>
+            <th className="px-4 py-3 text-xs font-medium tracking-wider text-left text-gray-500 uppercase">Renter</th>
+            <th className="px-4 py-3 text-xs font-medium tracking-wider text-left text-gray-500 uppercase">Owner</th>
+            <th className="px-4 py-3 text-xs font-medium tracking-wider text-left text-gray-500 uppercase">Date</th>
+            <th className="px-4 py-3 text-xs font-medium tracking-wider text-left text-gray-500 uppercase">Status</th>
+          </tr>
+        </thead>
+        <tbody className="bg-white divide-y divide-gray-200">
+          {rentals.map((rental) => (
+            <tr key={rental.id}>
+              <td className="px-4 py-3 whitespace-nowrap">
+                <div className="flex items-center">
+                  <svg className="w-5 h-5 text-blue-500 mr-2" viewBox="0 0 20 20" fill="currentColor">
+                    <path d="M4 3a1 1 0 00-1 1v12a1 1 0 001 1h12a1 1 0 001-1V4a1 1 0 00-1-1H4zm0 2h12v10H4V5z" />
+                  </svg>
+                  {rental.equipmentName || 'N/A'}
+                </div>
+              </td>
+              <td className="px-4 py-3 whitespace-nowrap">{rental.renterName || 'Unknown'}</td>
+              <td className="px-4 py-3 whitespace-nowrap">{rental.ownerName || 'Unknown'}</td>
+              <td className="px-4 py-3 whitespace-nowrap">
+                {rental.startDate ? new Date(rental.startDate).toLocaleDateString() : 'Unknown'}
+              </td>
+              <td className="px-4 py-3 whitespace-nowrap">
+                <span className={`inline-flex px-2 text-xs font-semibold leading-5 rounded-full ${statusColors[rental.status] || 'bg-gray-100 text-gray-800'}`}>
+                  {rental.status || 'Unknown'}
+                </span>
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+// Custom SVG Icons
+function CartIcon() {
+  return (
+    <svg className="w-6 h-6" fill="currentColor" viewBox="0 0 20 20">
+      <path d="M3 1a1 1 0 000 2h1.22l.305 1.222a.993.993 0 00.01.042l1.358 5.43-.893.892C3.74 11.84 2 13.497 2 15a3 3 0 106 0c0-1.503-1.74-3.16-2.49-4.455l-.913-.913L9.44 9.44A1 1 0 0010 10v2a1 1 0 001 1h1a1 1 0 001-1v-1a1 1 0 00-1-1h-1a1 1 0 00-.707.293l-2.42 2.42a1 1 0 01-1.414 0L6.586 10A1 1 0 005.172 9.586l-.913-.913L3.74 7.26a1 1 0 01.042-.01 1 1 0 01.293-.144l1.358-.892L5 3.292A1 1 0 004.293 2H3z"></path>
+    </svg>
+  );
+}
+
+function UserIcon() {
+  return (
+    <svg className="w-6 h-6" fill="currentColor" viewBox="0 0 20 20">
+      <path d="M9 6a3 3 0 11-6 0 3 3 0 016 0zM17 6a3 3 0 11-6 0 3 3 0 016 0z"></path>
+      <path d="M12.93 17c.046-.327.07-.66.07-1a6.97 6.97 0 00-1.5-4.33A5 5 0 0119 16v1h-6.07zM6 11a5 5 0 015 5v1H1v-1a5 5 0 015-5z"></path>
+    </svg>
+  );
+}
+
+function ChartIcon() {
+  return (
+    <svg className="w-6 h-6" fill="currentColor" viewBox="0 0 20 20">
+      <path d="M2 10a8 8 0 018-8v8h8a8 8 0 11-16 0z"></path>
+      <path d="M12 2.252A8.014 8.014 0 0117.748 8H12V2.252z"></path>
+    </svg>
+  );
+}
