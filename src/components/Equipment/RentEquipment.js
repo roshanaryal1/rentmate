@@ -5,7 +5,9 @@ import { doc, getDoc, addDoc, collection, Timestamp } from 'firebase/firestore';
 import { db } from '../../firebase';
 import { useAuth } from '../../contexts/AuthContext';
 
-function RentEquipment() {
+function RentEquipment(
+
+) {
   const { equipmentId } = useParams();
   const { currentUser } = useAuth();
   const navigate = useNavigate();
@@ -17,7 +19,9 @@ function RentEquipment() {
   const [error, setError] = useState('');
 
   useEffect(() => {
-    const fetchEquipment = async () => {
+    const fetchEquipment = async (
+        
+    ) => {
       try {
         const docRef = doc(db, 'equipment', equipmentId);
         const docSnap = await getDoc(docRef);
