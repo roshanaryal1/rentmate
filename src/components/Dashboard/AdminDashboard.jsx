@@ -1,638 +1,510 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { collection, query, where, orderBy, limit, onSnapshot } from 'firebase/firestore';
-import PropTypes from 'prop-types';
+import { 
+  collection, 
+  query, 
+  where, 
+  orderBy, 
+  limit, 
+  onSnapshot, 
+  getCountFromServer,
+  getDocs
+} from 'firebase/firestore';
 import { db } from '../../firebase';
 import { useAuth } from '../../contexts/AuthContext';
-import {
-  House,
-  Gear,
-  Cart4,
-  People,
-  Check2All,
-  BarChart,
-  Building,
-  PersonCircle,
-  List,
-  X
+import { Container, Row, Col, Card, Badge, Dropdown, Button, Form, InputGroup } from 'react-bootstrap';
+
+// Icon imports
+import { 
+  Bell, 
+  Flag, 
+  ArrowDown, 
+  Building, 
+  People, 
+  Tools, 
+  FileEarmark, 
+  HouseDoor, 
+  Gear, 
+  GraphUp, 
+  CheckCircle, 
+  Person, 
+  Search,
+  BoxArrowRight 
 } from 'react-bootstrap-icons';
-import {
-  Container,
-  Row,
-  Col,
-  Navbar,
-  Nav,
-  Offcanvas,
-  Card,
-  Table,
-  Badge,
-  Form,
-  InputGroup,
-  Button,
-  Image,
-  Spinner,
-  Alert
-} from 'react-bootstrap';
-import { format } from 'date-fns';
 
-// Constants moved to separate object
-const DASHBOARD_CONSTANTS = {
-  ICON_SIZE: 24,
-  TAB_ICONS: {
-    Overview: House,
-    Equipment: Cart4,
-    Users: People,
-    Rentals: Check2All,
-    Analytics: BarChart,
-    Settings: Gear
-  },
-  STATUS_VARIANTS: {
-    Returned: 'success',
-    Pending: 'warning',
-    Overdue: 'danger',
-    Default: 'secondary'
-  }
-};
-
-// Extracted StatCard component with PropTypes
-const StatCard = ({ Icon, value, label, loading }) => (
-  <Card className="h-100 shadow-sm">
-    <Card.Body className="d-flex align-items-center">
-      <div className="bg-primary bg-opacity-10 rounded-circle p-3 me-3">
-        <Icon size={DASHBOARD_CONSTANTS.ICON_SIZE} className="text-primary" />
-      </div>
-      <div>
-        <h3 className="mb-0">
-          {loading ? <Spinner animation="border" size="sm" /> : value}
-        </h3>
-        <small className="text-muted">{label}</small>
-      </div>
-    </Card.Body>
-  </Card>
-);
-
-StatCard.propTypes = {
-  Icon: PropTypes.elementType.isRequired,
-  value: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
-  label: PropTypes.string.isRequired,
-  loading: PropTypes.bool
-};
-
-// Extracted Sidebar component
-const Sidebar = ({ activeTab, setActiveTab, show, handleClose }) => (
-  <Offcanvas show={show} onHide={handleClose} backdrop={false} scroll={true} className="bg-white border-end">
-    <Offcanvas.Header>
-      <Offcanvas.Title className="d-flex align-items-center">
-        <Building size={DASHBOARD_CONSTANTS.ICON_SIZE} className="text-primary me-2" />
-        <span>RentMate</span>
-      </Offcanvas.Title>
-      <Button 
-        variant="link" 
-        onClick={handleClose} 
-        className="p-0 ms-auto"
-        aria-label="Close sidebar"
-      >
-        <X size={20} />
-      </Button>
-    </Offcanvas.Header>
-    <Offcanvas.Body className="pt-0">
-      <Nav variant="pills" className="flex-column">
-        {Object.keys(DASHBOARD_CONSTANTS.TAB_ICONS).map(tab => {
-          const Icon = DASHBOARD_CONSTANTS.TAB_ICONS[tab];
-          return (
-            <Nav.Item key={tab}>
-              <Nav.Link
-                active={activeTab === tab}
-                onClick={() => {
-                  setActiveTab(tab);
-                  handleClose();
-                }}
-                className="d-flex align-items-center"
-                eventKey={tab}
-              >
-                <Icon size={DASHBOARD_CONSTANTS.ICON_SIZE} className="me-2" />
-                {tab}
-              </Nav.Link>
-            </Nav.Item>
-          );
-        })}
-      </Nav>
-    </Offcanvas.Body>
-  </Offcanvas>
-);
-
-Sidebar.propTypes = {
-  activeTab: PropTypes.string.isRequired,
-  setActiveTab: PropTypes.func.isRequired,
-  show: PropTypes.bool.isRequired,
-  handleClose: PropTypes.func.isRequired
-};
-
-// Extracted RecentRentalsTable component
-const RecentRentalsTable = ({ rentals, loading }) => {
-  if (loading) {
-    return (
-      <div className="text-center py-4">
-        <Spinner animation="border" />
-      </div>
-    );
-  }
-
-  if (!rentals.length) {
-    return <Alert variant="info">No recent rentals found</Alert>;
-  }
-
-  return (
-    <Table hover responsive className="mb-0">
-      <thead className="table-light">
-        <tr>
-          <th>Equipment</th>
-          <th>Renter</th>
-          <th>Owner</th>
-          <th>Dates</th>
-          <th>Status</th>
-        </tr>
-      </thead>
-      <tbody>
-        {rentals.map(rental => (
-          <tr key={rental.id}>
-            <td className="d-flex align-items-center">
-              <Cart4 className="me-2 text-primary" />
-              {rental.equipmentName}
-            </td>
-            <td>{rental.renterName}</td>
-            <td>{rental.ownerName}</td>
-            <td>{format(new Date(rental.startDate), 'MMM dd, yyyy')}</td>
-            <td>
-              <Badge 
-                bg={DASHBOARD_CONSTANTS.STATUS_VARIANTS[rental.status] || 
-                    DASHBOARD_CONSTANTS.STATUS_VARIANTS.Default}
-              >
-                {rental.status}
-              </Badge>
-            </td>
-          </tr>
-        ))}
-      </tbody>
-    </Table>
-  );
-};
-
-RecentRentalsTable.propTypes = {
-  rentals: PropTypes.array.isRequired,
-  loading: PropTypes.bool
-};
-
-// Extracted DashboardHeader component
-const DashboardHeader = ({ currentUser, handleLogout, handleSearch, toggleSidebar }) => (
-  <Navbar bg="white" expand={false} className="border-bottom px-3">
-    <Button 
-      variant="outline-secondary" 
-      onClick={toggleSidebar}
-      className="me-3 d-lg-none"
-      aria-label="Toggle sidebar"
-    >
-      <List size={20} />
-    </Button>
-    <Navbar.Brand as="h2" className="mb-0">
-      Admin Dashboard
-    </Navbar.Brand>
-    <div className="d-flex align-items-center ms-auto">
-      <Form className="me-3 d-none d-md-block">
-        <InputGroup>
-          <Form.Control 
-            size="sm" 
-            placeholder="Search..." 
-            onChange={(e) => handleSearch(e.target.value)}
-          />
-          <Button variant="outline-secondary" size="sm">
-            <House />
-          </Button>
-        </InputGroup>
-      </Form>
-      <Nav>
-        <Nav.Link onClick={handleLogout} className="position-relative p-0">
-          <Image
-            src={currentUser?.photoURL || '/default-user.png'}
-            roundedCircle
-            width={32}
-            height={32}
-            className="border"
-            alt="User profile"
-          />
-        </Nav.Link>
-      </Nav>
-    </div>
-  </Navbar>
-);
-
-DashboardHeader.propTypes = {
-  currentUser: PropTypes.object,
-  handleLogout: PropTypes.func.isRequired,
-  handleSearch: PropTypes.func.isRequired,
-  toggleSidebar: PropTypes.func.isRequired
-};
-
-// Main Dashboard Component
 export default function AdminDashboard() {
-  const [activeTab, setActiveTab] = useState('Overview');
-  const [metrics, setMetrics] = useState({ 
-    equipment: 0, 
-    users: 0, 
-    revenue: 0,
-    loading: true,
+  const [activeTab, setActiveTab] = useState('Dashboard');
+  const [showNotifications, setShowNotifications] = useState(false);
+  const [metrics, setMetrics] = useState({
+    properties: 0,
+    occupied: 0,
+    activeRenters: 0,
+    inactiveRenters: 0,
+    loading: true
   });
-  const [recentRentals, setRecentRentals] = useState([]);
-  const [rentalsLoading, setRentalsLoading] = useState(true);
+  const [recentActivity, setRecentActivity] = useState([]);
+  const [notifications, setNotifications] = useState([]);
   const [error, setError] = useState(null);
-  const [sidebarOpen, setSidebarOpen] = useState(window.innerWidth > 992);
+  const [searchQuery, setSearchQuery] = useState('');
   const { currentUser, logout } = useAuth();
-  const navigate = useNavigate(); // Use React Router's navigate hook
+  const navigate = useNavigate();
 
-  // Handle window resize
+  // Fetch real-time data from Firestore
   useEffect(() => {
-    const handleResize = () => {
-      setSidebarOpen(window.innerWidth > 992);
-    };
-
-    window.addEventListener('resize', handleResize);
-    return () => window.removeEventListener('resize', handleResize);
-  }, []);
-
-  useEffect(() => {
-    setMetrics(prev => ({ ...prev, loading: true }));
-    setRentalsLoading(true);
-    setError(null);
-
-    const subscriptions = [];
-    const errorHandler = (err) => {
-      console.error("Firebase error:", err);
-      setError("Failed to load dashboard data");
-      setMetrics(prev => ({ ...prev, loading: false }));
-      setRentalsLoading(false);
-    };
-
+    const unsubs = [];
+    
     try {
-      // Equipment count
-      const unsubEquip = onSnapshot(
-        collection(db, 'equipment'),
-        snap => setMetrics(m => ({ ...m, equipment: snap.size })),
-        errorHandler
+      // Properties count
+      const fetchProperties = async () => {
+        const propertiesRef = collection(db, 'equipment');
+        const propertiesSnapshot = await getCountFromServer(propertiesRef);
+        const total = propertiesSnapshot.data().count;
+        
+        // Occupied properties
+        const occupiedQuery = query(
+          collection(db, 'equipment'),
+          where('available', '==', false)
+        );
+        const occupiedSnapshot = await getCountFromServer(occupiedQuery);
+        const occupied = occupiedSnapshot.data().count;
+        
+        setMetrics(prev => ({
+          ...prev,
+          properties: total,
+          occupied: occupied
+        }));
+      };
+      
+      fetchProperties();
+      
+      // Renters count
+      const rentersQuery = query(
+        collection(db, 'users'),
+        where('role', '==', 'renter')
       );
-      subscriptions.push(unsubEquip);
-
-      // Users count
-      const unsubUsers = onSnapshot(
-        query(collection(db, 'users'), where('role', '==', 'renter')),
-        snap => setMetrics(m => ({ ...m, users: snap.size })),
-        errorHandler
+      
+      const rentersUnsub = onSnapshot(rentersQuery, async (snapshot) => {
+        const total = snapshot.size;
+        
+        // Active renters (with at least one active rental)
+        const activeRentersQuery = query(
+          collection(db, 'users'),
+          where('role', '==', 'renter'),
+          where('hasActiveRental', '==', true)
+        );
+        
+        try {
+          const activeSnapshot = await getDocs(activeRentersQuery);
+          const active = activeSnapshot.size;
+          
+          setMetrics(prev => ({
+            ...prev,
+            activeRenters: active,
+            inactiveRenters: total - active,
+            loading: false
+          }));
+        } catch (err) {
+          console.error('Error fetching active renters:', err);
+          setMetrics(prev => ({
+            ...prev,
+            activeRenters: 0,
+            inactiveRenters: total,
+            loading: false
+          }));
+        }
+      });
+      
+      unsubs.push(rentersUnsub);
+      
+      // Recent activity
+      const activityQuery = query(
+        collection(db, 'activity'),
+        orderBy('timestamp', 'desc'),
+        limit(5)
       );
-      subscriptions.push(unsubUsers);
-
-      // Revenue calculation
-      const unsubRevenue = onSnapshot(
-        collection(db, 'rentals'),
-        snap => {
-          const total = snap.docs.reduce((sum, d) => sum + (d.data().price || 0), 0);
-          setMetrics(m => ({ ...m, revenue: total, loading: false }));
-        },
-        errorHandler
+      
+      const activityUnsub = onSnapshot(activityQuery, (snapshot) => {
+        const activities = snapshot.docs.map(doc => ({
+          id: doc.id,
+          ...doc.data(),
+          timestamp: doc.data().timestamp?.toDate() || new Date()
+        }));
+        setRecentActivity(activities);
+      });
+      
+      unsubs.push(activityUnsub);
+      
+      // Notifications
+      const notificationsQuery = query(
+        collection(db, 'notifications'),
+        where('recipients', 'array-contains', 'admin'),
+        orderBy('timestamp', 'desc'),
+        limit(3)
       );
-      subscriptions.push(unsubRevenue);
-
-      // Recent rentals
-      const unsubRecent = onSnapshot(
-        query(collection(db, 'rentals'), orderBy('startDate', 'desc'), limit(5)),
-        snap => {
-          setRecentRentals(snap.docs.map(d => ({ id: d.id, ...d.data() })));
-          setRentalsLoading(false);
-        },
-        errorHandler
-      );
-      subscriptions.push(unsubRecent);
+      
+      const notificationsUnsub = onSnapshot(notificationsQuery, (snapshot) => {
+        const notifs = snapshot.docs.map(doc => ({
+          id: doc.id,
+          ...doc.data(),
+          timestamp: doc.data().timestamp?.toDate() || new Date()
+        }));
+        setNotifications(notifs);
+      });
+      
+      unsubs.push(notificationsUnsub);
+      
     } catch (err) {
       console.error('Error fetching dashboard data:', err);
       setError('Failed to load dashboard data');
-      setMetrics((prev) => ({ ...prev, loading: false }));
-      setRentalsLoading(false);
+      setMetrics(prev => ({ ...prev, loading: false }));
     }
-
-    return () => subscriptions.forEach(unsub => unsub());
+    
+    return () => unsubs.forEach(unsub => unsub && unsub());
   }, []);
-
-  // Format currency
-  const formattedRevenue = metrics.revenue.toLocaleString('en-US', {
-    style: 'currency',
-    currency: 'USD',
-    minimumFractionDigits: 0
-  });
-
-  // Generate chart data
-  const chartData = () => {
-    const revenueByMonth = {};
-    const now = new Date();
-    
-    // Initialize with last 6 months
-    for (let i = 6; i >= 1; i--) {
-      const date = new Date(now.getFullYear(), now.getMonth() - i, 1);
-      const monthKey = format(date, 'MMM yyyy');
-      revenueByMonth[monthKey] = 0;
-    }
-    
-    // Add data from rentals
-    recentRentals.forEach(rental => {
-      const date = new Date(rental.rentalDate);
-      const monthKey = format(date, 'MMM yyyy');
-      revenueByMonth[monthKey] = (revenueByMonth[monthKey] || 0) + rental.totalPrice;
-    });
-
-    // Convert to array and sort by date
-    const sortedData = Object.entries(revenueByMonth)
-      .map(([name, uv]) => ({ name, uv }))
-      .sort((a, b) => new Date(a.name) - new Date(b.name));
-      
-    return sortedData;
-  };
 
   const handleLogout = async () => {
     try {
       await logout();
-      navigate('/login'); // Use navigate instead of window.location
+      navigate('/login');
     } catch (err) {
-      console.error("Logout failed:", err);
-      setError("Logout failed. Please try again.");
+      setError('Logout failed. Please try again.');
     }
   };
 
-  const handleSearch = (query) => {
-    // Implement search functionality
-    console.log("Search query:", query);
+  const formatTimestamp = (timestamp) => {
+    if (!timestamp) return 'Unknown time';
+    
+    const now = new Date();
+    const diff = now - timestamp;
+    
+    // Less than a minute
+    if (diff < 60000) {
+      return 'Just now';
+    }
+    
+    // Less than an hour
+    if (diff < 3600000) {
+      const minutes = Math.floor(diff / 60000);
+      return `${minutes}m ago`;
+    }
+    
+    // Less than a day
+    if (diff < 86400000) {
+      const hours = Math.floor(diff / 3600000);
+      return `${hours}h ago`;
+    }
+    
+    // More than a day
+    const days = Math.floor(diff / 86400000);
+    return `${days}d ago`;
   };
 
-  const toggleSidebar = () => {
-    setSidebarOpen(!sidebarOpen);
-  };
-
-  const closeSidebar = () => {
-    if (window.innerWidth <= 992) {
-      setSidebarOpen(false);
+  const getActivityIcon = (type) => {
+    switch(type) {
+      case 'new_renter':
+        return <Bell className="me-2 text-primary" />;
+      case 'maintenance':
+        return <Tools className="me-2 text-warning" />;
+      case 'lease':
+        return <FileEarmark className="me-2 text-success" />;
+      case 'property':
+        return <Building className="me-2 text-info" />;
+      default:
+        return <CheckCircle className="me-2 text-secondary" />;
     }
   };
 
-  const formattedRevenue = useMemo(() => {
-    return metrics.revenue.toLocaleString('en-US', {
-      style: 'currency',
-      currency: 'USD',
-      minimumFractionDigits: 0
-    });
-  }, [metrics.revenue]);
+  const toggleNotifications = () => {
+    setShowNotifications(!showNotifications);
+  };
+
+  // Mock sidebar navigation items
+  const navItems = [
+    { label: 'Dashboard', icon: <HouseDoor /> },
+    { label: 'Properties', icon: <Building /> },
+    { label: 'Renters', icon: <People /> },
+    { label: 'Maintenance', icon: <Tools /> },
+    { label: 'Approvals', icon: <CheckCircle /> },
+    { label: 'Reports', icon: <GraphUp /> },
+    { label: 'Settings', icon: <Gear /> }
+  ];
 
   return (
-    <div className="flex h-screen overflow-hidden bg-gray-100">
+    <div className="dashboard-container">
       {/* Sidebar */}
-      <aside
-        className={`fixed inset-y-0 left-0 z-30 w-64 overflow-y-auto transition duration-300 transform bg-white shadow-lg md:translate-x-0 ${
-          sidebarOpen ? 'translate-x-0' : '-translate-x-full'
-        }`}
-      >
-        <div className="flex items-center justify-between px-6 py-4">
-          <div className="flex items-center space-x-2">
-            <svg className="w-6 h-6 text-blue-600" viewBox="0 0 24 24" fill="none" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
-            </svg>
-            <span className="text-xl font-bold">RentMate</span>
-          </div>
-          <button
-            onClick={() => setSidebarOpen(false)}
-            className="md:hidden text-gray-500 focus:outline-none"
-          >
-            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
-            </svg>
-          </button>
+      <div className="sidebar bg-dark text-white">
+        <div className="d-flex align-items-center p-3 mb-3">
+          <Building size={24} className="text-primary me-2" />
+          <h4 className="m-0">RentMate</h4>
         </div>
-
-        <nav className="mt-4 px-4">
-          {Object.keys(tabIcons).map((tab) => (
-            <button
-              key={tab}
-              onClick={() => setActiveTab(tab)}
-              className={`flex items-center w-full px-4 py-2 mt-2 rounded-md capitalize ${
-                activeTab === tab
-                  ? 'bg-blue-100 text-blue-700'
-                  : 'text-gray-600 hover:bg-gray-100'
-              }`}
-            >
-              {tabIcons[tab]}
-              {tab}
-            </button>
+        <ul className="nav flex-column">
+          {navItems.map((item, index) => (
+            <li key={index} className="nav-item">
+              <button
+                className={`nav-link d-flex align-items-center ${activeTab === item.label ? 'active' : ''}`}
+                onClick={() => setActiveTab(item.label)}
+              >
+                <span className="icon me-3">{item.icon}</span>
+                {item.label}
+              </button>
+            </li>
           ))}
-        </nav>
-      </aside>
-
-      {/* Overlay for mobile */}
-      {sidebarOpen && (
-        <div
-          className="fixed inset-0 z-20 bg-black opacity-50 md:hidden"
-          onClick={() => setSidebarOpen(false)}
-        ></div>
-      )}
+        </ul>
+      </div>
 
       {/* Main Content */}
-      <div className="flex flex-col flex-1 overflow-hidden">
-        {/* Top Header */}
-        <header className="flex items-center justify-between px-6 py-4 bg-white border-b border-gray-200">
-          <div className="flex items-center">
-            <button
-              onClick={() => setSidebarOpen(!sidebarOpen)}
-              className="text-gray-500 focus:outline-none md:hidden"
-            >
-              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth="2"
-                  d="M4 6h16M4 12h16M4 18h16"
-                />
-              </svg>
-            </button>
-            <h1 className="ml-4 text-xl font-semibold text-gray-700">Admin Dashboard</h1>
-          </div>
-
-          <div className="flex items-center space-x-4">
-            <div className="relative">
-              <input
-                type="text"
+      <div className="main-content">
+        {/* Header */}
+        <header className="dashboard-header bg-white d-flex justify-content-between align-items-center p-3 shadow-sm">
+          <h4>Dashboard</h4>
+          <div className="d-flex align-items-center">
+            <InputGroup className="me-3">
+              <Form.Control
                 placeholder="Search..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="pl-10 pr-4 py-1 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-400"
               />
-              <svg
-                className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
+              <Button variant="outline-secondary">
+                <Search />
+              </Button>
+            </InputGroup>
+            <div className="position-relative me-3">
+              <Button 
+                variant="link" 
+                className="position-relative"
+                onClick={toggleNotifications}
               >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth="2"
-                  d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
-                />
-              </svg>
+                <Bell size={20} />
+                <Badge 
+                  bg="danger" 
+                  className="position-absolute top-0 start-100 translate-middle rounded-pill"
+                >
+                  {notifications.length}
+                </Badge>
+              </Button>
+              
+              {/* Notifications Panel */}
+              {showNotifications && (
+                <div className="notifications-panel">
+                  <div className="d-flex justify-content-between align-items-center p-3 border-bottom">
+                    <h5 className="m-0">
+                      <Bell className="me-2" /> Notifications
+                    </h5>
+                    <Button 
+                      variant="link" 
+                      className="text-secondary p-0"
+                      onClick={toggleNotifications}
+                    >
+                      &times;
+                    </Button>
+                  </div>
+                  <div className="notifications-body">
+                    {notifications.map(notif => (
+                      <div key={notif.id} className="notification-item p-3 border-bottom">
+                        <div className="d-flex align-items-center">
+                          {notif.type === 'approval' ? (
+                            <Flag className="text-warning me-2" />
+                          ) : notif.type === 'alert' ? (
+                            <ArrowDown className="text-danger me-2" />
+                          ) : (
+                            <Bell className="text-primary me-2" />
+                          )}
+                          <div>
+                            <p className="mb-1">{notif.message}</p>
+                            <small className="text-muted">
+                              {formatTimestamp(notif.timestamp)}
+                              {notif.recats && ` · ${notif.recats} recats ago`}
+                            </small>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                    <div className="p-2 text-center">
+                      <Button variant="link">View all</Button>
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
-            <img
-              src={currentUser?.photoURL || 'https://i.pravatar.cc/60'}
-              alt="Profile"
-              className="w-8 h-8 rounded-full border border-gray-300"
-            />
-            <button
-              onClick={handleLogout}
-              className="px-3 py-1 text-sm text-white bg-red-500 rounded hover:bg-red-600 transition"
-            >
-              Logout
-            </button>
+            <Dropdown>
+              <Dropdown.Toggle variant="link" className="p-0">
+                <img 
+                  src={currentUser?.photoURL || "/assets/default-avatar.png"} 
+                  alt="Profile" 
+                  className="avatar rounded-circle"
+                  onError={(e) => {
+                    e.target.onerror = null;
+                    e.target.src = "https://via.placeholder.com/32";
+                  }}
+                />
+              </Dropdown.Toggle>
+              <Dropdown.Menu align="end">
+                <Dropdown.Item>
+                  <Person className="me-2" /> Profile
+                </Dropdown.Item>
+                <Dropdown.Item>
+                  <Gear className="me-2" /> Settings
+                </Dropdown.Item>
+                <Dropdown.Divider />
+                <Dropdown.Item onClick={handleLogout}>
+                  <BoxArrowRight className="me-2" /> Logout
+                </Dropdown.Item>
+              </Dropdown.Menu>
+            </Dropdown>
           </div>
         </header>
 
-        {/* Page Content */}
-        <main className="flex-1 p-6 overflow-auto">
+        {/* Main Dashboard Content */}
+        <div className="dashboard-body p-4">
           {error && (
-            <div className="mb-4 p-3 text-sm text-red-700 bg-red-100 rounded">
-              {error}
-            </div>
+            <div className="alert alert-danger">{error}</div>
           )}
 
-          {activeTab === 'Overview' && (
-            <>
-              <Row className="g-4 mb-4">
-                <Col xs={12} md={4}>
-                  <StatCard 
-                    Icon={Cart4} 
-                    value={metrics.equipment} 
-                    label="Total Equipment" 
-                    loading={metrics.loading}
-                  />
-                </Col>
-                <Col xs={12} md={4}>
-                  <StatCard 
-                    Icon={People} 
-                    value={metrics.users} 
-                    label="Total Users" 
-                    loading={metrics.loading}
-                  />
-                </Col>
-                <Col xs={12} md={4}>
-                  <StatCard
-                    Icon={BarChart}
-                    value={formattedRevenue}
-                    label="Total Revenue"
-                    loading={metrics.loading}
-                  />
-                </Col>
-              </Row>
-
-              <Card className="shadow-sm">
-                <Card.Header>
-                  <h5 className="mb-0">Recent Rentals</h5>
-                </Card.Header>
+          {/* Stats Cards */}
+          <Row className="mb-4">
+            <Col md={6} lg={3} className="mb-3">
+              <Card className="stats-card">
                 <Card.Body>
-                  <RecentRentalsTable rentals={recentRentals} loading={rentalsLoading} />
+                  <h2 className="display-4">{metrics.loading ? '...' : metrics.properties}</h2>
+                  <p className="text-muted">Total Properties</p>
                 </Card.Body>
               </Card>
-            </>
-          )}
-
-          {activeTab !== 'Overview' && (
-            <Alert variant="info">
-              {activeTab} section is under development
-            </Alert>
-          )}
-        </Container>
+            </Col>
+            <Col md={6} lg={3} className="mb-3">
+              <Card className="stats-card">
+                <Card.Body>
+                  <h2 className="display-4">{metrics.loading ? '...' : metrics.occupied}</h2>
+                  <p className="text-muted">Occupied</p>
+                </Card.Body>
+              </Card>
+            </Col>
+            <Col md={6} lg={3} className="mb-3">
+              <Card className="stats-card">
+                <Card.Body>
+                  <h2 className="display-4">{metrics.loading ? '...' : metrics.occupied}</h2>
+                  <p className="text-muted">Vacant</p>
+                </Card.Body>
+              </Card>
+            </Col>
+            <Col md={6} lg={3} className="mb-3">
+              <Card className="stats-card">
+                <Card.Body>
+                  <h2 className="display-4">{metrics.loading ? '...' : (metrics.properties > 0 ? Math.round((metrics.occupied / metrics.properties) * 100) : 0)}%</h2>
+                  <p className="text-muted">Occupancy Rate</p>
+                </Card.Body>
+              </Card>
+            </Col>
+          </Row>
+          
+          {/* Recent Activity */}
+          <Row className="mb-4">
+            <Col md={12}>
+              <Card>
+                <Card.Header className="bg-white">
+                  <h5 className="mb-0">Recent Activity</h5>
+                </Card.Header>
+                <Card.Body>
+                  {recentActivity.length > 0 ? (
+                    <ul className="activity-list list-unstyled">
+                      {recentActivity.map(activity => (
+                        <li key={activity.id} className="d-flex align-items-center mb-3">
+                          {getActivityIcon(activity.type)}
+                          <div>
+                            <p className="mb-0">{activity.description}</p>
+                          </div>
+                        </li>
+                      ))}
+                    </ul>
+                  ) : (
+                    <p className="text-center text-muted">No recent activity</p>
+                  )}
+                </Card.Body>
+              </Card>
+            </Col>
+          </Row>
+          
+          {/* Renter Overview */}
+          <Row>
+            <Col md={6} className="mb-3">
+              <Card>
+                <Card.Header className="bg-white">
+                  <h5 className="mb-0">Renters Overview</h5>
+                </Card.Header>
+                <Card.Body>
+                  <div className="d-flex justify-content-between align-items-center mb-2">
+                    <span>Active</span>
+                    <span>{metrics.activeRenters}</span>
+                  </div>
+                  <div className="progress mb-4">
+                    <div 
+                      className="progress-bar bg-primary" 
+                      style={{ 
+                        width: `${metrics.activeRenters + metrics.inactiveRenters > 0 ? 
+                          (metrics.activeRenters / (metrics.activeRenters + metrics.inactiveRenters)) * 100 : 0}%` 
+                      }}
+                    ></div>
+                  </div>
+                  
+                  <div className="d-flex justify-content-between align-items-center mb-2">
+                    <span>Inactive</span>
+                    <span>{metrics.inactiveRenters}</span>
+                  </div>
+                  <div className="progress">
+                    <div 
+                      className="progress-bar bg-secondary" 
+                      style={{ 
+                        width: `${metrics.activeRenters + metrics.inactiveRenters > 0 ? 
+                          (metrics.inactiveRenters / (metrics.activeRenters + metrics.inactiveRenters)) * 100 : 0}%` 
+                      }}
+                    ></div>
+                  </div>
+                </Card.Body>
+              </Card>
+            </Col>
+            
+            <Col md={6} className="mb-3">
+              <Card>
+                <Card.Header className="bg-white">
+                  <h5 className="mb-0">Renters Overview</h5>
+                </Card.Header>
+                <Card.Body>
+                  <div className="renters-chart">
+                    <div className="d-flex">
+                      <div className="flex-grow-1">
+                        <div className="d-flex justify-content-between align-items-center">
+                          <span>Active</span>
+                        </div>
+                        <div className="progress mb-3" style={{ height: '30px' }}>
+                          <div 
+                            className="progress-bar bg-primary" 
+                            style={{ 
+                              width: `${metrics.activeRenters + metrics.inactiveRenters > 0 ? 
+                                (metrics.activeRenters / (metrics.activeRenters + metrics.inactiveRenters)) * 100 : 0}%` 
+                            }}
+                          ></div>
+                        </div>
+                        
+                        <div className="d-flex justify-content-between align-items-center">
+                          <span>Inactive</span>
+                        </div>
+                        <div className="progress" style={{ height: '30px' }}>
+                          <div 
+                            className="progress-bar bg-primary" 
+                            style={{ 
+                              width: `${metrics.activeRenters + metrics.inactiveRenters > 0 ? 
+                                (metrics.inactiveRenters / (metrics.activeRenters + metrics.inactiveRenters)) * 100 : 0}%` 
+                            }}
+                          ></div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </Card.Body>
+              </Card>
+            </Col>
+          </Row>
+        </div>
       </div>
     </div>
-  );
-}
-
-// RecentRentalsTable Component
-function RecentRentalsTable({ rentals, loading, statusColors }) {
-  if (loading) {
-    return (
-      <div className="flex justify-center py-6">
-        <div className="w-8 h-8 border-4 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
-      </div>
-    );
-  }
-
-  if (!rentals.length) {
-    return <p className="text-sm text-gray-500">No recent rentals found.</p>;
-  }
-
-  return (
-    <div className="overflow-x-auto">
-      <table className="min-w-full divide-y divide-gray-200">
-        <thead className="bg-gray-50">
-          <tr>
-            <th className="px-4 py-3 text-xs font-medium tracking-wider text-left text-gray-500 uppercase">Equipment</th>
-            <th className="px-4 py-3 text-xs font-medium tracking-wider text-left text-gray-500 uppercase">Renter</th>
-            <th className="px-4 py-3 text-xs font-medium tracking-wider text-left text-gray-500 uppercase">Owner</th>
-            <th className="px-4 py-3 text-xs font-medium tracking-wider text-left text-gray-500 uppercase">Date</th>
-            <th className="px-4 py-3 text-xs font-medium tracking-wider text-left text-gray-500 uppercase">Status</th>
-          </tr>
-        </thead>
-        <tbody className="bg-white divide-y divide-gray-200">
-          {rentals.map((rental) => (
-            <tr key={rental.id}>
-              <td className="px-4 py-3 whitespace-nowrap">
-                <div className="flex items-center">
-                  <svg className="w-5 h-5 text-blue-500 mr-2" viewBox="0 0 20 20" fill="currentColor">
-                    <path d="M4 3a1 1 0 00-1 1v12a1 1 0 001 1h12a1 1 0 001-1V4a1 1 0 00-1-1H4zm0 2h12v10H4V5z" />
-                  </svg>
-                  {rental.equipmentName || 'N/A'}
-                </div>
-              </td>
-              <td className="px-4 py-3 whitespace-nowrap">{rental.renterName || 'Unknown'}</td>
-              <td className="px-4 py-3 whitespace-nowrap">{rental.ownerName || 'Unknown'}</td>
-              <td className="px-4 py-3 whitespace-nowrap">
-                {rental.startDate ? new Date(rental.startDate).toLocaleDateString() : 'Unknown'}
-              </td>
-              <td className="px-4 py-3 whitespace-nowrap">
-                <span className={`inline-flex px-2 text-xs font-semibold leading-5 rounded-full ${statusColors[rental.status] || 'bg-gray-100 text-gray-800'}`}>
-                  {rental.status || 'Unknown'}
-                </span>
-              </td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
-  );
-}
-
-// Custom SVG Icons
-function CartIcon() {
-  return (
-    <svg className="w-6 h-6" fill="currentColor" viewBox="0 0 20 20">
-      <path d="M3 1a1 1 0 000 2h1.22l.305 1.222a.993.993 0 00.01.042l1.358 5.43-.893.892C3.74 11.84 2 13.497 2 15a3 3 0 106 0c0-1.503-1.74-3.16-2.49-4.455l-.913-.913L9.44 9.44A1 1 0 0010 10v2a1 1 0 001 1h1a1 1 0 001-1v-1a1 1 0 00-1-1h-1a1 1 0 00-.707.293l-2.42 2.42a1 1 0 01-1.414 0L6.586 10A1 1 0 005.172 9.586l-.913-.913L3.74 7.26a1 1 0 01.042-.01 1 1 0 01.293-.144l1.358-.892L5 3.292A1 1 0 004.293 2H3z"></path>
-    </svg>
-  );
-}
-
-function UserIcon() {
-  return (
-    <svg className="w-6 h-6" fill="currentColor" viewBox="0 0 20 20">
-      <path d="M9 6a3 3 0 11-6 0 3 3 0 016 0zM17 6a3 3 0 11-6 0 3 3 0 016 0z"></path>
-      <path d="M12.93 17c.046-.327.07-.66.07-1a6.97 6.97 0 00-1.5-4.33A5 5 0 0119 16v1h-6.07zM6 11a5 5 0 015 5v1H1v-1a5 5 0 015-5z"></path>
-    </svg>
-  );
-}
-
-function ChartIcon() {
-  return (
-    <svg className="w-6 h-6" fill="currentColor" viewBox="0 0 20 20">
-      <path d="M2 10a8 8 0 018-8v8h8a8 8 0 11-16 0z"></path>
-      <path d="M12 2.252A8.014 8.014 0 0117.748 8H12V2.252z"></path>
-    </svg>
   );
 }
