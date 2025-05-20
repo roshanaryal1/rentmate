@@ -9,7 +9,7 @@ import { sampleEquipment } from '../../data/sampleEquipment';
 // import 'bootstrap/dist/css/bootstrap.min.css';
 
 function RenterDashboard(
-  
+
 ) {
   const { currentUser } = useAuth();
   const [rentedItems, setRentedItems] = useState([]);
@@ -214,12 +214,11 @@ function RenterDashboard(
                         <h5 className="text-success mb-0">
                           ${item.ratePerDay}/day
                         </h5>
-                        <Link
-                          to={`/rent/${item.id}`}
-                          className="btn btn-primary btn-sm"
-                        >
+                        <Link to={`/rent/${item.id}/fill-details`} 
+                        className="btn btn-primary btn-sm">
                           Rent Now
                         </Link>
+
                       </div>
                       <div className="text-muted small mt-2">
                         <div>

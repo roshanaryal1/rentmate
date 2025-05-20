@@ -4,12 +4,12 @@ import { AuthProvider, useAuth } from './contexts/AuthContext';
 import LoadingSpinner from './components/common/LoadingSpinner';
 import AuthDebug from './components/AuthDebug';
 import RentalHistory from './components/Rental/RentalHistory';
+const RentEquipment = React.lazy(() => import('./components/Rental/RentEquipment'));
 
 
-<Routes>
-  {/* Other routes */}
-  <Route path="/rental-history" element={<RentalHistory />} />
-</Routes>
+
+
+
 
 
 // Lazy load components for better performance
@@ -144,6 +144,8 @@ function AppContent() {
       {/* Catch-all route */}
       <Route path="*" element={<Navigate to="/" />} />
     </Routes>
+
+    
   );
 }
 
