@@ -6,22 +6,10 @@ import AuthDebug from './components/AuthDebug';
 import RentalHistory from './components/Rental/RentalHistory';
 
 
-
-
-
-<Route 
-  path="/rental-history" 
-  element={
-    <ProtectedRoute role="renter" currentUser={currentUser} userRole={userRole}>
-      <DashboardLayout title="Rental History">
-        <RentalHistory />
-      </DashboardLayout>
-    </ProtectedRoute>
-  } 
-/>
-
-
-
+<Routes>
+  {/* Other routes */}
+  <Route path="/rental-history" element={<RentalHistory />} />
+</Routes>
 
 
 // Lazy load components for better performance
