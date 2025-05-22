@@ -1,387 +1,296 @@
+// src/components/Dashboard/AddEquipment.js
 import React, { useState } from 'react';
-import { useAuth } from '../../contexts/AuthContext';
-import { db } from '../../firebase';
-import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
 import { useNavigate } from 'react-router-dom';
-import { Container, Row, Col, Card, Form, Button, Alert, Spinner } from 'react-bootstrap';
-import './AddEquipment.css';
-
-
-// Complete equipment list with all 40 items
-const equipmentList = [
-  // Heavy machinery
-  { name: "Excavator (30-ton)", category: "Heavy Machinery", description: "A heavy-duty digging machine for large-scale earthmoving projects.", suggestedPrice: 450 },
-  { name: "Excavator (70-ton)", category: "Heavy Machinery", description: "Ideal for deep excavation and heavy material handling.", suggestedPrice: 650 },
-  { name: "Bulldozer (D6)", category: "Heavy Machinery", description: "Used for pushing large quantities of soil, sand, or rubble.", suggestedPrice: 500 },
-  { name: "Bulldozer (D9)", category: "Heavy Machinery", description: "Designed for large-scale land clearing and grading.", suggestedPrice: 750 },
-  { name: "Backhoe Loader", category: "Heavy Machinery", description: "Versatile machine for digging and loading in smaller construction sites.", suggestedPrice: 350 },
-  
-  // Material Handling
-  { name: "Forklift (5,000 lbs capacity)", category: "Material Handling", description: "Used for lifting and transporting materials in warehouses.", suggestedPrice: 250 },
-  { name: "Telehandler (Skytrak 10042)", category: "Material Handling", description: "All-terrain forklift with extendable boom for varied heights.", suggestedPrice: 400 },
-  { name: "Wheel Loader (Cat 966)", category: "Material Handling", description: "Efficient for loading trucks with loose materials like gravel.", suggestedPrice: 450 },
-  { name: "Skid Steer Loader", category: "Material Handling", description: "Compact loader for tight spaces and landscaping tasks.", suggestedPrice: 200 },
-  
-  // Concrete Equipment
-  { name: "Concrete Mixer (1.5 cu yd)", category: "Concrete Equipment", description: "Mixes concrete on-site for small to medium pours.", suggestedPrice: 80 },
-  { name: "Concrete Saw (Walk-Behind)", category: "Concrete Equipment", description: "Cuts concrete slabs for repairs or expansions.", suggestedPrice: 120 },
-  { name: "Concrete Pump (Trailer-Mounted)", category: "Concrete Equipment", description: "Pumps concrete to hard-to-reach areas.", suggestedPrice: 350 },
-  
-  // Power Tools
-  { name: "Power Drill (Cordless, 18V)", category: "Power Tools", description: "High-torque drill for construction and DIY projects.", suggestedPrice: 25 },
-  { name: "Orbital Sander", category: "Power Tools", description: "Smooths wood or metal surfaces with precision.", suggestedPrice: 30 },
-  { name: "Jackhammer (Electric)", category: "Power Tools", description: "Breaks up concrete or asphalt with precision.", suggestedPrice: 85 },
-  { name: "Welding Machine (MIG, 200A)", category: "Power Tools", description: "Joins metal pieces for structural work.", suggestedPrice: 75 },
-  
-  // Aerial Lifts
-  { name: "Scissor Lift (19' Electric)", category: "Aerial Lifts", description: "Elevates workers safely for indoor tasks up to 19 feet.", suggestedPrice: 180 },
-  { name: "Scissor Lift (32' Electric)", category: "Aerial Lifts", description: "Higher reach for indoor maintenance and construction.", suggestedPrice: 250 },
-  { name: "Boom Lift (40' Articulating)", category: "Aerial Lifts", description: "Provides flexible reach for outdoor elevated work.", suggestedPrice: 350 },
-  { name: "Boom Lift (45' Articulating)", category: "Aerial Lifts", description: "Extended reach for complex outdoor projects.", suggestedPrice: 400 },
-  
-  // Vehicles
-  { name: "Dump Truck (10-cube)", category: "Vehicles", description: "Transports loose materials like sand or gravel.", suggestedPrice: 300 },
-  { name: "Articulated Dump Truck (40-ton)", category: "Vehicles", description: "Heavy-duty hauler for rough terrains.", suggestedPrice: 450 },
-  { name: "Articulated Dump Truck (45-ton)", category: "Vehicles", description: "Larger capacity for industrial-scale transport.", suggestedPrice: 500 },
-  
-  // Foundation Equipment
-  { name: "Pile Driver (Hydraulic)", category: "Foundation Equipment", description: "Drives piles into the ground for foundation work.", suggestedPrice: 400 },
-  
-  // Pumps
-  { name: "Water Pump (2-inch)", category: "Pumps", description: "Removes water from construction sites or flooded areas.", suggestedPrice: 45 },
-  
-  // Landscaping
-  { name: "Stump Grinder", category: "Landscaping", description: "Grinds tree stumps for land clearing and landscaping.", suggestedPrice: 150 },
-  { name: "Wood Chipper (6-inch)", category: "Landscaping", description: "Shreds branches and wood waste for disposal.", suggestedPrice: 120 },
-  { name: "Lawn Mower (Ride-On)", category: "Landscaping", description: "Cuts large lawns or fields efficiently.", suggestedPrice: 60 },
-  
-  // Excavation
-  { name: "Trencher (Walk-Behind)", category: "Excavation", description: "Digs narrow trenches for utilities or irrigation.", suggestedPrice: 90 },
-  { name: "Trencher (Ride-On)", category: "Excavation", description: "Larger machine for deeper and wider trenching projects.", suggestedPrice: 180 },
-  
-  // Compaction
-  { name: "Compactor (Plate)", category: "Compaction", description: "Compacts soil or asphalt for stable surfaces.", suggestedPrice: 65 },
-  { name: "Compactor (Roller)", category: "Compaction", description: "Smooths and compacts large areas like roads or parking lots.", suggestedPrice: 200 },
-  { name: "Road Roller (Single Drum)", category: "Road Equipment", description: "Compacts asphalt or gravel for road construction.", suggestedPrice: 350 },
-  
-  // Power Equipment
-  { name: "Air Compressor (Portable, 185 CFM)", category: "Power Equipment", description: "Powers pneumatic tools on-site.", suggestedPrice: 55 },
-  { name: "Generator (10 kW)", category: "Power Equipment", description: "Provides temporary power for tools and lighting.", suggestedPrice: 85 },
-  { name: "Generator (20 kW)", category: "Power Equipment", description: "Higher capacity for larger construction sites.", suggestedPrice: 150 },
-  
-  // Cranes
-  { name: "Crane (Mobile, 30-ton)", category: "Cranes", description: "Lifts heavy materials to heights on construction sites.", suggestedPrice: 600 },
-  { name: "Crane (Tower, 50-ton)", category: "Cranes", description: "Stationary crane for high-rise building projects.", suggestedPrice: 850 },
-  
-  // Safety Equipment
-  { name: "Scaffolding System (Modular)", category: "Safety Equipment", description: "Provides safe platforms for workers at height.", suggestedPrice: 30 },
-  
-  // Cleaning Equipment
-  { name: "Pressure Washer (3000 PSI)", category: "Cleaning Equipment", description: "Cleans equipment, surfaces, or buildings.", suggestedPrice: 40 }
-];
-
-// Get unique categories
-const categories = [...new Set(equipmentList.map(item => item.category))];
+import { useAuth } from '../../contexts/AuthContext';
+import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
+import { db } from '../../firebase';
 
 function AddEquipment() {
-  const [formData, setFormData] = useState({
-    selectedEquipment: '',
-    ratePerDay: '',
-    location: '',
-    condition: 'excellent',
-    additionalNotes: '',
-    images: []
-  });
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState('');
-  const [success, setSuccess] = useState('');
-  const [selectedCategory, setSelectedCategory] = useState('');
   const { currentUser } = useAuth();
   const navigate = useNavigate();
-
-  // Filter equipment by category
-  const filteredEquipment = selectedCategory 
-    ? equipmentList.filter(item => item.category === selectedCategory)
-    : equipmentList;
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+  
+  const [formData, setFormData] = useState({
+    name: '',
+    description: '',
+    category: '',
+    ratePerDay: '',
+    location: '',
+    features: '',
+    imageUrl: ''
+  });
 
   const handleChange = (e) => {
     const { name, value } = e.target;
-    
-    // Auto-fill suggested price when equipment is selected
-    if (name === 'selectedEquipment') {
-      const selectedItem = equipmentList.find(item => item.name === value);
-      if (selectedItem && !formData.ratePerDay) {
-        setFormData({
-          ...formData,
-          [name]: value,
-          ratePerDay: selectedItem.suggestedPrice
-        });
-      } else {
-        setFormData({
-          ...formData,
-          [name]: value
-        });
-      }
-    } else {
-      setFormData({
-        ...formData,
-        [name]: value
-      });
-    }
-  };
-
-  const handleCategoryChange = (e) => {
-    setSelectedCategory(e.target.value);
-    // Reset selected equipment when category changes
-    setFormData({
-      ...formData,
-      selectedEquipment: ''
-    });
+    setFormData(prev => ({
+      ...prev,
+      [name]: value
+    }));
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    
-    if (!formData.selectedEquipment || !formData.ratePerDay || !formData.location) {
-      setError('Please fill in all required fields');
-      return;
-    }
-
-    if (formData.ratePerDay <= 0) {
-      setError('Please enter a valid rate per day');
-      return;
-    }
-
-    setLoading(true);
     setError('');
-    setSuccess('');
+    setLoading(true);
+
+    // Validation
+    if (!formData.name.trim()) {
+      setError('Equipment name is required');
+      setLoading(false);
+      return;
+    }
+
+    if (!formData.description.trim()) {
+      setError('Description is required');
+      setLoading(false);
+      return;
+    }
+
+    if (!formData.category) {
+      setError('Please select a category');
+      setLoading(false);
+      return;
+    }
+
+    if (!formData.ratePerDay || parseFloat(formData.ratePerDay) <= 0) {
+      setError('Please enter a valid rate per day');
+      setLoading(false);
+      return;
+    }
+
+    if (!formData.location.trim()) {
+      setError('Location is required');
+      setLoading(false);
+      return;
+    }
 
     try {
-      const selectedEquipmentItem = equipmentList.find(item => item.name === formData.selectedEquipment);
-      
       const equipmentData = {
-        name: selectedEquipmentItem.name,
-        category: selectedEquipmentItem.category,
-        description: selectedEquipmentItem.description,
+        ...formData,
         ratePerDay: parseFloat(formData.ratePerDay),
-        location: formData.location,
-        condition: formData.condition,
-        additionalNotes: formData.additionalNotes,
+        features: formData.features.split(',').map(f => f.trim()).filter(f => f),
         ownerId: currentUser.uid,
         ownerName: currentUser.displayName || currentUser.email,
         available: true,
-        status: 'pending', // Requires admin approval
-        createdAt: serverTimestamp(),
-        updatedAt: serverTimestamp()
+        status: 'approved', // In a real app, this might be 'pending'
+        createdAt: serverTimestamp()
       };
 
-      const docRef = await addDoc(collection(db, "equipment"), equipmentData);
-      console.log("Equipment added with ID: ", docRef.id);
+      await addDoc(collection(db, 'equipment'), equipmentData);
       
-      setSuccess('Equipment added successfully! It will be visible once approved by admin.');
+      // Redirect to owner dashboard with success parameter
+      navigate('/owner-dashboard?equipmentAdded=true');
       
-      // Reset form
-      setFormData({
-        selectedEquipment: '',
-        ratePerDay: '',
-        location: '',
-        condition: 'excellent',
-        additionalNotes: '',
-        images: []
-      });
-      setSelectedCategory('');
-      
-      // Redirect to dashboard after 2 seconds
-      setTimeout(() => {
-        navigate('/dashboard');
-      }, 2000);
-      
-    } catch (err) {
+    } catch (error) {
+      console.error('Error adding equipment:', error);
       setError('Failed to add equipment. Please try again.');
-      console.error(err);
     } finally {
       setLoading(false);
     }
   };
 
-  const quickFillDemo = () => {
-    const randomItem = equipmentList[Math.floor(Math.random() * equipmentList.length)];
-    setFormData({
-      selectedEquipment: randomItem.name,
-      ratePerDay: randomItem.suggestedPrice + Math.floor(Math.random() * 50) - 25, // ±25 variation
-      location: 'Demo Location, City, State',
-      condition: ['excellent', 'good', 'fair'][Math.floor(Math.random() * 3)],
-      additionalNotes: 'This is demo equipment for testing purposes. All equipment is regularly maintained and inspected.'
-    });
-    setSelectedCategory(randomItem.category);
-  };
+  const categories = [
+    'Power Tools',
+    'Construction Equipment', 
+    'Material Handling',
+    'Aerial Equipment',
+    'Concrete Equipment',
+    'Landscaping',
+    'Transportation',
+    'Pumps',
+    'Excavation',
+    'Compaction',
+    'Cutting Tools',
+    'Air Tools',
+    'Power Generation',
+    'Cranes',
+    'Demolition Tools',
+    'Safety Equipment',
+    'Welding Equipment',
+    'Cleaning Equipment',
+    'Surface Preparation',
+    'Painting Equipment',
+    'Plumbing Tools',
+    'Survey Equipment'
+  ];
 
   return (
-    <Container className="py-5">
-      <Row className="justify-content-center">
-        <Col md={8}>
-          <Card className="shadow">
-            <Card.Header className="bg-primary text-white text-center">
-              <h3><i className="fas fa-plus-circle me-2"></i>Add Equipment to Rent</h3>
-              <p className="mb-0">List your equipment and start earning today</p>
-            </Card.Header>
-            <Card.Body>
-              {error && <Alert variant="danger"><i className="fas fa-exclamation-triangle me-2"></i>{error}</Alert>}
-              {success && <Alert variant="success"><i className="fas fa-check-circle me-2"></i>{success}</Alert>}
-              
-              <Form onSubmit={handleSubmit}>
-                <Row className="mb-3">
-                  <Col md={6}>
-                    <Form.Group className="mb-3">
-                      <Form.Label><i className="fas fa-list me-2"></i>Category</Form.Label>
-                      <Form.Select 
-                        value={selectedCategory} 
-                        onChange={handleCategoryChange}
-                      >
-                        <option value="">All Categories</option>
-                        {categories.map((category, index) => (
-                          <option key={index} value={category}>{category}</option>
-                        ))}
-                      </Form.Select>
-                    </Form.Group>
-                  </Col>
-                  <Col md={6}>
-                    <Form.Group className="mb-3">
-                      <Form.Label><i className="fas fa-tools me-2"></i>Select Equipment *</Form.Label>
-                      <Form.Select
-                        name="selectedEquipment"
-                        value={formData.selectedEquipment}
-                        onChange={handleChange}
-                        required
-                      >
-                        <option value="">Choose equipment...</option>
-                        {filteredEquipment.map((item, index) => (
-                          <option key={index} value={item.name}>
-                            {item.name}
-                          </option>
-                        ))}
-                      </Form.Select>
-                    </Form.Group>
-                  </Col>
-                </Row>
+    <div className="max-w-2xl mx-auto">
+      <div className="bg-white shadow-sm rounded-lg p-6">
+        <div className="mb-6">
+          <h2 className="text-2xl font-bold text-gray-900">Add New Equipment</h2>
+          <p className="mt-1 text-sm text-gray-600">
+            List your equipment to start earning rental income.
+          </p>
+        </div>
+        
+        {error && (
+          <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-md">
+            <div className="flex">
+              <div className="flex-shrink-0">
+                <svg className="h-5 w-5 text-red-400" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+                  <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
+                </svg>
+              </div>
+              <div className="ml-3">
+                <p className="text-sm text-red-600">{error}</p>
+              </div>
+            </div>
+          </div>
+        )}
+        
+        <form onSubmit={handleSubmit} className="space-y-6">
+          <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
+            <div className="sm:col-span-2">
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Equipment Name *
+              </label>
+              <input
+                type="text"
+                name="name"
+                value={formData.name}
+                onChange={handleChange}
+                required
+                className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                placeholder="e.g., Power Drill 18V Cordless"
+              />
+            </div>
 
-                {formData.selectedEquipment && (
-                  <Alert variant="info">
-                    <strong>Description:</strong> {equipmentList.find(item => item.name === formData.selectedEquipment)?.description}
-                  </Alert>
-                )}
+            <div className="sm:col-span-2">
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Description *
+              </label>
+              <textarea
+                name="description"
+                value={formData.description}
+                onChange={handleChange}
+                required
+                rows={4}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                placeholder="Describe your equipment, its condition, and what it's best used for..."
+              />
+            </div>
 
-                <Row className="mb-3">
-                  <Col md={6}>
-                    <Form.Group className="mb-3">
-                      <Form.Label><i className="fas fa-dollar-sign me-2"></i>Rate per Day ($) *</Form.Label>
-                      <div className="input-group">
-                        <span className="input-group-text">$</span>
-                        <Form.Control
-                          name="ratePerDay"
-                          type="number"
-                          min="1"
-                          step="0.01"
-                          value={formData.ratePerDay}
-                          onChange={handleChange}
-                          placeholder="Enter daily rate"
-                          required
-                        />
-                      </div>
-                      {formData.selectedEquipment && (
-                        <Form.Text className="text-muted">
-                          Suggested: ${equipmentList.find(item => item.name === formData.selectedEquipment)?.suggestedPrice}/day
-                        </Form.Text>
-                      )}
-                    </Form.Group>
-                  </Col>
-                  <Col md={6}>
-                    <Form.Group className="mb-3">
-                      <Form.Label><i className="fas fa-map-marker-alt me-2"></i>Location/Address *</Form.Label>
-                      <Form.Control
-                        name="location"
-                        type="text"
-                        value={formData.location}
-                        onChange={handleChange}
-                        placeholder="Enter equipment location"
-                        required
-                      />
-                    </Form.Group>
-                  </Col>
-                </Row>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Category *
+              </label>
+              <select
+                name="category"
+                value={formData.category}
+                onChange={handleChange}
+                required
+                className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+              >
+                <option value="">Select a category</option>
+                {categories.map((category) => (
+                  <option key={category} value={category}>
+                    {category}
+                  </option>
+                ))}
+              </select>
+            </div>
 
-                <Form.Group className="mb-3">
-                  <Form.Label><i className="fas fa-star me-2"></i>Condition</Form.Label>
-                  <Form.Select
-                    name="condition"
-                    value={formData.condition}
-                    onChange={handleChange}
-                  >
-                    <option value="excellent">Excellent - Like new, minimal wear</option>
-                    <option value="good">Good - Well-maintained with minor wear</option>
-                    <option value="fair">Fair - Functional with visible wear</option>
-                    <option value="poor">Poor - Functional but needs attention</option>
-                  </Form.Select>
-                </Form.Group>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Rate Per Day ($) *
+              </label>
+              <input
+                type="number"
+                name="ratePerDay"
+                value={formData.ratePerDay}
+                onChange={handleChange}
+                required
+                min="1"
+                step="0.01"
+                className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                placeholder="25.00"
+              />
+            </div>
 
-                <Form.Group className="mb-3">
-                  <Form.Label><i className="fas fa-comment me-2"></i>Additional Notes (Optional)</Form.Label>
-                  <Form.Control
-                    as="textarea"
-                    rows={3}
-                    name="additionalNotes"
-                    value={formData.additionalNotes}
-                    onChange={handleChange}
-                    placeholder="Any additional information about the equipment, special instructions, or requirements..."
-                  />
-                </Form.Group>
+            <div className="sm:col-span-2">
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Location *
+              </label>
+              <input
+                type="text"
+                name="location"
+                value={formData.location}
+                onChange={handleChange}
+                required
+                className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                placeholder="e.g., Auckland Central, Wellington CBD, Christchurch"
+              />
+            </div>
 
-                <Row className="mb-3">
-                  <Col className="text-center">
-                    <Button 
-                      type="button" 
-                      variant="outline-secondary" 
-                      onClick={quickFillDemo}
-                      className="me-3"
-                    >
-                      <i className="fas fa-magic me-2"></i>Quick Fill Demo
-                    </Button>
-                  </Col>
-                </Row>
+            <div className="sm:col-span-2">
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Features (comma-separated)
+              </label>
+              <input
+                type="text"
+                name="features"
+                value={formData.features}
+                onChange={handleChange}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                placeholder="e.g., Cordless, LED light, Fast charging, Variable speed"
+              />
+              <p className="mt-1 text-xs text-gray-500">
+                List key features that make your equipment stand out
+              </p>
+            </div>
 
-                <div className="d-grid gap-2 d-md-flex justify-content-md-end">
-                  <Button
-                    type="button"
-                    variant="secondary"
-                    onClick={() => navigate('/dashboard')}
-                    className="me-md-2"
-                  >
-                    <i className="fas fa-arrow-left me-2"></i>Back to Dashboard
-                  </Button>
-                  <Button
-                    type="submit"
-                    variant="primary"
-                    disabled={loading}
-                  >
-                    {loading ? (
-                      <>
-                        <Spinner animation="border" size="sm" className="me-2" />
-                        Adding...
-                      </>
-                    ) : (
-                      <>
-                        <i className="fas fa-plus me-2"></i>Add Equipment
-                      </>
-                    )}
-                  </Button>
+            <div className="sm:col-span-2">
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Image URL (optional)
+              </label>
+              <input
+                type="url"
+                name="imageUrl"
+                value={formData.imageUrl}
+                onChange={handleChange}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                placeholder="https://example.com/image.jpg"
+              />
+              <p className="mt-1 text-xs text-gray-500">
+                Add a photo URL to make your listing more attractive
+              </p>
+            </div>
+          </div>
+
+          <div className="flex gap-4 pt-6 border-t border-gray-200">
+            <button
+              type="submit"
+              disabled={loading}
+              className="flex-1 bg-blue-600 text-white py-3 px-4 rounded-md font-medium hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            >
+              {loading ? (
+                <div className="flex items-center justify-center">
+                  <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                  </svg>
+                  Adding Equipment...
                 </div>
-              </Form>
-            </Card.Body>
-          </Card>
-        </Col>
-      </Row>
-    </Container>
+              ) : (
+                'Add Equipment'
+              )}
+            </button>
+            
+            <button
+              type="button"
+              onClick={() => navigate('/owner-dashboard')}
+              disabled={loading}
+              className="flex-1 bg-gray-100 text-gray-700 py-3 px-4 rounded-md font-medium hover:bg-gray-200 focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            >
+              Cancel
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
   );
 }
 
-export default AddEquipment; 
+export default AddEquipment;
