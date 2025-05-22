@@ -1,70 +1,232 @@
-# Getting Started with Create React App
+# RentMate - Equipment Rental Platform
 
-This project was bootstrapped with [Create React App](https://github.com/facebook/create-react-app).
+[![Version](https://img.shields.io/badge/version-1.0.0-blue.svg)](https://github.com/roshanaryal1/rentmate/releases)
+[![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
+[![React](https://img.shields.io/badge/React-19.1.0-blue.svg)](https://reactjs.org/)
+[![Firebase](https://img.shields.io/badge/Firebase-9.23.0-orange.svg)](https://firebase.google.com/)
 
-## Available Scripts
+RentMate is a modern, full-featured equipment rental platform that connects equipment owners with renters. Built with React and Firebase, it provides a seamless experience for listing, browsing, and renting construction and industrial equipment.
 
-In the project directory, you can run:
+## 🌟 Features
 
-### `npm start`
+### For Equipment Renters
+- **Browse Equipment**: Discover a wide variety of construction and industrial equipment
+- **Advanced Search**: Filter by category, location, price, and availability
+- **Rental Management**: Track current and past rentals
+- **User Dashboard**: Manage your rental history and preferences
+- **Secure Authentication**: Google OAuth and email/password login
 
-Runs the app in the development mode.\
-Open [http://localhost:3000](http://localhost:3000) to view it in your browser.
+### For Equipment Owners
+- **List Equipment**: Add your equipment with detailed descriptions and pricing
+- **Inventory Management**: Track availability and rental status
+- **Earnings Dashboard**: Monitor rental income and performance
+- **Rental History**: View all past and current rentals
 
-The page will reload when you make changes.\
-You may also see any lint errors in the console.
+### For Administrators
+- **User Management**: Oversee user accounts and permissions
+- **Equipment Approval**: Review and approve new equipment listings
+- **Platform Analytics**: Monitor platform usage and performance
+- **Content Moderation**: Ensure quality and safety standards
 
-### `npm test`
+## 🚀 Live Demo
 
-Launches the test runner in the interactive watch mode.\
-See the section about [running tests](https://facebook.github.io/create-react-app/docs/running-tests) for more information.
+Visit the live application: [RentMate Demo](https://roshanaryal1.github.io/rentmate)
 
-### `npm run build`
+## 📋 Prerequisites
 
-Builds the app for production to the `build` folder.\
-It correctly bundles React in production mode and optimizes the build for the best performance.
+Before running this project, make sure you have:
 
-The build is minified and the filenames include the hashes.\
-Your app is ready to be deployed!
+- Node.js (v16 or higher)
+- npm or yarn package manager
+- Firebase account
+- Git
 
-See the section about [deployment](https://facebook.github.io/create-react-app/docs/deployment) for more information.
+## 🛠️ Installation
 
-### `npm run eject`
+1. **Clone the repository**
+   ```bash
+   git clone https://github.com/roshanaryal1/rentmate.git
+   cd rentmate
+   ```
 
-**Note: this is a one-way operation. Once you `eject`, you can't go back!**
+2. **Install dependencies**
+   ```bash
+   npm install
+   ```
 
-If you aren't satisfied with the build tool and configuration choices, you can `eject` at any time. This command will remove the single build dependency from your project.
+3. **Firebase Setup**
+   - Create a new Firebase project at [Firebase Console](https://console.firebase.google.com/)
+   - Enable Authentication (Email/Password and Google)
+   - Create a Firestore database
+   - Copy your Firebase configuration
 
-Instead, it will copy all the configuration files and the transitive dependencies (webpack, Babel, ESLint, etc) right into your project so you have full control over them. All of the commands except `eject` will still work, but they will point to the copied scripts so you can tweak them. At this point you're on your own.
+4. **Environment Configuration**
+   Create a `.env` file in the root directory:
+   ```env
+   REACT_APP_FIREBASE_API_KEY=your_api_key
+   REACT_APP_FIREBASE_AUTH_DOMAIN=your_auth_domain
+   REACT_APP_FIREBASE_PROJECT_ID=your_project_id
+   REACT_APP_FIREBASE_STORAGE_BUCKET=your_storage_bucket
+   REACT_APP_FIREBASE_MESSAGING_SENDER_ID=your_messaging_sender_id
+   REACT_APP_FIREBASE_APP_ID=your_app_id
+   ```
 
-You don't have to ever use `eject`. The curated feature set is suitable for small and middle deployments, and you shouldn't feel obligated to use this feature. However we understand that this tool wouldn't be useful if you couldn't customize it when you are ready for it.
+5. **Start the development server**
+   ```bash
+   npm start
+   ```
 
-## Learn More
+6. **Build for production**
+   ```bash
+   npm run build
+   ```
 
-You can learn more in the [Create React App documentation](https://facebook.github.io/create-react-app/docs/getting-started).
+## 🏗️ Project Structure
 
-To learn React, check out the [React documentation](https://reactjs.org/).
+```
+rentmate/
+├── public/
+│   ├── index.html
+│   └── manifest.json
+├── src/
+│   ├── components/          # Reusable UI components
+│   │   ├── auth/           # Authentication components
+│   │   ├── Dashboard/      # Dashboard components
+│   │   ├── Equipment/      # Equipment-related components
+│   │   └── common/         # Shared components
+│   ├── contexts/           # React contexts
+│   ├── data/              # Sample data and constants
+│   ├── pages/             # Page components
+│   ├── services/          # API and service functions
+│   ├── theme/             # Theme and styling
+│   ├── App.js             # Main application component
+│   └── index.js           # Application entry point
+├── package.json
+└── README.md
+```
 
-### Code Splitting
+## 🧪 Testing
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/code-splitting](https://facebook.github.io/create-react-app/docs/code-splitting)
+Run the test suite:
+```bash
+npm test
+```
 
-### Analyzing the Bundle Size
+Run tests with coverage:
+```bash
+npm test -- --coverage
+```
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/analyzing-the-bundle-size](https://facebook.github.io/create-react-app/docs/analyzing-the-bundle-size)
+## 🚀 Deployment
 
-### Making a Progressive Web App
+### GitHub Pages
+1. Install gh-pages:
+   ```bash
+   npm install --save-dev gh-pages
+   ```
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/making-a-progressive-web-app](https://facebook.github.io/create-react-app/docs/making-a-progressive-web-app)
+2. Deploy:
+   ```bash
+   npm run deploy
+   ```
 
-### Advanced Configuration
+### Firebase Hosting
+1. Install Firebase CLI:
+   ```bash
+   npm install -g firebase-tools
+   ```
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/advanced-configuration](https://facebook.github.io/create-react-app/docs/advanced-configuration)
+2. Initialize hosting:
+   ```bash
+   firebase init hosting
+   ```
 
-### Deployment
+3. Deploy:
+   ```bash
+   npm run build
+   firebase deploy
+   ```
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/deployment](https://facebook.github.io/create-react-app/docs/deployment)
+## 🔧 Configuration
 
-### `npm run build` fails to minify
+### Firebase Security Rules
+```javascript
+// Firestore Security Rules
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    match /users/{userId} {
+      allow read, write: if request.auth != null && request.auth.uid == userId;
+    }
+    
+    match /equipment/{equipmentId} {
+      allow read: if request.auth != null;
+      allow write: if request.auth != null && 
+        (resource.data.ownerId == request.auth.uid || 
+         get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin');
+    }
+  }
+}
+```
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/troubleshooting#npm-run-build-fails-to-minify](https://facebook.github.io/create-react-app/docs/troubleshooting#npm-run-build-fails-to-minify)
+## 🤝 Contributing
+
+We welcome contributions! Please follow these steps:
+
+1. Fork the repository
+2. Create a feature branch: `git checkout -b feature/amazing-feature`
+3. Commit your changes: `git commit -m 'Add amazing feature'`
+4. Push to the branch: `git push origin feature/amazing-feature`
+5. Open a Pull Request
+
+### Development Guidelines
+- Follow React best practices
+- Write meaningful commit messages
+- Add tests for new features
+- Update documentation as needed
+
+## 📝 License
+
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+
+## 🆘 Support
+
+If you encounter any issues or have questions:
+
+1. Check the [Issues](https://github.com/roshanaryal1/rentmate/issues) page
+2. Create a new issue if your problem isn't already reported
+3. Contact us at support@rentmate.com
+
+## 🗺️ Roadmap
+
+### Version 1.1 (Coming Soon)
+- [ ] Mobile app (React Native)
+- [ ] Payment integration (Stripe)
+- [ ] Real-time chat between renters and owners
+- [ ] Equipment location tracking (GPS)
+- [ ] Advanced analytics dashboard
+
+### Version 1.2 (Future)
+- [ ] Multi-language support
+- [ ] Equipment insurance integration
+- [ ] Maintenance scheduling
+- [ ] Review and rating system
+
+## 📊 Stats
+
+- **Total Equipment Categories**: 15+
+- **Sample Equipment Items**: 50+
+- **User Roles**: 3 (Renter, Owner, Admin)
+- **Supported Browsers**: Chrome, Firefox, Safari, Edge
+
+## 🏆 Acknowledgments
+
+- [React](https://reactjs.org/) - UI library
+- [Firebase](https://firebase.google.com/) - Backend services
+- [Bootstrap](https://getbootstrap.com/) - CSS framework
+- [React Router](https://reactrouter.com/) - Client-side routing
+- [Bootstrap Icons](https://icons.getbootstrap.com/) - Icon library
+
+---
+
+**Made with ❤️ by ROSHAN ARYAL ,DHRUB, APKSHYA (https://github.com/roshanaryal1)
