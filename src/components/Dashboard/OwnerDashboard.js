@@ -1,10 +1,10 @@
 // src/components/Dashboard/OwnerDashboard.js
 import React, { useState, useEffect } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import { collection, query, where, getDocs } from 'firebase/firestore';
 import { db } from '../../firebase';
-import { Modal, Button, Tab, Tabs } from 'react-bootstrap';
+import FeedbackModal from '../FeedbackModal';
 import './OwnerDashboard.css';
 
 function OwnerDashboard() {
@@ -12,9 +12,19 @@ function OwnerDashboard() {
   const [equipmentItems, setEquipmentItems] = useState([]);
   const [activeRentals, setActiveRentals] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [showModal, setShowModal] = useState(false);
-  const [selectedEquipment, setSelectedEquipment] = useState(null);
-  const [activeTab, setActiveTab] = useState('equipment');
+  const [showFeedback, setShowFeedback] = useState(false);
+  const location = useLocation();
+  const navigate = useNavigate();
+
+  useEffect(() => {
+    // Check if we just came from adding equipment
+    const urlParams = new URLSearchParams(location.search);
+    if (urlParams.get('equipmentAdded') === 'true') {
+      setShowFeedback(true);
+      // Clean up the URL
+      navigate('/my-dashboard', { replace: true });
+    }
+  }, [location, navigate]);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -71,303 +81,152 @@ function OwnerDashboard() {
     fetchData();
   }, [currentUser]);
 
-  const handleShowDetails = (equipment) => {
-    setSelectedEquipment(equipment);
-    setShowModal(true);
-  };
-
-  const handleCloseModal = () => {
-    setShowModal(false);
-  };
-
-  const renderEquipmentSection = () => (
-    <div className="equipment-section">
-      <div className="section-header">
-        <h3 className="text-xl font-semibold mb-4">Your Equipment</h3>
-        <Link
-          to="/add-equipment"
-          className="add-equipment-btn"
-        >
-          <i className="fas fa-plus-circle me-2"></i>
-          Add Equipment
-        </Link>
-      </div>
-      
-      {loading ? (
-        <div className="loader-container">
-          <div className="spinner-border text-primary" role="status">
-            <span className="visually-hidden">Loading...</span>
-          </div>
-          <p>Loading your equipment...</p>
-        </div>
-      ) : equipmentItems.length > 0 ? (
-        <div className="equipment-grid">
-          {equipmentItems.map((item) => (
-            <div key={item.id} className="equipment-card">
-              <div className="equipment-image">
-                <img 
-                  src={item.imageUrl || "https://via.placeholder.com/300x200?text=No+Image"} 
-                  alt={item.name}
-                  className="img-fluid"
-                />
-                <span className={`status-badge ${item.available ? 'available' : 'unavailable'}`}>
-                  {item.available ? 'Available' : 'Rented Out'}
-                </span>
-              </div>
-              <div className="equipment-details">
-                <h4 className="equipment-name">{item.name}</h4>
-                <p className="equipment-category">{item.category}</p>
-                <p className="equipment-rate">${item.ratePerDay}/day</p>
-                <div className="equipment-actions">
-                  <button 
-                    className="details-btn"
-                    onClick={() => handleShowDetails(item)}
-                  >
-                    View Details
-                  </button>
-                  <Link
-                    to={`/equipment/${item.id}`}
-                    className="edit-btn"
-                  >
-                    Edit
-                  </Link>
-                </div>
-              </div>
-            </div>
-          ))}
-        </div>
-      ) : (
-        <div className="no-equipment">
-          <div className="empty-state">
-            <img 
-              src="/images/empty-equipment.svg" 
-              alt="No equipment" 
-              className="empty-icon"
-              onError={(e) => {
-                e.target.onerror = null;
-                e.target.src = "https://via.placeholder.com/150?text=Empty";
-              }}
-            />
-            <h4>You haven't listed any equipment yet</h4>
-            <p>Start earning by listing your equipment for rent</p>
-            <Link
-              to="/add-equipment"
-              className="empty-action-btn"
-            >
-              Add Your First Equipment
-            </Link>
-          </div>
-        </div>
-      )}
-    </div>
-  );
-
-  const renderRentalsSection = () => (
-    <div className="rentals-section">
-      <h3 className="text-xl font-semibold mb-4">Active Rentals</h3>
-      
-      {loading ? (
-        <div className="loader-container">
-          <div className="spinner-border text-primary" role="status">
-            <span className="visually-hidden">Loading...</span>
-          </div>
-          <p>Loading active rentals...</p>
-        </div>
-      ) : activeRentals.length > 0 ? (
-        <div className="rentals-list">
-          {activeRentals.map((rental) => (
-            <div key={rental.id} className="rental-card">
-              <div className="rental-info">
-                <div className="rental-primary">
-                  <h4>{rental.equipmentName}</h4>
-                  <span className="rental-dates">
-                    Until {new Date(rental.endDate.toDate()).toLocaleDateString()}
-                  </span>
-                </div>
-                <div className="rental-secondary">
-                  <p>Rented by: {rental.renterName}</p>
-                  <p className="rental-price">${rental.totalPrice}</p>
-                </div>
-              </div>
-              <div className="rental-actions">
-                <button className="contact-btn">Contact Renter</button>
-                <button className="track-btn">Track Equipment</button>
-              </div>
-            </div>
-          ))}
-        </div>
-      ) : (
-        <div className="no-rentals">
-          <div className="empty-state">
-            <img 
-              src="/images/no-rentals.svg" 
-              alt="No rentals" 
-              className="empty-icon"
-              onError={(e) => {
-                e.target.onerror = null;
-                e.target.src = "https://via.placeholder.com/150?text=No+Rentals";
-              }}
-            />
-            <h4>No active rentals at the moment</h4>
-            <p>Your equipment is available for rent</p>
-          </div>
-        </div>
-      )}
-    </div>
-  );
-
-  // Equipment detail modal
-  const renderEquipmentModal = () => {
-    if (!selectedEquipment) return null;
-    
-    return (
-      <Modal 
-        show={showModal} 
-        onHide={handleCloseModal} 
-        size="lg" 
-        centered
-      >
-        <Modal.Header closeButton>
-          <Modal.Title>{selectedEquipment.name}</Modal.Title>
-        </Modal.Header>
-        <Modal.Body>
-          <div className="equipment-modal-content">
-            <div className="equipment-modal-image">
-              <img 
-                src={selectedEquipment.imageUrl || "https://via.placeholder.com/400x300?text=No+Image"} 
-                alt={selectedEquipment.name}
-                className="img-fluid rounded"
-              />
-            </div>
-            <div className="equipment-modal-details">
-              <div className="detail-row">
-                <span className="detail-label">Category:</span>
-                <span className="detail-value">{selectedEquipment.category}</span>
-              </div>
-              <div className="detail-row">
-                <span className="detail-label">Daily Rate:</span>
-                <span className="detail-value">${selectedEquipment.ratePerDay}</span>
-              </div>
-              <div className="detail-row">
-                <span className="detail-label">Status:</span>
-                <span className={`detail-value status-text ${selectedEquipment.available ? 'text-success' : 'text-danger'}`}>
-                  {selectedEquipment.available ? 'Available' : 'Rented Out'}
-                </span>
-              </div>
-              <div className="detail-row">
-                <span className="detail-label">Description:</span>
-                <p className="detail-value description">
-                  {selectedEquipment.description || "No description provided."}
-                </p>
-              </div>
-              
-              {selectedEquipment.features && selectedEquipment.features.length > 0 && (
-                <div className="detail-row">
-                  <span className="detail-label">Features:</span>
-                  <ul className="features-list">
-                    {selectedEquipment.features.map((feature, index) => (
-                      <li key={index}>{feature}</li>
-                    ))}
-                  </ul>
-                </div>
-              )}
-            </div>
-          </div>
-        </Modal.Body>
-        <Modal.Footer>
-          <Button variant="secondary" onClick={handleCloseModal}>
-            Close
-          </Button>
-          <Link 
-            to={`/equipment/${selectedEquipment.id}/edit`} 
-            className="btn btn-primary"
-          >
-            Edit Equipment
-          </Link>
-        </Modal.Footer>
-      </Modal>
-    );
+  const handleCloseFeedback = () => {
+    setShowFeedback(false);
   };
 
   return (
-    <div className="owner-dashboard">
+    <div className="dashboard-container">
+      <FeedbackModal 
+        isOpen={showFeedback}
+        onClose={handleCloseFeedback}
+        title="Equipment Added Successfully! 🎉"
+        message="Your equipment has been listed and is now available for rent. You can track its performance and manage bookings from this dashboard."
+      />
+      
       <div className="dashboard-header">
-        <div className="dashboard-title">
-          <h2>Owner Dashboard</h2>
-          <p className="dashboard-subtitle">
-            Manage your equipment and track rentals from one place
-          </p>
-        </div>
-        <div className="dashboard-stats">
-          <div className="stat-card">
-            <span className="stat-number">{equipmentItems.length}</span>
-            <span className="stat-label">Equipment Items</span>
-          </div>
-          <div className="stat-card">
-            <span className="stat-number">{activeRentals.length}</span>
-            <span className="stat-label">Active Rentals</span>
-          </div>
-          <div className="stat-card">
-            <span className="stat-number">
-              ${activeRentals.reduce((sum, rental) => sum + rental.totalPrice, 0)}
-            </span>
-            <span className="stat-label">Current Earnings</span>
-          </div>
-        </div>
+        <h2>Owner Dashboard</h2>
+        <p className="mt-2 max-w-4xl text-sm text-gray-500">
+          List your equipment and manage your rentals in one place.
+        </p>
       </div>
       
-      <div className="dashboard-navigation">
-        <Tabs
-          activeKey={activeTab}
-          onSelect={(key) => setActiveTab(key)}
-          className="dashboard-tabs"
-        >
-          <Tab eventKey="equipment" title="Equipment">
-            {renderEquipmentSection()}
-          </Tab>
-          <Tab eventKey="rentals" title="Active Rentals">
-            {renderRentalsSection()}
-          </Tab>
-          <Tab eventKey="history" title="Rental History">
-            <div className="rental-history-section">
-              <h3 className="text-xl font-semibold mb-4">Rental History</h3>
-              <p>View your past equipment rentals and earnings.</p>
-              <Link
-                to="/rental-history"
-                className="view-history-btn"
-              >
-                View Full History
-              </Link>
-            </div>
-          </Tab>
-        </Tabs>
+      <div className="dashboard-actions">
+        <Link to="/add-equipment" className="add-btn">
+          + Add New Equipment
+        </Link>
+        <Link to="/equipment-analytics" className="analytics-btn">
+          📊 View Analytics
+        </Link>
       </div>
       
-      <div className="dashboard-quick-links">
-        <div className="quick-link-card">
-          <h3 className="card-title">Account Settings</h3>
-          <p className="card-description">Update your profile information and preferences.</p>
-          <Link
-            to="/account-settings"
-            className="card-link"
-          >
-            Edit Settings
-          </Link>
+      <div className="mt-6">
+        <div className="flex justify-between mb-4">
+          <h4 className="text-md font-medium text-gray-700">Your Equipment</h4>
         </div>
         
-        <div className="quick-link-card">
-          <h3 className="card-title">Earnings Report</h3>
-          <p className="card-description">View detailed financial reports and analytics.</p>
-          <Link
-            to="/earnings-report"
-            className="card-link"
-          >
-            View Report
-          </Link>
-        </div>
+        {loading ? (
+          <p>Loading your equipment...</p>
+        ) : equipmentItems.length > 0 ? (
+          <ul className="equipment-list">
+            {equipmentItems.map((item) => (
+              <li key={item.id} className="equipment-card">
+                <img 
+                  src={item.imageUrl || '/api/placeholder/400/250'} 
+                  alt={item.name}
+                />
+                <div className="equipment-info">
+                  <h4>{item.name}</h4>
+                  <p>{item.category}</p>
+                  <span className={`status-badge ${item.available ? 'available' : 'unavailable'}`}>
+                    {item.available ? 'Available' : 'Rented Out'}
+                  </span>
+                  <p className="rate">${item.ratePerDay}/day</p>
+                  <Link to={`/equipment/${item.id}`} className="details-link">
+                    View Details →
+                  </Link>
+                </div>
+              </li>
+            ))}
+          </ul>
+        ) : (
+          <div className="no-equipment">
+            <p>You haven't listed any equipment yet</p>
+            <Link to="/add-equipment">
+              Add Your First Equipment
+            </Link>
+          </div>
+        )}
       </div>
       
-      {renderEquipmentModal()}
+      <div className="mt-8">
+        <h4 className="text-md font-medium text-gray-700 mb-4">Active Rentals</h4>
+        
+        {loading ? (
+          <p>Loading active rentals...</p>
+        ) : activeRentals.length > 0 ? (
+          <div className="bg-white shadow overflow-hidden sm:rounded-md">
+            <ul className="divide-y divide-gray-200">
+              {activeRentals.map((rental) => (
+                <li key={rental.id}>
+                  <div className="px-4 py-4 sm:px-6">
+                    <div className="flex items-center justify-between">
+                      <p className="text-sm font-medium text-blue-600 truncate">
+                        {rental.equipmentName}
+                      </p>
+                      <div className="ml-2 flex-shrink-0 flex">
+                        <p className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-green-100 text-green-800">
+                          Until {new Date(rental.endDate.toDate()).toLocaleDateString()}
+                        </p>
+                      </div>
+                    </div>
+                    <div className="mt-2 sm:flex sm:justify-between">
+                      <div className="sm:flex">
+                        <p className="flex items-center text-sm text-gray-500">
+                          Rented by: {rental.renterName}
+                        </p>
+                      </div>
+                      <div className="mt-2 flex items-center text-sm text-gray-500 sm:mt-0">
+                        <p>${rental.totalPrice}</p>
+                      </div>
+                    </div>
+                  </div>
+                </li>
+              ))}
+            </ul>
+          </div>
+        ) : (
+          <div className="text-center py-6 bg-gray-50 rounded-lg">
+            <p className="text-gray-500">No active rentals at the moment</p>
+          </div>
+        )}
+      </div>
+      
+      <div className="mt-8 grid grid-cols-1 gap-5 sm:grid-cols-2">
+        <div className="bg-white overflow-hidden shadow rounded-lg">
+          <div className="px-4 py-5 sm:p-6">
+            <h3 className="text-lg font-medium leading-6 text-gray-900">Rental History</h3>
+            <div className="mt-2 max-w-xl text-sm text-gray-500">
+              <p>View past rentals and income from your equipment.</p>
+            </div>
+            <div className="mt-5">
+              <Link
+                to="/rental-history"
+                className="inline-flex items-center px-4 py-2 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50"
+              >
+                View History
+              </Link>
+            </div>
+          </div>
+        </div>
+        
+        <div className="bg-white overflow-hidden shadow rounded-lg">
+          <div className="px-4 py-5 sm:p-6">
+            <h3 className="text-lg font-medium leading-6 text-gray-900">Account Settings</h3>
+            <div className="mt-2 max-w-xl text-sm text-gray-500">
+              <p>Update your profile information and preferences.</p>
+            </div>
+            <div className="mt-5">
+              <Link
+                to="/account-settings"
+                className="inline-flex items-center px-4 py-2 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50"
+              >
+                Edit Settings
+              </Link>
+            </div>
+          </div>
+        </div>
+      </div>
     </div>
   );
 }
