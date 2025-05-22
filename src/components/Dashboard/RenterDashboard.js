@@ -6,7 +6,7 @@ import { db } from '../../firebase';
 import { sampleEquipment } from '../../data/sampleEquipment';
 
 function RenterDashboard(
-  
+
 ) {
   const { currentUser } = useAuth();
   const [equipmentList, setEquipmentList] = useState([]);

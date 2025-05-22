@@ -12,6 +12,11 @@ import RentalHistory from './components/Rental/RentalHistory';
 </Routes>
 
 
+
+
+
+
+
 // Lazy load components for better performance
 const Signup = React.lazy(() => import('./components/auth/Signup'));
 const Login = React.lazy(() => import('./components/auth/Login'));
@@ -144,6 +149,8 @@ function AppContent() {
       {/* Catch-all route */}
       <Route path="*" element={<Navigate to="/" />} />
     </Routes>
+
+    
   );
 }
 
