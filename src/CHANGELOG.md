@@ -99,6 +99,6 @@ All notable changes to RentMate will be documented in this file.
 
 **Release Date**: January 22, 2025  
 **Contributors**: ROSHAN ARYAL 
-**Total Commits**: 50+  
+**Total Commits**: 60+  
 **Files Changed**: 50+  
 **Lines of Code**: 5000+
