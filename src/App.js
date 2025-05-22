@@ -1,16 +1,10 @@
 import React, { useState, Suspense } from 'react';
-import { BrowserRouter as Router, Routes, Route, Navigate, Link, useNavigate } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, Navigate, Link, useNavigate, useLocation } from 'react-router-dom';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import LoadingSpinner from './components/common/LoadingSpinner';
 import AuthDebug from './components/AuthDebug';
 import RentalHistory from './components/Rental/RentalHistory';
-
-
-<Routes>
-  {/* Other routes */}
-  <Route path="/rental-history" element={<RentalHistory />} />
-</Routes>
-
+import FeedbackModal from './components/FeedbackModal';
 
 // Lazy load components for better performance
 const Signup = React.lazy(() => import('./components/auth/Signup'));
@@ -109,7 +103,7 @@ function AppContent() {
         element={
           <ProtectedRoute role="owner" currentUser={currentUser} userRole={userRole}>
             <DashboardLayout title="Equipment Owner Dashboard">
-              <OwnerDashboard />
+              <OwnerDashboardWithFeedback />
             </DashboardLayout>
           </ProtectedRoute>
         } 
@@ -137,6 +131,18 @@ function AppContent() {
         } 
       />
       
+      {/* Rental History Route */}
+      <Route 
+        path="/rental-history" 
+        element={
+          <ProtectedRoute currentUser={currentUser} userRole={userRole}>
+            <DashboardLayout title="Rental History">
+              <RentalHistory />
+            </DashboardLayout>
+          </ProtectedRoute>
+        } 
+      />
+      
       {/* Legacy redirects */}
       <Route path="/my-dashboard" element={<Navigate to="/" />} />
       <Route path="/dashboard" element={<Navigate to="/" />} />
@@ -144,6 +150,39 @@ function AppContent() {
       {/* Catch-all route */}
       <Route path="*" element={<Navigate to="/" />} />
     </Routes>
+  );
+}
+
+// Wrapper component for OwnerDashboard with FeedbackModal
+function OwnerDashboardWithFeedback() {
+  const [showFeedback, setShowFeedback] = useState(false);
+  const location = useLocation();
+  const navigate = useNavigate();
+
+  React.useEffect(() => {
+    // Check if we just came from adding equipment
+    const urlParams = new URLSearchParams(location.search);
+    if (urlParams.get('equipmentAdded') === 'true') {
+      setShowFeedback(true);
+      // Clean up the URL
+      navigate('/owner-dashboard', { replace: true });
+    }
+  }, [location, navigate]);
+
+  const handleCloseFeedback = () => {
+    setShowFeedback(false);
+  };
+
+  return (
+    <>
+      <FeedbackModal 
+        isOpen={showFeedback}
+        onClose={handleCloseFeedback}
+        title="Equipment Added Successfully! 🎉"
+        message="Your equipment has been listed and is now available for rent. You can track its performance and manage bookings from this dashboard."
+      />
+      <OwnerDashboard />
+    </>
   );
 }
 
@@ -180,7 +219,7 @@ function ProtectedRoute({ role, currentUser, userRole, children }) {
     requiredRole: role, 
     currentUser: currentUser?.email, 
     userRole,
-    hasAccess: currentUser && (userRole === role || userRole === 'admin')
+    hasAccess: currentUser && (!role || userRole === role || userRole === 'admin')
   });
 
   if (!currentUser) {
@@ -194,6 +233,11 @@ function ProtectedRoute({ role, currentUser, userRole, children }) {
 
   // Admin can access everything
   if (userRole === 'admin') {
+    return children;
+  }
+
+  // If no specific role is required, allow access to any authenticated user
+  if (!role) {
     return children;
   }
 
@@ -228,6 +272,26 @@ function DashboardLayout({ children, title }) {
     setLoading(false);
   };
 
+  // Navigation items based on user role
+  const getNavigationItems = () => {
+    const baseItems = [
+      { name: 'Dashboard', href: '/', current: location.pathname === '/' }
+    ];
+
+    if (userRole === 'owner') {
+      baseItems.push(
+        { name: 'Add Equipment', href: '/add-equipment', current: location.pathname === '/add-equipment' },
+        { name: 'Rental History', href: '/rental-history', current: location.pathname === '/rental-history' }
+      );
+    } else if (userRole === 'renter') {
+      baseItems.push(
+        { name: 'Rental History', href: '/rental-history', current: location.pathname === '/rental-history' }
+      );
+    }
+
+    return baseItems;
+  };
+
   return (
     <div className="min-h-screen bg-gray-100">
       <nav className="bg-white shadow-sm">
@@ -237,7 +301,25 @@ function DashboardLayout({ children, title }) {
               <div className="flex-shrink-0 flex items-center">
                 <Link to="/" className="text-xl font-bold text-blue-600">RentMate</Link>
               </div>
+              
+              {/* Navigation Menu */}
+              <div className="hidden sm:ml-6 sm:flex sm:space-x-8">
+                {getNavigationItems().map((item) => (
+                  <Link
+                    key={item.name}
+                    to={item.href}
+                    className={`${
+                      item.current
+                        ? 'border-blue-500 text-gray-900'
+                        : 'border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700'
+                    } inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium`}
+                  >
+                    {item.name}
+                  </Link>
+                ))}
+              </div>
             </div>
+            
             <div className="flex items-center">
               <div className="hidden md:ml-4 md:flex-shrink-0 md:flex md:items-center">
                 <div className="ml-3 relative">
