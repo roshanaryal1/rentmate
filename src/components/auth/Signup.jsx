@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
+import { signInWithGoogle, signInWithFacebook } from '../../firebase'; // Adjust the path based on your project structure
 
-const Signup = () => {
+export default function Signup() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [passwordConfirm, setPasswordConfirm] = useState('');
@@ -32,7 +33,6 @@ const Signup = () => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-
     // Form validation
     if (!fullName.trim()) {
       setError('Please enter your full name');
@@ -61,7 +61,7 @@ const Signup = () => {
 
     setLoading(true);
     try {
-      // Simulate API call
+      // Simulate API call or Firebase signup
       console.log('Signing up with:', { email, fullName, selectedRole });
       await new Promise((resolve) => setTimeout(resolve, 1500));
       alert('Signup successful!');
@@ -70,6 +70,28 @@ const Signup = () => {
       console.error(err);
     } finally {
       setLoading(false);
+    }
+  };
+
+  // Google Sign-In handler
+  const handleGoogleSignUp = async () => {
+    try {
+      await signInWithGoogle();
+      alert('Successfully signed up with Google!');
+    } catch (error) {
+      setError("Failed to sign in with Google. Please try again.");
+      console.error("Google Sign-Up Error:", error.message);
+    }
+  };
+
+  // Facebook Sign-In handler
+  const handleFacebookSignUp = async () => {
+    try {
+      await signInWithFacebook();
+      alert('Successfully signed up with Facebook!');
+    } catch (error) {
+      setError("Failed to sign in with Facebook. Please try again.");
+      console.error("Facebook Sign-Up Error:", error.message);
     }
   };
 
@@ -84,6 +106,7 @@ const Signup = () => {
               <p className="text-muted">It's quick and easy</p>
             </div>
 
+            {/* Display form-level error */}
             {error && (
               <div className="alert alert-danger d-flex align-items-center" role="alert">
                 <i className="bi bi-exclamation-triangle me-2"></i>
@@ -108,21 +131,34 @@ const Signup = () => {
               <small className="text-muted">Choose your role to get started</small>
             </div>
 
-            {/* Google Sign Up Button */}
+            {/* Social Sign Up Buttons */}
             <button
               type="button"
-              className="btn btn-outline-dark d-flex align-items-center justify-content-center mb-3 w-100"
+              className="btn btn-outline-secondary d-flex align-items-center justify-content-center mb-3 w-100"
+              onClick={handleGoogleSignUp}
               disabled={loading}
             >
-              <i className="bi bi-google me-2"></i> Continue with Google
+              <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg " alt="Google" width="20" height="20" className="me-2" />
+              Sign up with Google
+            </button>
+            <button
+              type="button"
+              className="btn btn-outline-primary d-flex align-items-center justify-content-center mb-3 w-100"
+              onClick={handleFacebookSignUp}
+              disabled={loading}
+            >
+              <i className="bi bi-facebook me-2"></i>
+              Sign up with Facebook
             </button>
 
+            {/* Divider */}
             <div className="d-flex align-items-center my-3">
               <hr className="flex-grow-1" />
               <span className="mx-2 text-muted">or</span>
               <hr className="flex-grow-1" />
             </div>
 
+            {/* Email Sign-Up Form */}
             <form onSubmit={handleSubmit} autoComplete="off">
               {/* Full Name Field */}
               <div className="mb-3">
@@ -180,7 +216,6 @@ const Signup = () => {
                   }}
                   onBlur={() => handleFieldBlur('password')}
                 />
-
                 {/* Password Strength Indicator */}
                 {touchedFields.password && password.length > 0 && (
                   <div className="mt-2">
@@ -189,7 +224,7 @@ const Signup = () => {
                         className={`progress-bar ${
                           getPasswordStrength(password) <= 1
                             ? 'bg-danger'
-                            : getPasswordStrength(password) <= 3
+                            : getPasswordStrength(password) <= 2
                             ? 'bg-warning'
                             : 'bg-success'
                         }`}
@@ -211,7 +246,6 @@ const Signup = () => {
                     </small>
                   </div>
                 )}
-
                 {/* Password Requirements */}
                 <ul className="small mt-2 ps-4 text-muted mb-0">
                   <li>Password must be at least 8 characters</li>
@@ -321,6 +355,4 @@ const Signup = () => {
       </div>
     </div>
   );
-};
-
-export default Signup;
+}
