@@ -17,8 +17,6 @@ export default function Signup() {
   });
   const [termsChecked, setTermsChecked] = useState(false);
   const [privacyChecked, setPrivacyChecked] = useState(false);
-  const [showPassword, setShowPassword] = useState(false);
-  const [showPasswordConfirm, setShowPasswordConfirm] = useState(false);
 
   const { signup, signInWithGoogle } = useAuth();
   const navigate = useNavigate();
@@ -37,10 +35,10 @@ export default function Signup() {
     setTouchedFields((prev) => ({ ...prev, [field]: true }));
   };
 
-  // Handle role-based redirect
-  const redirectToDashboard = (userRole) => {
-    console.log('Redirecting user with role:', userRole);
-    switch (userRole) {
+  // Role-based redirection
+  const redirectUserByRole = (role) => {
+    console.log('Redirecting user with role:', role);
+    switch (role) {
       case 'admin':
         navigate('/admin-dashboard');
         break;
@@ -56,8 +54,7 @@ export default function Signup() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    setError('');
-
+    
     // Form validation
     if (!fullName.trim()) {
       setError('Please enter your full name');
@@ -71,8 +68,8 @@ export default function Signup() {
       setError('Please enter a password');
       return;
     }
-    if (password.length < 6) {
-      setError('Password should be at least 6 characters');
+    if (password.length < 8) {
+      setError('Password should be at least 8 characters');
       return;
     }
     if (password !== passwordConfirm) {
@@ -85,70 +82,45 @@ export default function Signup() {
     }
 
     setLoading(true);
+    setError('');
+
     try {
-      console.log('Signing up with role:', selectedRole);
+      console.log('Signing up with:', { email, fullName, selectedRole });
       const result = await signup(email, password, fullName, selectedRole);
-      console.log('Signup successful:', result);
+      console.log('Signup successful, result:', result);
       
-      // Small delay to ensure role is set in context
-      setTimeout(() => {
-        // Navigate to root and let App.js handle the redirect
-        navigate('/');
-      }, 100);
-      
+      // Redirect based on role
+      if (result.role) {
+        redirectUserByRole(result.role);
+      } else {
+        redirectUserByRole(selectedRole);
+      }
     } catch (err) {
       console.error('Signup error:', err);
-      
-      // Handle specific Firebase auth errors
-      let errorMessage = 'Failed to create account. Please try again.';
-      
-      if (err.code === 'auth/email-already-in-use') {
-        errorMessage = 'An account with this email already exists.';
-      } else if (err.code === 'auth/weak-password') {
-        errorMessage = 'Password is too weak. Please choose a stronger password.';
-      } else if (err.code === 'auth/invalid-email') {
-        errorMessage = 'Invalid email address format.';
-      } else if (err.code === 'auth/operation-not-allowed') {
-        errorMessage = 'Email/password accounts are not enabled.';
-      } else if (err.message) {
-        errorMessage = err.message;
-      }
-      
-      setError(errorMessage);
+      setError(err.message || 'Failed to create account');
     } finally {
       setLoading(false);
     }
   };
 
-  // Google Sign-Up handler
+  // Google Sign-In handler
   const handleGoogleSignUp = async () => {
-    setError('');
     setLoading(true);
-    
+    setError('');
+
     try {
-      console.log('Google signup with role:', selectedRole);
       const result = await signInWithGoogle(selectedRole);
       console.log('Google signup successful:', result);
       
-      // Small delay to ensure role is set
-      setTimeout(() => {
-        navigate('/');
-      }, 100);
-      
-    } catch (error) {
-      console.error("Google Sign-Up Error:", error);
-      
-      let errorMessage = "Failed to sign up with Google. Please try again.";
-      
-      if (error.code === 'auth/popup-closed-by-user') {
-        errorMessage = 'Google sign-up was cancelled.';
-      } else if (error.code === 'auth/popup-blocked') {
-        errorMessage = 'Popup was blocked. Please allow popups and try again.';
-      } else if (error.code === 'auth/account-exists-with-different-credential') {
-        errorMessage = 'An account already exists with this email using a different sign-in method.';
+      // Redirect based on role
+      if (result.role) {
+        redirectUserByRole(result.role);
+      } else {
+        redirectUserByRole(selectedRole);
       }
-      
-      setError(errorMessage);
+    } catch (error) {
+      setError("Failed to sign up with Google. Please try again.");
+      console.error("Google Sign-Up Error:", error.message);
     } finally {
       setLoading(false);
     }
@@ -160,41 +132,36 @@ export default function Signup() {
         <div className="col-md-6 col-lg-5">
           <div className="card shadow-sm border-0 rounded-4 p-4">
             <div className="text-center mb-4">
-              <h1 className="h3 fw-bold text-primary mb-3">RentMate</h1>
-              <h2 className="h4 fw-bold">Create your account</h2>
-              <p className="text-muted">Join the RentMate community</p>
+              <img src="/logo192.png" alt="RentMate Logo" width="60" className="mb-3" />
+              <h2 className="fw-bold">Create your RentMate Account</h2>
+              <p className="text-muted">It's quick and easy</p>
             </div>
 
             {/* Display form-level error */}
             {error && (
               <div className="alert alert-danger d-flex align-items-center" role="alert">
-                <i className="bi bi-exclamation-circle me-2"></i>
+                <i className="bi bi-exclamation-triangle me-2"></i>
                 {error}
               </div>
             )}
 
             {/* Role Selection Dropdown */}
-            <div className="mb-4">
+            <div className="mb-3">
               <label htmlFor="roleSelect" className="form-label fw-semibold">
-                <i className="bi bi-person-badge me-2"></i>
                 What would you like to do on RentMate?
               </label>
               <select
                 id="roleSelect"
                 className="form-select"
                 value={selectedRole}
-                disabled={loading}
                 onChange={(e) => setSelectedRole(e.target.value)}
+                disabled={loading}
               >
-                <option value="renter">🏠 Rent Equipment (I need tools/equipment)</option>
-                <option value="owner">🔧 List My Equipment (I want to rent out my tools)</option>
-                <option value="admin">👑 Admin Access (Platform management)</option>
+                <option value="renter">Rent Equipment</option>
+                <option value="owner">List My Equipment</option>
+                <option value="admin">Admin Access</option>
               </select>
-              <small className="text-muted">
-                {selectedRole === 'renter' && 'Browse and rent equipment from verified owners'}
-                {selectedRole === 'owner' && 'List your equipment and earn rental income'}
-                {selectedRole === 'admin' && 'Full platform access with management features'}
-              </small>
+              <small className="text-muted">Choose your role to get started</small>
             </div>
 
             {/* Social Sign Up Buttons */}
@@ -204,14 +171,8 @@ export default function Signup() {
               onClick={handleGoogleSignUp}
               disabled={loading}
             >
-              <img 
-                src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" 
-                alt="Google" 
-                width="20" 
-                height="20" 
-                className="me-2" 
-              />
-              Sign up with Google as {selectedRole === 'renter' ? 'Renter' : selectedRole === 'owner' ? 'Owner' : 'Admin'}
+              <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" alt="Google" width="20" height="20" className="me-2" />
+              Sign up with Google
             </button>
 
             {/* Divider */}
@@ -228,21 +189,16 @@ export default function Signup() {
                 <label htmlFor="fullName" className="form-label fw-semibold">
                   Full Name
                 </label>
-                <div className="input-group">
-                  <span className="input-group-text">
-                    <i className="bi bi-person"></i>
-                  </span>
-                  <input
-                    type="text"
-                    className="form-control rounded-end"
-                    id="fullName"
-                    placeholder="John Doe"
-                    value={fullName}
-                    disabled={loading}
-                    autoFocus
-                    onChange={(e) => setFullName(e.target.value)}
-                  />
-                </div>
+                <input
+                  type="text"
+                  className="form-control rounded-3"
+                  id="fullName"
+                  placeholder="John Doe"
+                  value={fullName}
+                  autoFocus
+                  onChange={(e) => setFullName(e.target.value)}
+                  disabled={loading}
+                />
               </div>
 
               {/* Email Field */}
@@ -250,28 +206,22 @@ export default function Signup() {
                 <label htmlFor="email" className="form-label fw-semibold">
                   Email address
                 </label>
-                <div className="input-group">
-                  <span className="input-group-text">
-                    <i className="bi bi-envelope"></i>
-                  </span>
-                  <input
-                    type="email"
-                    className={`form-control rounded-end ${touchedFields.email ? (/\S+@\S+\.\S+/.test(email) ? 'is-valid' : 'is-invalid') : ''}`}
-                    id="email"
-                    placeholder="you@example.com"
-                    value={email}
-                    disabled={loading}
-                    onChange={(e) => {
-                      setEmail(e.target.value);
-                      if (!touchedFields.email) handleFieldBlur('email');
-                      setError('');
-                    }}
-                    onBlur={() => handleFieldBlur('email')}
-                  />
-                  {touchedFields.email && !/\S+@\S+\.\S+/.test(email) && (
-                    <div className="invalid-feedback">Please enter a valid email address</div>
-                  )}
-                </div>
+                <input
+                  type="email"
+                  className={`form-control rounded-3 ${touchedFields.email ? (/\S+@\S+\.\S+/.test(email) ? 'is-valid' : 'is-invalid') : ''}`}
+                  id="email"
+                  placeholder="you@example.com"
+                  value={email}
+                  onChange={(e) => {
+                    setEmail(e.target.value);
+                    if (!touchedFields.email) handleFieldBlur('email');
+                  }}
+                  onBlur={() => handleFieldBlur('email')}
+                  disabled={loading}
+                />
+                {touchedFields.email && !/\S+@\S+\.\S+/.test(email) && (
+                  <div className="invalid-feedback">Please enter a valid email address</div>
+                )}
               </div>
 
               {/* Password Field */}
@@ -279,38 +229,20 @@ export default function Signup() {
                 <label htmlFor="password" className="form-label fw-semibold">
                   Password
                 </label>
-                <div className="input-group">
-                  <span className="input-group-text">
-                    <i className="bi bi-lock"></i>
-                  </span>
-                  <input
-                    type={showPassword ? 'text' : 'password'}
-                    className={`form-control ${touchedFields.password && password.length > 0 ? 'is-valid' : ''}`}
-                    id="password"
-                    placeholder="Create a password"
-                    value={password}
-                    disabled={loading}
-                    autoComplete="new-password"
-                    onChange={(e) => {
-                      setPassword(e.target.value);
-                      if (!touchedFields.password) handleFieldBlur('password');
-                      setError('');
-                    }}
-                    onBlur={() => handleFieldBlur('password')}
-                  />
-                  <button
-                    type="button"
-                    className="btn btn-outline-secondary"
-                    disabled={loading}
-                    onClick={() => setShowPassword(!showPassword)}
-                  >
-                    {showPassword ? (
-                      <i className="bi bi-eye-slash"></i>
-                    ) : (
-                      <i className="bi bi-eye"></i>
-                    )}
-                  </button>
-                </div>
+                <input
+                  type="password"
+                  className={`form-control rounded-3 ${touchedFields.password && password.length > 0 ? 'is-valid' : ''}`}
+                  id="password"
+                  placeholder="Create a password"
+                  value={password}
+                  autoComplete="new-password"
+                  onChange={(e) => {
+                    setPassword(e.target.value);
+                    if (!touchedFields.password) handleFieldBlur('password');
+                  }}
+                  onBlur={() => handleFieldBlur('password')}
+                  disabled={loading}
+                />
                 {/* Password Strength Indicator */}
                 {touchedFields.password && password.length > 0 && (
                   <div className="mt-2">
@@ -341,6 +273,13 @@ export default function Signup() {
                     </small>
                   </div>
                 )}
+                {/* Password Requirements */}
+                <ul className="small mt-2 ps-4 text-muted mb-0">
+                  <li>Password must be at least 8 characters</li>
+                  <li>At least one uppercase letter</li>
+                  <li>At least one number</li>
+                  <li>At least one special character</li>
+                </ul>
               </div>
 
               {/* Confirm Password Field */}
@@ -348,47 +287,29 @@ export default function Signup() {
                 <label htmlFor="passwordConfirm" className="form-label fw-semibold">
                   Confirm Password
                 </label>
-                <div className="input-group">
-                  <span className="input-group-text">
-                    <i className="bi bi-lock-fill"></i>
-                  </span>
-                  <input
-                    type={showPasswordConfirm ? 'text' : 'password'}
-                    className={`form-control ${
-                      touchedFields.passwordConfirm && passwordConfirm.length > 0
-                        ? password === passwordConfirm
-                          ? 'is-valid'
-                          : 'is-invalid'
-                        : ''
-                    }`}
-                    id="passwordConfirm"
-                    placeholder="Re-enter password"
-                    value={passwordConfirm}
-                    disabled={loading}
-                    autoComplete="new-password"
-                    onChange={(e) => {
-                      setPasswordConfirm(e.target.value);
-                      if (!touchedFields.passwordConfirm) handleFieldBlur('passwordConfirm');
-                      setError('');
-                    }}
-                    onBlur={() => handleFieldBlur('passwordConfirm')}
-                  />
-                  <button
-                    type="button"
-                    className="btn btn-outline-secondary"
-                    disabled={loading}
-                    onClick={() => setShowPasswordConfirm(!showPasswordConfirm)}
-                  >
-                    {showPasswordConfirm ? (
-                      <i className="bi bi-eye-slash"></i>
-                    ) : (
-                      <i className="bi bi-eye"></i>
-                    )}
-                  </button>
-                  {touchedFields.passwordConfirm && password !== passwordConfirm && (
-                    <div className="invalid-feedback">Passwords do not match</div>
-                  )}
-                </div>
+                <input
+                  type="password"
+                  className={`form-control rounded-3 ${
+                    touchedFields.passwordConfirm && passwordConfirm.length > 0
+                      ? password === passwordConfirm
+                        ? 'is-valid'
+                        : 'is-invalid'
+                      : ''
+                  }`}
+                  id="passwordConfirm"
+                  placeholder="Re-enter password"
+                  value={passwordConfirm}
+                  autoComplete="new-password"
+                  onChange={(e) => {
+                    setPasswordConfirm(e.target.value);
+                    if (!touchedFields.passwordConfirm) handleFieldBlur('passwordConfirm');
+                  }}
+                  onBlur={() => handleFieldBlur('passwordConfirm')}
+                  disabled={loading}
+                />
+                {touchedFields.passwordConfirm && password !== passwordConfirm && (
+                  <div className="invalid-feedback">Passwords do not match</div>
+                )}
               </div>
 
               {/* Terms and Privacy Checkboxes */}
@@ -398,15 +319,15 @@ export default function Signup() {
                   className="form-check-input"
                   id="termsCheck"
                   checked={termsChecked}
-                  disabled={loading}
                   onChange={(e) => setTermsChecked(e.target.checked)}
                   required
+                  disabled={loading}
                 />
-                <label className="form-check-label small" htmlFor="termsCheck">
+                <label className="form-check-label" htmlFor="termsCheck">
                   I agree to the{' '}
-                  <Link to="/terms" className="text-decoration-none" target="_blank" rel="noopener noreferrer">
+                  <a href="/terms" className="text-decoration-none" target="_blank" rel="noopener noreferrer">
                     Terms of Service
-                  </Link>
+                  </a>
                 </label>
               </div>
               <div className="mb-4 form-check">
@@ -415,15 +336,15 @@ export default function Signup() {
                   className="form-check-input"
                   id="privacyCheck"
                   checked={privacyChecked}
-                  disabled={loading}
                   onChange={(e) => setPrivacyChecked(e.target.checked)}
                   required
+                  disabled={loading}
                 />
-                <label className="form-check-label small" htmlFor="privacyCheck">
+                <label className="form-check-label" htmlFor="privacyCheck">
                   I agree to the{' '}
-                  <Link to="/privacy" className="text-decoration-none" target="_blank" rel="noopener noreferrer">
+                  <a href="/privacy" className="text-decoration-none" target="_blank" rel="noopener noreferrer">
                     Privacy Policy
-                  </Link>
+                  </a>
                 </label>
               </div>
 
@@ -437,10 +358,10 @@ export default function Signup() {
                 {loading ? (
                   <>
                     <span className="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
-                    Creating Account...
+                    Signing Up...
                   </>
                 ) : (
-                  `Create ${selectedRole === 'renter' ? 'Renter' : selectedRole === 'owner' ? 'Owner' : 'Admin'} Account`
+                  `Sign Up as ${selectedRole === 'renter' ? 'Renter' : selectedRole === 'owner' ? 'Equipment Owner' : 'Admin'}`
                 )}
               </button>
             </form>

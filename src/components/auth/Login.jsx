@@ -1,44 +1,37 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 
 export default function Login() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [rememberMe, setRememberMe] = useState(false);
-  const [showPassword, setShowPassword] = useState(false);
-  const [emailError, setEmailError] = useState('');
-  const [passwordError, setPasswordError] = useState('');
-  const [formError, setFormError] = useState('');
+  const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
 
-  const { login, signInWithGoogle } = useAuth();
+  const { login, signInWithGoogle, currentUser, userRole } = useAuth();
   const navigate = useNavigate();
 
-  // Email validation
-  const validateEmail = (value) => {
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    return emailRegex.test(value) ? '' : 'Please enter a valid email address';
-  };
-
-  // Password validation
-  const validatePassword = (value) => {
-    return value.length >= 6 ? '' : 'Password must be at least 6 characters';
-  };
+  // Redirect if already logged in
+  useEffect(() => {
+    if (currentUser && userRole) {
+      console.log('🔄 User already logged in, redirecting...', { userRole });
+      redirectUserByRole(userRole);
+    }
+  }, [currentUser, userRole, navigate]);
 
   // Role-based redirection
   const redirectUserByRole = (role) => {
-    console.log('Redirecting user with role:', role);
+    console.log('🎯 Redirecting user with role:', role);
     switch (role) {
       case 'admin':
-        navigate('/admin-dashboard');
+        navigate('/admin-dashboard', { replace: true });
         break;
       case 'owner':
-        navigate('/owner-dashboard');
+        navigate('/owner-dashboard', { replace: true });
         break;
       case 'renter':
       default:
-        navigate('/renter-dashboard');
+        navigate('/renter-dashboard', { replace: true });
         break;
     }
   };
@@ -46,34 +39,25 @@ export default function Login() {
   // Handle form submit
   const handleSubmit = async (e) => {
     e.preventDefault();
-    const emailErr = validateEmail(email);
-    const passwordErr = validatePassword(password);
-
-    setEmailError(emailErr);
-    setPasswordError(passwordErr);
-
-    if (emailErr || passwordErr) {
-      setFormError('Please fix the errors above');
+    
+    if (!email || !password) {
+      setError('Please fill in all fields');
       return;
     }
 
     setLoading(true);
-    setFormError('');
+    setError('');
 
     try {
+      console.log('🔑 Attempting login for:', email);
       const result = await login(email, password);
-      console.log('Login successful, result:', result);
+      console.log('✅ Login successful:', result);
       
-      // Redirect based on role
-      if (result.role) {
-        redirectUserByRole(result.role);
-      } else {
-        // Fallback - redirect to renter dashboard
-        navigate('/renter-dashboard');
-      }
+      // The redirection will be handled by the useEffect hook
+      // when currentUser and userRole are updated
     } catch (error) {
-      console.error('Login error:', error);
-      setFormError(error.message || 'Failed to log in. Please try again.');
+      console.error('❌ Login error:', error);
+      setError(error.message || 'Failed to log in. Please try again.');
     } finally {
       setLoading(false);
     }
@@ -82,21 +66,17 @@ export default function Login() {
   // Google Sign-In handler
   const handleGoogleLogin = async () => {
     setLoading(true);
-    setFormError('');
+    setError('');
 
     try {
-      const result = await signInWithGoogle('renter'); // Default to renter for Google login
-      console.log("Google Login successful:", result);
+      console.log('🔍 Attempting Google login...');
+      const result = await signInWithGoogle('renter'); // Default to renter
+      console.log('✅ Google login successful:', result);
       
-      // Redirect based on role
-      if (result.role) {
-        redirectUserByRole(result.role);
-      } else {
-        navigate('/renter-dashboard');
-      }
+      // The redirection will be handled by the useEffect hook
     } catch (error) {
-      console.error("Google Login Error:", error.message);
-      setFormError("Failed to sign in with Google. Please try again.");
+      console.error('❌ Google login error:', error);
+      setError("Failed to sign in with Google. Please try again.");
     } finally {
       setLoading(false);
     }
@@ -113,9 +93,9 @@ export default function Login() {
                 <p className="text-center text-muted mb-4">Sign in to your RentMate account</p>
 
                 {/* Display form-level error */}
-                {formError && (
+                {error && (
                   <div className="alert alert-danger" role="alert">
-                    {formError}
+                    {error}
                   </div>
                 )}
 
@@ -124,76 +104,45 @@ export default function Login() {
                   {/* Email Field */}
                   <div className="mb-3">
                     <label htmlFor="email" className="form-label fw-medium">Email address</label>
-                    <div className="input-group has-validation">
+                    <div className="input-group">
                       <span className="input-group-text">
                         <i className="bi bi-envelope"></i>
                       </span>
                       <input
                         type="email"
-                        className={`form-control ${emailError ? 'is-invalid' : ''}`}
+                        className="form-control"
                         id="email"
                         placeholder="you@example.com"
                         value={email}
-                        onChange={(e) => {
-                          setEmail(e.target.value);
-                          setEmailError(validateEmail(e.target.value));
-                        }}
+                        onChange={(e) => setEmail(e.target.value)}
                         disabled={loading}
+                        required
                       />
-                      {emailError && <div className="invalid-feedback">{emailError}</div>}
                     </div>
                   </div>
 
                   {/* Password Field */}
                   <div className="mb-3">
                     <label htmlFor="password" className="form-label fw-medium">Password</label>
-                    <div className="input-group has-validation">
+                    <div className="input-group">
                       <span className="input-group-text">
                         <i className="bi bi-lock"></i>
                       </span>
                       <input
-                        type={showPassword ? 'text' : 'password'}
-                        className={`form-control ${passwordError ? 'is-invalid' : ''}`}
+                        type="password"
+                        className="form-control"
                         id="password"
                         placeholder="••••••••"
                         value={password}
-                        onChange={(e) => {
-                          setPassword(e.target.value);
-                          setPasswordError(validatePassword(e.target.value));
-                        }}
+                        onChange={(e) => setPassword(e.target.value)}
                         disabled={loading}
+                        required
                       />
-                      <button
-                        type="button"
-                        className="btn btn-outline-secondary"
-                        onClick={() => setShowPassword(!showPassword)}
-                        disabled={loading}
-                      >
-                        {showPassword ? (
-                          <i className="bi bi-eye-slash"></i>
-                        ) : (
-                          <i className="bi bi-eye"></i>
-                        )}
-                      </button>
-                      {passwordError && <div className="invalid-feedback">{passwordError}</div>}
                     </div>
                   </div>
 
-                  {/* Remember Me & Forgot Password */}
-                  <div className="d-flex justify-content-between align-items-center mb-4">
-                    <div className="form-check">
-                      <input
-                        className="form-check-input"
-                        type="checkbox"
-                        id="rememberMe"
-                        checked={rememberMe}
-                        onChange={(e) => setRememberMe(e.target.checked)}
-                        disabled={loading}
-                      />
-                      <label className="form-check-label" htmlFor="rememberMe">
-                        Remember me
-                      </label>
-                    </div>
+                  {/* Forgot Password */}
+                  <div className="d-flex justify-content-end mb-4">
                     <Link to="/forgot-password" className="text-decoration-none small">
                       Forgot password?
                     </Link>
@@ -219,8 +168,8 @@ export default function Login() {
                 {/* Divider */}
                 <hr className="my-4" />
 
-                {/* Social Logins */}
-                <div className="d-grid gap-2 mb-3">
+                {/* Google Login */}
+                <div className="d-grid mb-3">
                   <button
                     type="button"
                     className="btn btn-outline-secondary d-flex align-items-center justify-content-center"
@@ -240,12 +189,13 @@ export default function Login() {
                   </Link>
                 </p>
 
-                {/* Back to Home */}
-                <p className="text-center mt-3">
-                  <Link to="/" className="text-decoration-none text-muted small">
-                    ← Back to Browse Equipment
-                  </Link>
-                </p>
+                {/* Debug Info (only in development) */}
+                {process.env.NODE_ENV === 'development' && (
+                  <div className="mt-3 p-2 bg-info bg-opacity-10 rounded text-small">
+                    <strong>Debug:</strong> currentUser: {currentUser?.email || 'None'}, 
+                    userRole: {userRole || 'None'}
+                  </div>
+                )}
               </div>
             </div>
           </div>
