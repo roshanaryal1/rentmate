@@ -33,7 +33,7 @@ export function AuthProvider({ children }) {
   const [loading, setLoading] = useState(true);
   const [authChecked, setAuthChecked] = useState(false);
 
-  console.log('AuthProvider rendering...', { currentUser: currentUser?.email, userRole, loading });
+  console.log('AuthProvider rendering...', { currentUser: currentUser?.email, userRole, loading, authChecked });
 
   // Create user document in Firestore with retry logic
   async function createUserDocument(user, additionalData = {}, retries = 3) {
@@ -47,8 +47,9 @@ export function AuthProvider({ children }) {
         if (!userDoc.exists()) {
           const { displayName, email } = user;
           const userData = {
-            displayName,
+            displayName: displayName || additionalData.fullName || email.split('@')[0],
             email,
+            role: additionalData.role || 'renter', // Default to renter
             createdAt: serverTimestamp(),
             ...additionalData
           };
@@ -56,11 +57,11 @@ export function AuthProvider({ children }) {
           console.log('Creating user document with data:', userData);
           await setDoc(userDocRef, userData);
           console.log("User document created successfully:", userData);
-          return userData;
+          return userData.role;
         } else {
           const existingData = userDoc.data();
           console.log("User document already exists:", existingData);
-          return existingData;
+          return existingData.role || 'renter';
         }
       } catch (error) {
         console.error(`Error creating user document (attempt ${i + 1}):`, error);
@@ -116,25 +117,25 @@ export function AuthProvider({ children }) {
       });
       console.log('Display name updated');
       
-      // Create user document with role
-      await createUserDocument(result.user, {
+      // Create user document with role and get the actual role back
+      const actualRole = await createUserDocument(result.user, {
         role: role,
         fullName: fullName
       });
       
-      console.log('User document created, setting role to:', role);
-      setUserRole(role);
+      console.log('User document created, setting role to:', actualRole);
+      setUserRole(actualRole);
       
       // Cache the role
-      localStorage.setItem(`userRole_${result.user.uid}`, role);
-      console.log('Role cached:', role);
+      localStorage.setItem(`userRole_${result.user.uid}`, actualRole);
+      console.log('Role cached:', actualRole);
       
-      return result;
+      // Don't set loading to false here - let the auth state observer handle it
+      return { user: result.user, role: actualRole };
     } catch (error) {
       console.error("Signup Error:", error);
-      throw error;
-    } finally {
       setLoading(false);
+      throw error;
     }
   }
 
@@ -152,19 +153,20 @@ export function AuthProvider({ children }) {
       const result = await signInWithPopup(auth, provider);
       console.log('Google signin successful:', result.user.uid);
       
-      // Create or update user document with role
-      await createUserDocument(result.user, { role });
+      // Create or update user document with role and get the actual role back
+      const actualRole = await createUserDocument(result.user, { role });
       
-      const userRole = await getUserRole(result.user.uid);
-      setUserRole(userRole);
-      console.log('Final role set after Google signin:', userRole);
+      setUserRole(actualRole);
+      console.log('Final role set after Google signin:', actualRole);
       
-      return result;
+      // Cache the role
+      localStorage.setItem(`userRole_${result.user.uid}`, actualRole);
+      
+      return { user: result.user, role: actualRole };
     } catch (error) {
       console.error("Google Sign-in Error:", error);
-      throw error;
-    } finally {
       setLoading(false);
+      throw error;
     }
   }
 
@@ -181,12 +183,12 @@ export function AuthProvider({ children }) {
       setUserRole(role);
       console.log('Role set after login:', role);
       
-      return result;
+      // Don't set loading to false here - let the auth state observer handle it
+      return { user: result.user, role };
     } catch (error) {
       console.error("Login Error:", error);
-      throw error;
-    } finally {
       setLoading(false);
+      throw error;
     }
   }
 
@@ -203,12 +205,14 @@ export function AuthProvider({ children }) {
   // Logout function
   async function logout() {
     try {
-      await signOut(auth);
-      setUserRole(null);
-      // Clear cached role
+      // Clear cached role before signing out
       if (currentUser) {
         localStorage.removeItem(`userRole_${currentUser.uid}`);
       }
+      
+      await signOut(auth);
+      setUserRole(null);
+      setCurrentUser(null);
     } catch (error) {
       console.error("Logout Error:", error);
       throw error;
@@ -226,7 +230,7 @@ export function AuthProvider({ children }) {
         setLoading(false);
         setAuthChecked(true);
       }
-    }, 5000); // 5 second timeout
+    }, 10000); // 10 second timeout
 
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
       console.log('Auth state changed:', user ? user.email : 'No user');

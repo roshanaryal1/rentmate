@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
-import { signInWithGoogle, signInWithFacebook } from '../../firebase'; // Adjust the import path as necessary
+import { Link, useNavigate } from 'react-router-dom';
+import { useAuth } from '../../contexts/AuthContext';
 
 export default function Login() {
   const [email, setEmail] = useState('');
@@ -9,6 +10,10 @@ export default function Login() {
   const [emailError, setEmailError] = useState('');
   const [passwordError, setPasswordError] = useState('');
   const [formError, setFormError] = useState('');
+  const [loading, setLoading] = useState(false);
+
+  const { login, signInWithGoogle } = useAuth();
+  const navigate = useNavigate();
 
   // Email validation
   const validateEmail = (value) => {
@@ -21,8 +26,25 @@ export default function Login() {
     return value.length >= 6 ? '' : 'Password must be at least 6 characters';
   };
 
+  // Role-based redirection
+  const redirectUserByRole = (role) => {
+    console.log('Redirecting user with role:', role);
+    switch (role) {
+      case 'admin':
+        navigate('/admin-dashboard');
+        break;
+      case 'owner':
+        navigate('/owner-dashboard');
+        break;
+      case 'renter':
+      default:
+        navigate('/renter-dashboard');
+        break;
+    }
+  };
+
   // Handle form submit
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     const emailErr = validateEmail(email);
     const passwordErr = validatePassword(password);
@@ -35,32 +57,48 @@ export default function Login() {
       return;
     }
 
-    // Simulate Firebase login
-    console.log({ email, password, rememberMe });
-    alert('Logging in...');
+    setLoading(true);
+    setFormError('');
+
+    try {
+      const result = await login(email, password);
+      console.log('Login successful, result:', result);
+      
+      // Redirect based on role
+      if (result.role) {
+        redirectUserByRole(result.role);
+      } else {
+        // Fallback - redirect to renter dashboard
+        navigate('/renter-dashboard');
+      }
+    } catch (error) {
+      console.error('Login error:', error);
+      setFormError(error.message || 'Failed to log in. Please try again.');
+    } finally {
+      setLoading(false);
+    }
   };
 
   // Google Sign-In handler
   const handleGoogleLogin = async () => {
+    setLoading(true);
+    setFormError('');
+
     try {
-      const result = await signInWithGoogle();
-      console.log("Google User:", result.user);
-      // Redirect or update UI accordingly
+      const result = await signInWithGoogle('renter'); // Default to renter for Google login
+      console.log("Google Login successful:", result);
+      
+      // Redirect based on role
+      if (result.role) {
+        redirectUserByRole(result.role);
+      } else {
+        navigate('/renter-dashboard');
+      }
     } catch (error) {
       console.error("Google Login Error:", error.message);
       setFormError("Failed to sign in with Google. Please try again.");
-    }
-  };
-
-  // Facebook Sign-In handler
-  const handleFacebookLogin = async () => {
-    try {
-      const result = await signInWithFacebook();
-      console.log("Facebook User:", result.user);
-      // Redirect or update UI accordingly
-    } catch (error) {
-      console.error("Facebook Login Error:", error.message);
-      setFormError("Failed to sign in with Facebook. Please try again.");
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -100,6 +138,7 @@ export default function Login() {
                           setEmail(e.target.value);
                           setEmailError(validateEmail(e.target.value));
                         }}
+                        disabled={loading}
                       />
                       {emailError && <div className="invalid-feedback">{emailError}</div>}
                     </div>
@@ -122,11 +161,13 @@ export default function Login() {
                           setPassword(e.target.value);
                           setPasswordError(validatePassword(e.target.value));
                         }}
+                        disabled={loading}
                       />
                       <button
                         type="button"
                         className="btn btn-outline-secondary"
                         onClick={() => setShowPassword(!showPassword)}
+                        disabled={loading}
                       >
                         {showPassword ? (
                           <i className="bi bi-eye-slash"></i>
@@ -147,17 +188,31 @@ export default function Login() {
                         id="rememberMe"
                         checked={rememberMe}
                         onChange={(e) => setRememberMe(e.target.checked)}
+                        disabled={loading}
                       />
                       <label className="form-check-label" htmlFor="rememberMe">
                         Remember me
                       </label>
                     </div>
-                    <a href="/forgot-password" className="text-decoration-none small">Forgot password?</a>
+                    <Link to="/forgot-password" className="text-decoration-none small">
+                      Forgot password?
+                    </Link>
                   </div>
 
                   {/* Submit Button */}
-                  <button type="submit" className="btn btn-primary w-100 py-2 fw-semibold">
-                    Sign In
+                  <button 
+                    type="submit" 
+                    className="btn btn-primary w-100 py-2 fw-semibold"
+                    disabled={loading}
+                  >
+                    {loading ? (
+                      <>
+                        <span className="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
+                        Signing in...
+                      </>
+                    ) : (
+                      'Sign In'
+                    )}
                   </button>
                 </form>
 
@@ -170,33 +225,26 @@ export default function Login() {
                     type="button"
                     className="btn btn-outline-secondary d-flex align-items-center justify-content-center"
                     onClick={handleGoogleLogin}
+                    disabled={loading}
                   >
-                    <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg " alt="Google" width="20" height="20" className="me-2" />
+                    <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" alt="Google" width="20" height="20" className="me-2" />
                     Sign in with Google
-                  </button>
-                  <button
-                    type="button"
-                    className="btn btn-outline-primary d-flex align-items-center justify-content-center"
-                    onClick={handleFacebookLogin}
-                  >
-                    <i className="bi bi-facebook me-2"></i>
-                    Sign in with Facebook
                   </button>
                 </div>
 
                 {/* Register Link */}
                 <p className="text-center mt-3 mb-0">
                   Don't have an account?{' '}
-                  <a href="/register" className="text-decoration-none fw-medium">
+                  <Link to="/signup" className="text-decoration-none fw-medium">
                     Sign up
-                  </a>
+                  </Link>
                 </p>
 
                 {/* Back to Home */}
                 <p className="text-center mt-3">
-                  <a href="/" className="text-decoration-none text-muted small">
+                  <Link to="/" className="text-decoration-none text-muted small">
                     ← Back to Browse Equipment
-                  </a>
+                  </Link>
                 </p>
               </div>
             </div>
