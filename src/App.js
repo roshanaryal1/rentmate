@@ -3,19 +3,6 @@ import { BrowserRouter as Router, Routes, Route, Navigate, Link, useNavigate } f
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import LoadingSpinner from './components/common/LoadingSpinner';
 import AuthDebug from './components/AuthDebug';
-import RentalHistory from './components/Rental/RentalHistory';
-
-
-<Routes>
-  {/* Other routes */}
-  <Route path="/rental-history" element={<RentalHistory />} />
-</Routes>
-
-
-
-
-
-
 
 // Lazy load components for better performance
 const Signup = React.lazy(() => import('./components/auth/Signup'));
@@ -42,7 +29,7 @@ function App() {
 function AppContent() {
   const { currentUser, userRole, loading, authChecked } = useAuth();
 
-  console.log('AppContent render:', { 
+  console.log('🎯 AppContent render:', { 
     currentUser: currentUser?.email, 
     userRole, 
     loading, 
@@ -61,40 +48,34 @@ function AppContent() {
     />;
   }
 
-  // Show error boundary if auth fails after timeout
-  if (!authChecked && !loading) {
-    return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="text-center">
-          <h2 className="text-2xl font-bold text-gray-900 mb-4">Connection Issue</h2>
-          <p className="text-gray-600 mb-6">Having trouble connecting. Please check your internet connection.</p>
-          <button 
-            onClick={() => window.location.reload()} 
-            className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
-          >
-            Retry
-          </button>
-        </div>
-      </div>
-    );
-  }
-
   return (
     <Routes>
-      {/* Redirect to role-specific dashboard based on user role */}
+      {/* Root route - redirect based on auth status */}
       <Route path="/" element={
-        <RoleBasedRedirect currentUser={currentUser} userRole={userRole} />
+        currentUser ? (
+          <RoleBasedRedirect currentUser={currentUser} userRole={userRole} />
+        ) : (
+          <Navigate to="/login" />
+        )
       } />
       
-      {/* Authentication routes */}
+      {/* Authentication routes - redirect if already logged in */}
       <Route path="/login" element={
-        !currentUser ? <Login /> : 
-        <RoleBasedRedirect currentUser={currentUser} userRole={userRole} />
+        currentUser ? (
+          <RoleBasedRedirect currentUser={currentUser} userRole={userRole} />
+        ) : (
+          <Login />
+        )
       } />
+      
       <Route path="/signup" element={
-        !currentUser ? <Signup /> : 
-        <RoleBasedRedirect currentUser={currentUser} userRole={userRole} />
+        currentUser ? (
+          <RoleBasedRedirect currentUser={currentUser} userRole={userRole} />
+        ) : (
+          <Signup />
+        )
       } />
+      
       <Route path="/register" element={<Navigate to="/signup" />} />
       <Route path="/forgot-password" element={<ForgotPassword />} />
       
@@ -109,6 +90,7 @@ function AppContent() {
           </ProtectedRoute>
         } 
       />
+      
       <Route 
         path="/owner-dashboard" 
         element={
@@ -119,6 +101,7 @@ function AppContent() {
           </ProtectedRoute>
         } 
       />
+      
       <Route 
         path="/admin-dashboard" 
         element={
@@ -149,67 +132,81 @@ function AppContent() {
       {/* Catch-all route */}
       <Route path="*" element={<Navigate to="/" />} />
     </Routes>
-
-    
   );
 }
 
 // Helper component for role-based redirects
 function RoleBasedRedirect({ currentUser, userRole }) {
-  console.log('RoleBasedRedirect:', { currentUser: currentUser?.email, userRole });
+  console.log('🚀 RoleBasedRedirect:', { 
+    currentUser: currentUser?.email, 
+    userRole,
+    timestamp: new Date().toISOString()
+  });
   
   if (!currentUser) {
-    return <Navigate to="/login" />;
+    console.log('❌ No current user, redirecting to login');
+    return <Navigate to="/login" replace />;
   }
 
   // Wait for userRole to be loaded
   if (!userRole) {
+    console.log('⏳ Waiting for user role...');
     return <LoadingSpinner message="Loading user data..." />;
   }
 
+  let redirectPath;
   switch (userRole) {
     case 'admin':
-      console.log('Redirecting to admin dashboard');
-      return <Navigate to="/admin-dashboard" />;
+      redirectPath = '/admin-dashboard';
+      break;
     case 'owner':
-      console.log('Redirecting to owner dashboard');
-      return <Navigate to="/owner-dashboard" />;
+      redirectPath = '/owner-dashboard';
+      break;
     case 'renter':
     default:
-      console.log('Redirecting to renter dashboard (default)');
-      return <Navigate to="/renter-dashboard" />;
+      redirectPath = '/renter-dashboard';
+      break;
   }
+
+  console.log(`🎯 Redirecting to: ${redirectPath}`);
+  return <Navigate to={redirectPath} replace />;
 }
 
 // Helper component for protected routes
 function ProtectedRoute({ role, currentUser, userRole, children }) {
-  console.log('ProtectedRoute check:', { 
+  console.log('🔐 ProtectedRoute check:', { 
     requiredRole: role, 
     currentUser: currentUser?.email, 
     userRole,
-    hasAccess: currentUser && (userRole === role || userRole === 'admin')
+    hasAccess: currentUser && (userRole === role || userRole === 'admin'),
+    timestamp: new Date().toISOString()
   });
 
   if (!currentUser) {
-    return <Navigate to="/login" />;
+    console.log('❌ No user, redirecting to login');
+    return <Navigate to="/login" replace />;
   }
 
   // Wait for userRole to be loaded
   if (!userRole) {
+    console.log('⏳ Waiting for user role in protected route...');
     return <LoadingSpinner message="Loading user data..." />;
   }
 
   // Admin can access everything
   if (userRole === 'admin') {
+    console.log('✅ Admin access granted');
     return children;
   }
 
   // Check if user has the required role
   if (userRole === role) {
+    console.log('✅ Role access granted');
     return children;
   }
 
   // Redirect to appropriate dashboard if user doesn't have access
+  console.log('❌ Access denied, redirecting to appropriate dashboard');
   return <RoleBasedRedirect currentUser={currentUser} userRole={userRole} />;
 }
 

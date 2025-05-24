@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
-import { signInWithGoogle, signInWithFacebook } from '../../firebase'; // Adjust the path based on your project structure
+import { Link, useNavigate } from 'react-router-dom';
+import { useAuth } from '../../contexts/AuthContext';
 
 export default function Signup() {
   const [email, setEmail] = useState('');
@@ -17,6 +18,9 @@ export default function Signup() {
   const [termsChecked, setTermsChecked] = useState(false);
   const [privacyChecked, setPrivacyChecked] = useState(false);
 
+  const { signup, signInWithGoogle } = useAuth();
+  const navigate = useNavigate();
+
   // Password strength calculation
   const getPasswordStrength = (password) => {
     let strength = 0;
@@ -31,8 +35,26 @@ export default function Signup() {
     setTouchedFields((prev) => ({ ...prev, [field]: true }));
   };
 
+  // Role-based redirection
+  const redirectUserByRole = (role) => {
+    console.log('Redirecting user with role:', role);
+    switch (role) {
+      case 'admin':
+        navigate('/admin-dashboard');
+        break;
+      case 'owner':
+        navigate('/owner-dashboard');
+        break;
+      case 'renter':
+      default:
+        navigate('/renter-dashboard');
+        break;
+    }
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
+    
     // Form validation
     if (!fullName.trim()) {
       setError('Please enter your full name');
@@ -60,14 +82,22 @@ export default function Signup() {
     }
 
     setLoading(true);
+    setError('');
+
     try {
-      // Simulate API call or Firebase signup
       console.log('Signing up with:', { email, fullName, selectedRole });
-      await new Promise((resolve) => setTimeout(resolve, 1500));
-      alert('Signup successful!');
+      const result = await signup(email, password, fullName, selectedRole);
+      console.log('Signup successful, result:', result);
+      
+      // Redirect based on role
+      if (result.role) {
+        redirectUserByRole(result.role);
+      } else {
+        redirectUserByRole(selectedRole);
+      }
     } catch (err) {
-      setError('Failed to create account');
-      console.error(err);
+      console.error('Signup error:', err);
+      setError(err.message || 'Failed to create account');
     } finally {
       setLoading(false);
     }
@@ -75,23 +105,24 @@ export default function Signup() {
 
   // Google Sign-In handler
   const handleGoogleSignUp = async () => {
-    try {
-      await signInWithGoogle();
-      alert('Successfully signed up with Google!');
-    } catch (error) {
-      setError("Failed to sign in with Google. Please try again.");
-      console.error("Google Sign-Up Error:", error.message);
-    }
-  };
+    setLoading(true);
+    setError('');
 
-  // Facebook Sign-In handler
-  const handleFacebookSignUp = async () => {
     try {
-      await signInWithFacebook();
-      alert('Successfully signed up with Facebook!');
+      const result = await signInWithGoogle(selectedRole);
+      console.log('Google signup successful:', result);
+      
+      // Redirect based on role
+      if (result.role) {
+        redirectUserByRole(result.role);
+      } else {
+        redirectUserByRole(selectedRole);
+      }
     } catch (error) {
-      setError("Failed to sign in with Facebook. Please try again.");
-      console.error("Facebook Sign-Up Error:", error.message);
+      setError("Failed to sign up with Google. Please try again.");
+      console.error("Google Sign-Up Error:", error.message);
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -124,9 +155,11 @@ export default function Signup() {
                 className="form-select"
                 value={selectedRole}
                 onChange={(e) => setSelectedRole(e.target.value)}
+                disabled={loading}
               >
                 <option value="renter">Rent Equipment</option>
                 <option value="owner">List My Equipment</option>
+                <option value="admin">Admin Access</option>
               </select>
               <small className="text-muted">Choose your role to get started</small>
             </div>
@@ -138,17 +171,8 @@ export default function Signup() {
               onClick={handleGoogleSignUp}
               disabled={loading}
             >
-              <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg " alt="Google" width="20" height="20" className="me-2" />
+              <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" alt="Google" width="20" height="20" className="me-2" />
               Sign up with Google
-            </button>
-            <button
-              type="button"
-              className="btn btn-outline-primary d-flex align-items-center justify-content-center mb-3 w-100"
-              onClick={handleFacebookSignUp}
-              disabled={loading}
-            >
-              <i className="bi bi-facebook me-2"></i>
-              Sign up with Facebook
             </button>
 
             {/* Divider */}
@@ -173,6 +197,7 @@ export default function Signup() {
                   value={fullName}
                   autoFocus
                   onChange={(e) => setFullName(e.target.value)}
+                  disabled={loading}
                 />
               </div>
 
@@ -192,6 +217,7 @@ export default function Signup() {
                     if (!touchedFields.email) handleFieldBlur('email');
                   }}
                   onBlur={() => handleFieldBlur('email')}
+                  disabled={loading}
                 />
                 {touchedFields.email && !/\S+@\S+\.\S+/.test(email) && (
                   <div className="invalid-feedback">Please enter a valid email address</div>
@@ -215,6 +241,7 @@ export default function Signup() {
                     if (!touchedFields.password) handleFieldBlur('password');
                   }}
                   onBlur={() => handleFieldBlur('password')}
+                  disabled={loading}
                 />
                 {/* Password Strength Indicator */}
                 {touchedFields.password && password.length > 0 && (
@@ -278,6 +305,7 @@ export default function Signup() {
                     if (!touchedFields.passwordConfirm) handleFieldBlur('passwordConfirm');
                   }}
                   onBlur={() => handleFieldBlur('passwordConfirm')}
+                  disabled={loading}
                 />
                 {touchedFields.passwordConfirm && password !== passwordConfirm && (
                   <div className="invalid-feedback">Passwords do not match</div>
@@ -293,6 +321,7 @@ export default function Signup() {
                   checked={termsChecked}
                   onChange={(e) => setTermsChecked(e.target.checked)}
                   required
+                  disabled={loading}
                 />
                 <label className="form-check-label" htmlFor="termsCheck">
                   I agree to the{' '}
@@ -309,6 +338,7 @@ export default function Signup() {
                   checked={privacyChecked}
                   onChange={(e) => setPrivacyChecked(e.target.checked)}
                   required
+                  disabled={loading}
                 />
                 <label className="form-check-label" htmlFor="privacyCheck">
                   I agree to the{' '}
@@ -331,7 +361,7 @@ export default function Signup() {
                     Signing Up...
                   </>
                 ) : (
-                  `Sign Up as ${selectedRole === 'renter' ? 'Renter' : 'Equipment Owner'}`
+                  `Sign Up as ${selectedRole === 'renter' ? 'Renter' : selectedRole === 'owner' ? 'Equipment Owner' : 'Admin'}`
                 )}
               </button>
             </form>
@@ -340,15 +370,15 @@ export default function Signup() {
             <div className="mt-3 text-center">
               <p className="mb-0 text-muted">
                 Already have an account?{' '}
-                <a href="/login" className="text-primary text-decoration-none fw-semibold">
+                <Link to="/login" className="text-primary text-decoration-none fw-semibold">
                   Log in
-                </a>
+                </Link>
               </p>
             </div>
             <div className="mt-3 text-center">
-              <a href="/" className="text-secondary text-decoration-none">
+              <Link to="/" className="text-secondary text-decoration-none">
                 <i className="bi bi-arrow-left me-1"></i>Back to Browse Equipment
-              </a>
+              </Link>
             </div>
           </div>
         </div>
