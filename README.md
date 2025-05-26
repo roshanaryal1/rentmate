@@ -229,4 +229,4 @@ If you encounter any issues or have questions:
 
 ---
 
-**Made with ❤️ by ROSHAN ARYAL, DHRUB, APKSHYA (https://github.com/roshanaryal1)**
+**Made with ❤️ by ROSHAN, DHRUB, APKSHYA (https://github.com/roshanaryal1)**
