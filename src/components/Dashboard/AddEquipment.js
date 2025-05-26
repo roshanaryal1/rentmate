@@ -284,13 +284,14 @@ function AddEquipment() {
               disabled={loading}
               className="flex-1 bg-gray-100 text-gray-700 py-3 px-4 rounded-md font-medium hover:bg-gray-200 focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
             >
-              Cancel
             </button>
           </div>
         </form>
       </div>
+   
     </div>
-  );
+  
+);
 }
 
 export default AddEquipment;
