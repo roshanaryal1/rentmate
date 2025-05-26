@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import { collection, getDocs, query, where, orderBy } from 'firebase/firestore';
 import { db } from '../../firebase';
+import { equipmentService } from '../../services/equipmentService';
 
 function RenterDashboard() {
   const { currentUser } = useAuth();
@@ -21,91 +22,80 @@ function RenterDashboard() {
 
   useEffect(() => {
     const fetchData = async () => {
+      if (!currentUser) return;
+      
       try {
         setLoading(true);
         
-        // Fetch equipment from Firebase (added by owners through Add Equipment page)
-        try {
-          const equipmentSnapshot = await getDocs(collection(db, 'equipment'));
-          const equipment = equipmentSnapshot.docs.map(doc => {
-            const data = doc.data();
-            return {
-              id: doc.id,
-              ...data,
-              // Ensure all required fields exist with defaults
-              name: data.name || 'Unnamed Equipment',
-              description: data.description || 'No description available',
-              category: data.category || 'Other',
-              ratePerDay: data.ratePerDay || 0,
-              available: data.available !== undefined ? data.available : true,
-              ownerName: data.ownerName || 'Unknown Owner',
-              location: data.location || 'Location not specified',
-              features: data.features || [],
-              imageUrl: data.imageUrl || null,
-              status: data.status || 'approved',
-              createdAt: data.createdAt || null
-            };
-          });
-          
-          console.log('Fetched equipment from Firebase:', equipment.length, 'items');
-          
-          // Filter to show only approved equipment
-          const approvedEquipment = equipment.filter(item => item.status === 'approved');
-          
-          setEquipmentList(approvedEquipment);
-          
-          // If no equipment found, show a message but don't add sample data
-          if (approvedEquipment.length === 0) {
-            console.log('No approved equipment found in Firebase');
-          }
-        } catch (error) {
-          console.error('Error fetching equipment from Firebase:', error);
-          // On error, set empty array - this will show "no equipment" message
-          setEquipmentList([]);
+        // Fetch equipment from OTHER owners only (not user's own equipment)
+        console.log('🔍 Fetching equipment for renter dashboard...');
+        const equipment = await equipmentService.getEquipmentForRenter(currentUser.uid);
+        
+        // Process and set equipment data
+        const processedEquipment = equipment.map(item => ({
+          ...item,
+          // Ensure all required fields exist with defaults
+          name: item.name || 'Unnamed Equipment',
+          description: item.description || 'No description available',
+          category: item.category || 'Other',
+          ratePerDay: item.ratePerDay || 0,
+          available: item.available !== undefined ? item.available : true,
+          ownerName: item.ownerName || 'Unknown Owner',
+          location: item.location || 'Location not specified',
+          features: item.features || [],
+          imageUrl: item.imageUrl || null,
+          status: item.status || 'approved'
+        }));
+        
+        setEquipmentList(processedEquipment);
+        
+        if (processedEquipment.length === 0) {
+          console.log('ℹ️ No equipment available from other owners');
+        } else {
+          console.log(`✅ Loaded ${processedEquipment.length} equipment items for renter`);
         }
 
         // Fetch rental history for current user
-        if (currentUser) {
-          try {
-            const rentalsQuery = query(
-              collection(db, 'rentals'),
-              where('renterId', '==', currentUser.uid),
-              orderBy('createdAt', 'desc')
-            );
-            
-            const rentalsSnapshot = await getDocs(rentalsQuery);
-            const rentals = rentalsSnapshot.docs.map(doc => ({
-              id: doc.id,
-              ...doc.data()
-            }));
-            setRentalHistory(rentals);
-            
-            // Calculate stats
-            const totalRentals = rentals.length;
-            const activeRentals = rentals.filter(r => r.status === 'active').length;
-            const totalSpent = rentals.reduce((sum, r) => sum + (r.totalPrice || 0), 0);
-            
-            setStats({ totalRentals, activeRentals, totalSpent });
-          } catch (error) {
-            console.log('Error fetching rentals:', error);
-            // Use sample rental data if Firebase fails
-            const sampleRentals = [
-              {
-                id: 'rental-1',
-                equipmentName: 'Power Drill (Cordless, 18V)',
-                status: 'completed',
-                startDate: { toDate: () => new Date(Date.now() - 7 * 24 * 60 * 60 * 1000) },
-                endDate: { toDate: () => new Date(Date.now() - 2 * 24 * 60 * 60 * 1000) },
-                totalPrice: 125,
-                ownerName: 'Tool Rental Pro'
-              }
-            ];
-            setRentalHistory(sampleRentals);
-            setStats({ totalRentals: 1, activeRentals: 0, totalSpent: 125 });
-          }
+        try {
+          const rentalsQuery = query(
+            collection(db, 'rentals'),
+            where('renterId', '==', currentUser.uid),
+            orderBy('createdAt', 'desc')
+          );
+          
+          const rentalsSnapshot = await getDocs(rentalsQuery);
+          const rentals = rentalsSnapshot.docs.map(doc => ({
+            id: doc.id,
+            ...doc.data()
+          }));
+          setRentalHistory(rentals);
+          
+          // Calculate stats
+          const totalRentals = rentals.length;
+          const activeRentals = rentals.filter(r => r.status === 'active').length;
+          const totalSpent = rentals.reduce((sum, r) => sum + (r.totalPrice || 0), 0);
+          
+          setStats({ totalRentals, activeRentals, totalSpent });
+          console.log(`✅ Loaded ${totalRentals} rental records`);
+        } catch (error) {
+          console.log('ℹ️ No rentals found or error fetching rentals:', error);
+          // Use sample rental data if needed for demo
+          const sampleRentals = [
+            {
+              id: 'rental-1',
+              equipmentName: 'Power Drill (Cordless, 18V)',
+              status: 'completed',
+              startDate: { toDate: () => new Date(Date.now() - 7 * 24 * 60 * 60 * 1000) },
+              endDate: { toDate: () => new Date(Date.now() - 2 * 24 * 60 * 60 * 1000) },
+              totalPrice: 125,
+              ownerName: 'Tool Rental Pro'
+            }
+          ];
+          setRentalHistory(sampleRentals);
+          setStats({ totalRentals: 1, activeRentals: 0, totalSpent: 125 });
         }
       } catch (error) {
-        console.error('Error fetching data:', error);
+        console.error('❌ Error fetching renter dashboard data:', error);
       } finally {
         setLoading(false);
       }
@@ -154,7 +144,7 @@ function RenterDashboard() {
           <h2 className="h3 fw-bold text-dark mb-1">
             Welcome back, {currentUser?.displayName || currentUser?.email?.split('@')[0]}!
           </h2>
-          <p className="text-muted mb-0">Find and rent the equipment you need for your projects.</p>
+          <p className="text-muted mb-0">Find and rent equipment from other owners for your projects.</p>
         </div>
       </div>
 
@@ -291,6 +281,7 @@ function RenterDashboard() {
               <small className="text-muted">
                 Showing {filteredEquipment.length} of {equipmentList.length} items
                 {searchTerm && <span> for "{searchTerm}"</span>}
+                <span className="text-info ms-2">(Equipment from other owners)</span>
               </small>
             </div>
           </div>
@@ -301,7 +292,7 @@ function RenterDashboard() {
               <div className="spinner-border text-primary" role="status">
                 <span className="visually-hidden">Loading...</span>
               </div>
-              <p className="text-muted mt-3">Loading equipment...</p>
+              <p className="text-muted mt-3">Loading available equipment...</p>
             </div>
           ) : filteredEquipment.length > 0 ? (
             <div className="row">
@@ -316,12 +307,12 @@ function RenterDashboard() {
               <i className="bi bi-tools display-1 text-muted mb-3"></i>
               <h5>No Equipment Available</h5>
               <p className="text-muted mb-4">
-                No equipment has been added yet. Equipment owners can list their equipment to make it available for rent.
+                No equipment is currently available from other owners for rent.
               </p>
               <div className="alert alert-info">
                 <h6 className="alert-heading">
                   <i className="bi bi-info-circle me-2"></i>
-                  For Equipment Owners
+                  Want to List Equipment?
                 </h6>
                 <p className="mb-2">Have equipment to rent out? You can:</p>
                 <ul className="mb-3 text-start">
