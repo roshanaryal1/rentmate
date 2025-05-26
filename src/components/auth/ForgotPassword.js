@@ -12,6 +12,7 @@ export default function ForgotPassword() {
   const [resendCountdown, setResendCountdown] = useState(0);
   const [resendAttempts, setResendAttempts] = useState(0);
   const [suggestions, setSuggestions] = useState([]);
+  const [selectedSuggestionIndex, setSelectedSuggestionIndex] = useState(-1);
 
   useEffect(() => {
     let timer;
@@ -24,7 +25,7 @@ export default function ForgotPassword() {
   const validateEmail = (email) => {
     if (!email) return { isValid: false, message: '' };
     if (!emailRegex.test(email)) return { isValid: false, message: 'Invalid email format' };
-    return { isValid: true, message: 'Email looks good' };
+    return { isValid: true, message: 'Valid email address' };
   };
 
   const suggestEmails = (email) => {
@@ -45,6 +46,29 @@ export default function ForgotPassword() {
     const val = validateEmail(value);
     setValidation(val);
     setSuggestions(value.includes('@') && !val.isValid ? suggestEmails(value) : []);
+    setSelectedSuggestionIndex(-1);
+  };
+
+  const handleKeyDown = (e) => {
+    if (suggestions.length === 0) return;
+
+    switch (e.key) {
+      case 'ArrowDown':
+        setSelectedSuggestionIndex(prev =>
+          prev < suggestions.length - 1 ? prev + 1 : prev
+        );
+        break;
+      case 'ArrowUp':
+        setSelectedSuggestionIndex(prev => (prev > 0 ? prev - 1 : -1));
+        break;
+      case 'Enter':
+        if (selectedSuggestionIndex >= 0) {
+          handleSuggestionClick(suggestions[selectedSuggestionIndex]);
+        }
+        break;
+      default:
+        break;
+    }
   };
 
   const handleSuggestionClick = (suggestion) => {
@@ -54,7 +78,7 @@ export default function ForgotPassword() {
   };
 
   const handleSubmit = async (e) => {
-    e.preventDefault();
+    if (e) e.preventDefault();
     if (!validation.isValid) {
       setError('Please enter a valid email.');
       return;
@@ -77,128 +101,128 @@ export default function ForgotPassword() {
 
   const handleResend = () => {
     if (resendCountdown === 0) {
-      handleSubmit({ preventDefault: () => {} });
+      handleSubmit();
     }
   };
 
   const handleBackToLogin = () => {
-    console.log('Navigate back to login page'); // Implement with router
+    console.log('Navigate back to login page'); // Replace with real routing logic
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 flex items-center justify-center px-4 py-12">
-      <div className="max-w-md w-full space-y-6 bg-white p-8 rounded-xl shadow-lg">
+    <div className="min-vh-100 d-flex align-items-center justify-content-center py-5 px-3">
+      <div className="card shadow-lg border-0 rounded-4 p-4 p-md-5" style={{ maxWidth: '500px', width: '100%' }}>
+        
         {/* Logo */}
-        <div className="text-center flex justify-center">
-          <h1 className="text-3xl font-bold text-gray-800">
-            <span className="text-orange-500">Rent</span>Mate
+        <div className="text-center mb-4">
+          <h1 className="h2 fw-bold text-orange">
+            <span className="text-primary">Rent</span>Mate
           </h1>
         </div>
 
-        {/* State: Success */}
+        {/* Success State */}
         {success ? (
-          <div className="text-center space-y-4">
-            <div className="flex justify-center">
-              <div className="bg-green-100 p-4 rounded-full">
-                <svg className="w-8 h-8 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                </svg>
+          <div className="text-center">
+            <div className="mb-3 d-flex justify-content-center">
+              <div className="bg-success bg-opacity-10 rounded-circle d-flex align-items-center justify-content-center" style={{ width: '60px', height: '60px' }}>
+                <i className="bi bi-check2 fs-1 text-success"></i>
               </div>
             </div>
-            <h2 className="text-xl font-semibold text-gray-900">Check your email</h2>
-            <p className="text-sm text-gray-600">
-              A password reset link has been sent to: <span className="text-blue-600">{email}</span>
+            <h2 className="h5 fw-bold mb-3">Check your email</h2>
+            <p className="text-muted small">
+              A password reset link has been sent to: <strong>{email}</strong>
             </p>
+            <ul className="list-unstyled text-start small text-muted mt-3">
+              <li className="mb-1"><i className="bi bi-exclamation-circle me-1"></i> Check spam/junk folder</li>
+              <li><i className="bi bi-clock me-1"></i> Link expires in 15 minutes</li>
+            </ul>
 
-            <div className="text-sm text-gray-500">
-              <ul className="list-disc list-inside space-y-1 mt-2 text-left">
-                <li>Check your spam/junk folder if it doesn't arrive.</li>
-                <li>The link will expire in 15 minutes.</li>
-              </ul>
-            </div>
-
-            <div className="flex gap-3 pt-4">
+            <div className="d-grid gap-2 mt-4">
               <button
                 onClick={handleResend}
                 disabled={resendCountdown > 0 || loading}
-                className={`w-full py-2 px-4 border rounded-md text-sm font-medium ${
-                  resendCountdown > 0 || loading
-                    ? 'text-gray-400 border-gray-300 cursor-not-allowed'
-                    : 'text-gray-700 border-gray-300 hover:bg-gray-100'
-                }`}
+                className={`btn btn-outline-secondary ${resendCountdown > 0 || loading ? 'disabled' : ''}`}
               >
                 {resendCountdown > 0 ? `Resend in ${resendCountdown}s` : 'Resend Email'}
               </button>
-              <button
-                onClick={handleBackToLogin}
-                className="w-full py-2 px-4 bg-blue-600 text-white text-sm font-medium rounded-md hover:bg-blue-700"
-              >
+              <button onClick={handleBackToLogin} className="btn btn-primary">
                 Back to Login
               </button>
             </div>
 
             {resendAttempts > 0 && (
-              <p className="text-xs text-gray-500">
+              <p className="mt-3 text-muted small">
                 Email sent {resendAttempts} {resendAttempts === 1 ? 'time' : 'times'}
               </p>
             )}
           </div>
         ) : (
-          // Form
-          <form onSubmit={handleSubmit} className="space-y-6">
-            <div className="text-center">
-              <h2 className="text-2xl font-bold text-gray-900">Forgot Password?</h2>
-              <p className="text-sm text-gray-600">No problem! Enter your email and we’ll send a reset link.</p>
-            </div>
+          <form onSubmit={handleSubmit}>
+            <h2 className="h5 fw-bold text-center mb-4">Forgot Password?</h2>
+            <p className="text-center text-muted small mb-4">
+              Enter your email and we'll send you a reset link.
+            </p>
 
-            {/* Error */}
+            {/* Error Message */}
             {error && (
-              <div className="bg-red-50 border border-red-200 text-red-600 text-sm p-3 rounded-md">
+              <div className="alert alert-danger p-2 small" role="alert">
                 {error}
               </div>
             )}
 
-            {/* Input */}
-            <div className="relative">
+            {/* Email Input */}
+            <div className="position-relative mb-3">
               <input
                 type="email"
-                className={`w-full border ${
-                  validation.isValid ? 'border-green-400' : 'border-gray-300'
-                } rounded-md py-2 px-4 focus:outline-none focus:ring-2 focus:ring-blue-500`}
+                className={`form-control ${validation.isValid ? 'is-valid' : validation.message ? 'is-invalid' : ''}`}
                 placeholder="you@example.com"
                 value={email}
                 onChange={handleEmailChange}
+                onKeyDown={handleKeyDown}
+                required
               />
               {validation.message && (
-                <p className={`text-sm mt-1 ${validation.isValid ? 'text-green-600' : 'text-red-500'}`}>
+                <div className={`form-text ${validation.isValid ? 'text-success' : 'text-danger'}`}>
                   {validation.message}
-                </p>
+                </div>
               )}
             </div>
 
-            {/* Suggestions */}
+            {/* Suggestions Dropdown */}
             {suggestions.length > 0 && (
-              <div className="bg-blue-50 p-2 rounded-md text-sm space-y-1">
-                <p className="text-gray-600 font-medium">Did you mean?</p>
-                {suggestions.map((s, idx) => (
-                  <div
-                    key={idx}
-                    onClick={() => handleSuggestionClick(s)}
-                    className="cursor-pointer hover:underline text-blue-600"
+              <ul className="list-group position-absolute w-100 z-10 border rounded shadow-sm bg-white mt-n2">
+                <li className="list-group-item small fw-medium text-muted">Did you mean?</li>
+                {suggestions.map((suggestion, index) => (
+                  <li
+                    key={index}
+                    onClick={() => handleSuggestionClick(suggestion)}
+                    className={`list-group-item list-group-item-action cursor-pointer ${
+                      selectedSuggestionIndex === index ? 'active' : ''
+                    }`}
+                    role="button"
+                    tabIndex="0"
+                    aria-label={`Suggestion: ${suggestion}`}
                   >
-                    {s}
-                  </div>
+                    {suggestion}
+                  </li>
                 ))}
-              </div>
+              </ul>
             )}
 
-            {/* Submit */}
+            {/* Submit Button */}
             <button
               type="submit"
-              className="w-full py-2 bg-blue-600 text-white rounded-md font-medium hover:bg-blue-700 transition"
+              className="btn btn-primary w-100 mt-3"
               disabled={loading}
             >
-              {loading ? 'Sending...' : 'Send Reset Link'}
+              {loading ? (
+                <>
+                  <span className="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
+                  Sending...
+                </>
+              ) : (
+                'Send Reset Link'
+              )}
             </button>
           </form>
         )}
