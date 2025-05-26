@@ -1,3 +1,5 @@
+// src/services/equipmentService.js
+
 import { 
   collection, 
   query, 
@@ -14,8 +16,34 @@ import {
 import { db } from '../firebase';
 
 export const equipmentService = {
-  // For Renters: Get equipment from OTHER owners only
+  // For Renters: Get ALL approved equipment (including their own)
   async getEquipmentForRenter(currentUserId) {
+    try {
+      console.log('🔍 Fetching ALL approved equipment for renter...');
+      
+      // Get all approved equipment
+      const equipmentQuery = query(
+        collection(db, 'equipment'),
+        where('status', '==', 'approved'),
+        orderBy('createdAt', 'desc')
+      );
+      
+      const snapshot = await getDocs(equipmentQuery);
+      const allEquipment = snapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      }));
+      
+      console.log(`✅ Found ${allEquipment.length} approved equipment items (including user's own)`);
+      return allEquipment;
+    } catch (error) {
+      console.error('❌ Error fetching equipment for renter:', error);
+      return [];
+    }
+  },
+
+  // For Renters: Get equipment from OTHER owners only (alternative method)
+  async getEquipmentFromOthers(currentUserId) {
     try {
       console.log('🔍 Fetching equipment for renter, excluding userId:', currentUserId);
       
