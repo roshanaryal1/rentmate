@@ -40,6 +40,8 @@ const FeedbackModal = ({
             <svg className="checkmark" viewBox="0 0 24 24" fill="none" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
             </svg>
+
+            
           </div>
           <button className="close-button" onClick={handleClose} aria-label="Close">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
