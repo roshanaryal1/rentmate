@@ -73,6 +73,7 @@ const FeedbackModal = ({
       </div>
     </div>
   );
+  
 };
 
 export default FeedbackModal;
