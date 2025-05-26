@@ -1,10 +1,7 @@
-/* src/components/FeedbackModal.css */
+/* Overlay */
 .feedback-overlay {
   position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
+  inset: 0;
   background-color: rgba(0, 0, 0, 0.5);
   display: flex;
   justify-content: center;
@@ -18,30 +15,36 @@
   opacity: 1;
 }
 
+/* Modal */
 .feedback-modal {
-  background: white;
+  background: #ffffff;
   border-radius: 16px;
-  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
-  max-width: 450px;
+  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1),
+              0 10px 10px -5px rgba(0, 0, 0, 0.04);
   width: 90%;
+  max-width: 450px;
   max-height: 90vh;
   overflow: hidden;
-  transform: scale(0.9) translateY(20px);
-  transition: transform 0.3s ease;
+  transform: scale(0.95) translateY(20px);
+  transition: transform 0.3s ease, opacity 0.3s ease;
   position: relative;
+  opacity: 0;
 }
 
 .feedback-modal.visible {
   transform: scale(1) translateY(0);
+  opacity: 1;
 }
 
+/* Header */
 .feedback-header {
   display: flex;
   justify-content: space-between;
-  align-items: flex-start;
-  padding: 24px 24px 0 24px;
+  align-items: center;
+  padding: 24px 24px 0;
 }
 
+/* Icon */
 .success-icon {
   width: 60px;
   height: 60px;
@@ -60,20 +63,7 @@
   stroke-width: 3;
 }
 
-@keyframes successPulse {
-  0% {
-    transform: scale(0);
-    opacity: 0;
-  }
-  50% {
-    transform: scale(1.1);
-  }
-  100% {
-    transform: scale(1);
-    opacity: 1;
-  }
-}
-
+/* Close button */
 .close-button {
   background: none;
   border: none;
@@ -81,12 +71,12 @@
   padding: 8px;
   border-radius: 50%;
   color: #6b7280;
-  transition: all 0.2s ease;
   width: 36px;
   height: 36px;
   display: flex;
   align-items: center;
   justify-content: center;
+  transition: background 0.2s ease, color 0.2s ease;
 }
 
 .close-button:hover {
@@ -99,6 +89,7 @@
   height: 20px;
 }
 
+/* Content */
 .feedback-content {
   padding: 24px;
   text-align: center;
@@ -108,29 +99,31 @@
   font-size: 1.75rem;
   font-weight: 700;
   color: #111827;
-  margin: 0 0 12px 0;
+  margin-bottom: 12px;
 }
 
 .feedback-content p {
   font-size: 1rem;
   color: #6b7280;
   line-height: 1.6;
-  margin: 0 0 32px 0;
+  margin-bottom: 32px;
 }
 
+/* Action Buttons */
 .feedback-actions {
   display: flex;
   flex-direction: column;
   gap: 12px;
 }
 
-.primary-button, .secondary-button {
+.primary-button,
+.secondary-button {
   padding: 12px 24px;
   border-radius: 8px;
   font-weight: 600;
   font-size: 0.95rem;
-  transition: all 0.2s ease;
   cursor: pointer;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
   border: none;
 }
 
@@ -157,6 +150,7 @@
   transform: translateY(-1px);
 }
 
+/* Progress bar */
 .progress-bar {
   position: absolute;
   bottom: 0;
@@ -174,6 +168,21 @@
   animation: progressFill 5s linear forwards;
 }
 
+/* Animations */
+@keyframes successPulse {
+  0% {
+    transform: scale(0);
+    opacity: 0;
+  }
+  50% {
+    transform: scale(1.1);
+  }
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
 @keyframes progressFill {
   0% {
     width: 0%;
@@ -183,26 +192,26 @@
   }
 }
 
-/* Mobile responsiveness */
+/* Mobile */
 @media (max-width: 480px) {
   .feedback-modal {
     margin: 20px;
     width: calc(100% - 40px);
   }
-  
+
+  .feedback-header {
+    padding: 20px 20px 0;
+  }
+
+  .feedback-content {
+    padding: 20px;
+  }
+
   .feedback-content h2 {
     font-size: 1.5rem;
   }
-  
+
   .feedback-actions {
     flex-direction: column;
-  }
-  
-  .feedback-header {
-    padding: 20px 20px 0 20px;
-  }
-  
-  .feedback-content {
-    padding: 20px;
   }
 }
