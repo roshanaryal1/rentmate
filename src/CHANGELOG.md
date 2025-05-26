@@ -2,6 +2,68 @@
 
 All notable changes to RentMate will be documented in this file.
 
+## [Unreleased]
+
+### Planned Features
+- [ ] Equipment insurance integration
+- [ ] Maintenance scheduling
+- [ ] Review and rating system
+- [ ] Multi-language support
+
+## [1.1.0] - 2025-05-26
+
+### 🚀 New Features
+- **Mobile App Integration**
+  - React Native mobile app for Android and iOS
+  - Synchronized user accounts between web and mobile
+  - Push notifications for rental status updates
+
+- **Payment Processing**
+  - Stripe integration for secure payments
+  - Support for credit/debit cards and digital wallets
+  - Automated invoicing and receipt generation
+
+- **Real-time Chat**
+  - Direct messaging between renters and equipment owners
+  - Image and document sharing capabilities
+  - Read receipts and typing indicators
+
+- **Equipment Tracking**
+  - GPS location tracking for high-value equipment
+  - Real-time location updates on map interface
+  - Geofencing alerts for unauthorized movement
+
+- **Enhanced Analytics Dashboard**
+  - Comprehensive rental statistics and insights
+  - Revenue projections and trend analysis
+  - Equipment performance metrics
+
+### 🔧 Improvements
+- Redesigned user dashboard for improved navigation
+- Optimized image loading and caching
+- Enhanced search with filters and sorting options
+- Improved mobile responsiveness
+- Added dark mode support
+- Streamlined rental request workflow
+
+### 🐛 Bug Fixes
+- Fixed authentication issues on some browsers
+- Corrected date calculation in rental duration
+- Resolved image display problems on equipment listings
+- Fixed notification delivery delays
+- Addressed accessibility issues in UI components
+- Improved error handling for failed API requests
+
+### 💻 Technical Changes
+- Upgraded to React 19.1.0
+- Migrated to React Router 7.6.0
+- Updated Firebase to version 9.23.0
+- Improved test coverage
+- Implemented lazy loading for better performance
+- Enhanced security with improved authentication flows
+
+---
+
 ## [1.0.0] - 2025-01-22
 
 ### 🎉 Initial Release
@@ -84,21 +146,8 @@ All notable changes to RentMate will be documented in this file.
 
 ---
 
-## [Unreleased]
-
-### Planned Features
-- [ ] Equipment image upload and management
-- [ ] Real-time chat between users
-- [ ] Payment integration (Stripe)
-- [ ] Equipment location tracking
-- [ ] Mobile app (React Native)
-- [ ] Advanced analytics
-- [ ] Multi-language support
-
----
-
-**Release Date**: January 22, 2025  
-**Contributors**: ROSHAN ARYAL 
-**Total Commits**: 60+  
-**Files Changed**: 50+  
-**Lines of Code**: 5000+
+**Release Date**: May 26, 2025  
+**Contributors**: ROSHAN ARYAL, DHRUB, APKSHYA  
+**Total Commits**: 120+  
+**Files Changed**: 75+  
+**Lines of Code**: 9000+

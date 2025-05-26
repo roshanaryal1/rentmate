@@ -1,6 +1,6 @@
 # RentMate - Equipment Rental Platform
 
-[![Version](https://img.shields.io/badge/version-1.0.0-blue.svg)](https://github.com/roshanaryal1/rentmate/releases)
+[![Version](https://img.shields.io/badge/version-1.1.0-blue.svg)](https://github.com/roshanaryal1/rentmate/releases)
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 [![React](https://img.shields.io/badge/React-19.1.0-blue.svg)](https://reactjs.org/)
 [![Firebase](https://img.shields.io/badge/Firebase-9.23.0-orange.svg)](https://firebase.google.com/)
@@ -15,12 +15,17 @@ RentMate is a modern, full-featured equipment rental platform that connects equi
 - **Rental Management**: Track current and past rentals
 - **User Dashboard**: Manage your rental history and preferences
 - **Secure Authentication**: Google OAuth and email/password login
+- **Mobile App**: Access RentMate on the go with our mobile application
+- **Real-time Chat**: Communicate directly with equipment owners
+- **Secure Payments**: Process rentals with integrated payment system
 
 ### For Equipment Owners
 - **List Equipment**: Add your equipment with detailed descriptions and pricing
 - **Inventory Management**: Track availability and rental status
 - **Earnings Dashboard**: Monitor rental income and performance
 - **Rental History**: View all past and current rentals
+- **Equipment Tracking**: Monitor location of your equipment with GPS
+- **Analytics Dashboard**: Gain insights into your rental business
 
 ### For Administrators
 - **User Management**: Oversee user accounts and permissions
@@ -199,13 +204,6 @@ If you encounter any issues or have questions:
 
 ## 🗺️ Roadmap
 
-### Version 1.1 (Coming Soon)
-- [ ] Mobile app (React Native)
-- [ ] Payment integration (Stripe)
-- [ ] Real-time chat between renters and owners
-- [ ] Equipment location tracking (GPS)
-- [ ] Advanced analytics dashboard
-
 ### Version 1.2 (Future)
 - [ ] Multi-language support
 - [ ] Equipment insurance integration
@@ -218,6 +216,7 @@ If you encounter any issues or have questions:
 - **Sample Equipment Items**: 50+
 - **User Roles**: 3 (Renter, Owner, Admin)
 - **Supported Browsers**: Chrome, Firefox, Safari, Edge
+- **Mobile Platforms**: Android, iOS
 
 ## 🏆 Acknowledgments
 
@@ -226,7 +225,8 @@ If you encounter any issues or have questions:
 - [Bootstrap](https://getbootstrap.com/) - CSS framework
 - [React Router](https://reactrouter.com/) - Client-side routing
 - [Bootstrap Icons](https://icons.getbootstrap.com/) - Icon library
+- [Stripe](https://stripe.com/) - Payment processing
 
 ---
 
-**Made with ❤️ by ROSHAN ARYAL ,DHRUB, APKSHYA (https://github.com/roshanaryal1)
+**Made with ❤️ by ROSHAN ARYAL, DHRUB, APKSHYA (https://github.com/roshanaryal1)**
