@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 
 const emailDomains = ['gmail.com', 'yahoo.com', 'outlook.com', 'icloud.com', 'hotmail.com'];
 const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -13,6 +14,8 @@ export default function ForgotPassword() {
   const [resendAttempts, setResendAttempts] = useState(0);
   const [suggestions, setSuggestions] = useState([]);
   const [selectedSuggestionIndex, setSelectedSuggestionIndex] = useState(-1);
+
+  const navigate = useNavigate();
 
   useEffect(() => {
     let timer;
@@ -106,12 +109,12 @@ export default function ForgotPassword() {
   };
 
   const handleBackToLogin = () => {
-    console.log('Navigate back to login page'); // Replace with real routing logic
+    navigate('/login'); // Change '/login' if your route is different
   };
 
   return (
-    <div className="min-vh-100 d-flex align-items-center justify-content-center py-5 px-3">
-      <div className="card shadow-lg border-0 rounded-4 p-4 p-md-5" style={{ maxWidth: '500px', width: '100%' }}>
+    <div className="min-vh-100 d-flex align-items-center justify-content-center py-5 px-3 bg-light">
+      <div className="card shadow-lg border-0 rounded-4 p-4 p-md-5" style={{ maxWidth: '450px', width: '100%' }}>
         
         {/* Logo */}
         <div className="text-center mb-4">
@@ -157,7 +160,7 @@ export default function ForgotPassword() {
             )}
           </div>
         ) : (
-          <form onSubmit={handleSubmit}>
+          <form onSubmit={handleSubmit} className="position-relative">
             <h2 className="h5 fw-bold text-center mb-4">Forgot Password?</h2>
             <p className="text-center text-muted small mb-4">
               Enter your email and we'll send you a reset link.
@@ -190,7 +193,7 @@ export default function ForgotPassword() {
 
             {/* Suggestions Dropdown */}
             {suggestions.length > 0 && (
-              <ul className="list-group position-absolute w-100 z-10 border rounded shadow-sm bg-white mt-n2">
+              <ul className="list-group position-absolute w-100 z-10 border rounded shadow-sm bg-white mt-n2" style={{ top: '70px', zIndex: 10 }}>
                 <li className="list-group-item small fw-medium text-muted">Did you mean?</li>
                 {suggestions.map((suggestion, index) => (
                   <li
@@ -223,6 +226,15 @@ export default function ForgotPassword() {
               ) : (
                 'Send Reset Link'
               )}
+            </button>
+
+            {/* Back to login link button */}
+            <button
+              type="button"
+              onClick={handleBackToLogin}
+              className="btn btn-link w-100 mt-2 text-decoration-none text-secondary"
+            >
+              &larr; Back to Login
             </button>
           </form>
         )}
