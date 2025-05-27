@@ -17,6 +17,7 @@ function RenterDashboard() {
   const [selectedEquipment, setSelectedEquipment] = useState(null);
   const [showDetailModal, setShowDetailModal] = useState(false);
   const [stats, setStats] = useState({
+    
     totalRentals: 0,
     activeRentals: 0,
     totalSpent: 0
