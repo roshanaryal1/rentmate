@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { doc, getDoc, addDoc, collection, serverTimestamp } from 'firebase/firestore';
 import { db } from '../../firebase';
-import QRCode from 'qrcode.react';
+import { QRCodeCanvas } from 'qrcode.react'; // ✅ FIXED
 
 function PaymentPage() {
   const { equipmentId } = useParams();
@@ -32,14 +32,12 @@ function PaymentPage() {
       equipmentName: equipment.name,
       amountPaid: totalPrice,
       days,
-      renterId: equipment.renterId || 'test-renter', // Replace with auth user ID
+      renterId: equipment.renterId || 'test-renter', // Replace with currentUser.uid
       timestamp: serverTimestamp()
     });
 
     setTransactionId(transactionRef.id);
     setPaymentSuccess(true);
-
-    // Optional: Navigate or update equipment/rental status here
   };
 
   if (!equipment) return <div className="container py-5 text-center">Loading equipment...</div>;
@@ -83,7 +81,7 @@ function PaymentPage() {
           ) : (
             <div className="text-center mt-4">
               <h5 className="text-success mb-3">Payment Successful!</h5>
-              <QRCode value={transactionId} size={180} />
+              <QRCodeCanvas value={transactionId} size={180} />
               <p className="mt-2 small text-muted">Transaction ID: {transactionId}</p>
               <button
                 className="btn btn-outline-secondary mt-3"
