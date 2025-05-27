@@ -7,34 +7,34 @@ import {
   orderBy, 
   limit, 
   onSnapshot, 
-  getCountFromServer,
-  getDocs
+  getDocs,
 } from 'firebase/firestore';
 import { db } from '../../firebase';
 import { useAuth } from '../../contexts/AuthContext';
 import { equipmentService } from '../../services/equipmentService';
 import { Container, Row, Col, Card, Badge, Dropdown, Button, Form, InputGroup } from 'react-bootstrap';
-
-// Recharts for reports/charts
 import { LineChart, Line, XAxis, YAxis, Tooltip, CartesianGrid, ResponsiveContainer } from 'recharts';
-
-// Icon imports
 import { 
-  Bell, 
-  Flag, 
-  ArrowDown, 
-  Building, 
-  People, 
-  Tools, 
-  FileEarmark, 
-  HouseDoor, 
-  Gear, 
-  GraphUp, 
-  CheckCircle, 
-  Person, 
-  Search,
-  BoxArrowRight 
+  Bell, Flag, Building, People, Tools, FileEarmark, HouseDoor, Gear, GraphUp, CheckCircle, Person, Search, BoxArrowRight
 } from 'react-bootstrap-icons';
+import { startOfMonth, endOfMonth, subMonths } from 'date-fns';
+
+function getLastNMonths(n = 6) {
+  const monthsShort = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+  const arr = [];
+  const now = new Date();
+  for (let i = n - 1; i >= 0; i--) {
+    const d = subMonths(now, i);
+    arr.push({
+      label: monthsShort[d.getMonth()],
+      year: d.getFullYear(),
+      month: d.getMonth(),
+      start: startOfMonth(d),
+      end: endOfMonth(d),
+    });
+  }
+  return arr;
+}
 
 export default function AdminDashboard() {
   const [activeTab, setActiveTab] = useState('Dashboard');
@@ -53,63 +53,44 @@ export default function AdminDashboard() {
   const [notifications, setNotifications] = useState([]);
   const [allEquipment, setAllEquipment] = useState([]);
   const [allUsers, setAllUsers] = useState([]);
+  const [chartData, setChartData] = useState([]);
   const [error, setError] = useState(null);
   const [searchQuery, setSearchQuery] = useState('');
   const { currentUser, logout } = useAuth();
   const navigate = useNavigate();
 
-  // Reports chart data (replace with real Firestore data)
-  const chartData = [
-    { month: 'Jan', equipment: 20, rentals: 45 },
-    { month: 'Feb', equipment: 23, rentals: 52 },
-    { month: 'Mar', equipment: 25, rentals: 48 },
-    { month: 'Apr', equipment: 28, rentals: 61 },
-    { month: 'May', equipment: 30, rentals: 58 },
-    { month: 'Jun', equipment: 33, rentals: 67 }
-  ];
-
-  // Fetch real-time data from Firestore
+  // Fetch main data & chart data from Firestore
   useEffect(() => {
     const unsubs = [];
-    
     const fetchData = async () => {
       try {
         setMetrics(prev => ({ ...prev, loading: true }));
-        
-        // Get all equipment using our service
-        console.log('🔍 Admin fetching all equipment...');
+
+        // Equipment
         const equipment = await equipmentService.getAllEquipment();
         setAllEquipment(equipment);
-        
-        // Calculate equipment metrics
+
         const totalEquipment = equipment.length;
         const availableEquipment = equipment.filter(item => item.available).length;
         const rentedEquipment = equipment.filter(item => !item.available).length;
-        
-        console.log(`✅ Admin loaded ${totalEquipment} total equipment items`);
-        
-        // Get all users
+
+        // Users
         const usersQuery = query(collection(db, 'users'));
         const usersSnapshot = await getDocs(usersQuery);
         const users = usersSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
         setAllUsers(users);
-        
-        // Calculate user metrics
+
         const totalUsers = users.length;
         const activeRenters = users.filter(user => user.role === 'renter').length;
         const equipmentOwners = users.filter(user => user.role === 'owner').length;
-        
-        console.log(`✅ Admin loaded ${totalUsers} total users`);
-        
-        // Get rental statistics
+
+        // Rentals
         let totalRentals = 0;
         try {
           const rentalsSnapshot = await getDocs(collection(db, 'rentals'));
           totalRentals = rentalsSnapshot.size;
-        } catch (error) {
-          console.log('ℹ️ Could not fetch rentals count:', error);
-        }
-        
+        } catch (error) { }
+
         setMetrics({
           totalEquipment,
           availableEquipment,
@@ -120,17 +101,45 @@ export default function AdminDashboard() {
           totalRentals,
           loading: false
         });
-        
       } catch (err) {
-        console.error('❌ Error fetching admin dashboard data:', err);
         setError('Failed to load dashboard data');
         setMetrics(prev => ({ ...prev, loading: false }));
       }
     };
-    
+
+    // Chart data for last 6 months (real from Firestore)
+    const fetchChartData = async () => {
+      const months = getLastNMonths(6);
+      const promises = months.map(async (m) => {
+        // Equipment added this month
+        const eqQuery = query(
+          collection(db, "equipment"),
+          where("createdAt", ">=", m.start),
+          where("createdAt", "<=", m.end)
+        );
+        const eqSnap = await getDocs(eqQuery);
+
+        // Rentals completed this month
+        const rentalQuery = query(
+          collection(db, "rentals"),
+          where("createdAt", ">=", m.start),
+          where("createdAt", "<=", m.end)
+        );
+        const rentalSnap = await getDocs(rentalQuery);
+
+        return {
+          month: m.label,
+          equipment: eqSnap.size,
+          rentals: rentalSnap.size,
+        };
+      });
+      setChartData(await Promise.all(promises));
+    };
+
     fetchData();
-    
-    // Set up real-time listeners for activity and notifications
+    fetchChartData();
+
+    // Listeners for activity & notifications
     try {
       // Recent activity
       const activityQuery = query(
@@ -145,27 +154,7 @@ export default function AdminDashboard() {
           timestamp: doc.data().timestamp?.toDate() || new Date()
         }));
         setRecentActivity(activities);
-      }, (error) => {
-        console.log('ℹ️ Activity listener error (expected if collection is empty):', error);
-        setRecentActivity([
-          {
-            id: 'activity-1',
-            type: 'new_equipment',
-            userName: 'Equipment Owner',
-            description: 'added new equipment "Excavator (30-ton)"',
-            equipmentName: 'Excavator (30-ton)',
-            timestamp: new Date(Date.now() - 2 * 60 * 60 * 1000) // 2 hours ago
-          },
-          {
-            id: 'activity-2',
-            type: 'rental',
-            userName: 'John Renter',
-            description: 'rented equipment "Power Drill"',
-            equipmentName: 'Power Drill',
-            timestamp: new Date(Date.now() - 4 * 60 * 60 * 1000) // 4 hours ago
-          }
-        ]);
-      });
+      }, (error) => setRecentActivity([]));
       unsubs.push(activityUnsub);
 
       // Notifications
@@ -182,31 +171,11 @@ export default function AdminDashboard() {
           timestamp: doc.data().timestamp?.toDate() || new Date()
         }));
         setNotifications(notifs);
-      }, (error) => {
-        console.log('ℹ️ Notifications listener error (expected if collection is empty):', error);
-        setNotifications([
-          {
-            id: 'notif-1',
-            title: 'New Equipment Approval',
-            message: 'New equipment "Bulldozer D6" requires approval',
-            severity: 'normal',
-            timestamp: new Date(Date.now() - 30 * 60 * 1000) // 30 minutes ago
-          },
-          {
-            id: 'notif-2',
-            title: 'System Update',
-            message: 'Platform maintenance scheduled for tonight',
-            severity: 'info',
-            timestamp: new Date(Date.now() - 2 * 60 * 60 * 1000) // 2 hours ago
-          }
-        ]);
-      });
+      }, (error) => setNotifications([]));
       unsubs.push(notificationsUnsub);
 
-    } catch (err) {
-      console.log('ℹ️ Some real-time listeners could not be set up:', err);
-    }
-    
+    } catch (err) {}
+
     return () => unsubs.forEach(unsub => unsub && unsub());
   }, []);
 
@@ -231,16 +200,11 @@ export default function AdminDashboard() {
 
   const getActivityIcon = (type) => {
     switch(type) {
-      case 'new_equipment':
-        return <Tools className="me-2 text-success" />;
-      case 'rental':
-        return <FileEarmark className="me-2 text-primary" />;
-      case 'new_user':
-        return <Person className="me-2 text-info" />;
-      case 'maintenance':
-        return <Gear className="me-2 text-warning" />;
-      default:
-        return <CheckCircle className="me-2 text-secondary" />;
+      case 'new_equipment': return <Tools className="me-2 text-success" />;
+      case 'rental': return <FileEarmark className="me-2 text-primary" />;
+      case 'new_user': return <Person className="me-2 text-info" />;
+      case 'maintenance': return <Gear className="me-2 text-warning" />;
+      default: return <CheckCircle className="me-2 text-secondary" />;
     }
   };
 
@@ -256,7 +220,6 @@ export default function AdminDashboard() {
     { label: 'Settings', icon: <Gear /> }
   ];
 
-  // Filtered data for Equipment/Users tab
   const filteredEquipment = allEquipment.filter(
     item => item.name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
             item.category?.toLowerCase().includes(searchQuery.toLowerCase())
@@ -844,63 +807,15 @@ export default function AdminDashboard() {
       
       {/* CSS Styles */}
       <style jsx>{`
-        .sidebar {
-          width: 250px;
-          min-height: 100vh;
-        }
-        
-        .sidebar .nav-link {
-          color: rgba(255, 255, 255, 0.8);
-          padding: 0.75rem 1rem;
-          border: none;
-          background: none;
-          width: 100%;
-          text-align: left;
-          border-radius: 0;
-          transition: all 0.2s;
-        }
-        
-        .sidebar .nav-link:hover {
-          color: white;
-          background-color: rgba(255, 255, 255, 0.1);
-        }
-        
-        .sidebar .nav-link.active {
-          color: white;
-          background-color: #3b82f6;
-        }
-        
-        .notifications-panel {
-          position: absolute;
-          top: 100%;
-          right: 0;
-          width: 350px;
-          background: white;
-          border: 1px solid #e5e7eb;
-          border-radius: 0.5rem;
-          box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
-          z-index: 1000;
-          max-height: 400px;
-          overflow-y: auto;
-        }
-        
-        .notification-item:hover {
-          background-color: #f8f9fa;
-        }
-        
-        .stats-card:hover {
-          transform: translateY(-2px);
-          transition: transform 0.2s;
-        }
-        
-        .activity-list li {
-          padding: 0.5rem 0;
-          border-bottom: 1px solid #f1f3f4;
-        }
-        
-        .activity-list li:last-child {
-          border-bottom: none;
-        }
+        .sidebar { width: 250px; min-height: 100vh; }
+        .sidebar .nav-link { color: rgba(255, 255, 255, 0.8); padding: 0.75rem 1rem; border: none; background: none; width: 100%; text-align: left; border-radius: 0; transition: all 0.2s; }
+        .sidebar .nav-link:hover { color: white; background-color: rgba(255, 255, 255, 0.1); }
+        .sidebar .nav-link.active { color: white; background-color: #3b82f6; }
+        .notifications-panel { position: absolute; top: 100%; right: 0; width: 350px; background: white; border: 1px solid #e5e7eb; border-radius: 0.5rem; box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1); z-index: 1000; max-height: 400px; overflow-y: auto; }
+        .notification-item:hover { background-color: #f8f9fa; }
+        .stats-card:hover { transform: translateY(-2px); transition: transform 0.2s; }
+        .activity-list li { padding: 0.5rem 0; border-bottom: 1px solid #f1f3f4; }
+        .activity-list li:last-child { border-bottom: none; }
       `}</style>
     </div>
   );
