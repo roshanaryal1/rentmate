@@ -18,10 +18,18 @@ function RentEquipment() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [totalPrice, setTotalPrice] = useState(0);
   const [totalDays, setTotalDays] = useState(0);
+  const [contactInfo, setContactInfo] = useState({
+    phone: '',
+    address: '',
+    notes: ''
+  });
 
   useEffect(() => {
     const fetchEquipment = async () => {
       try {
+        setLoading(true);
+        console.log('🔍 Fetching equipment with ID:', equipmentId);
+        
         const docRef = doc(db, 'equipment', equipmentId);
         const docSnap = await getDoc(docRef);
         
@@ -29,14 +37,19 @@ function RentEquipment() {
           throw new Error('Equipment not found');
         }
         
-        const equipmentData = docSnap.data();
+        const equipmentData = { id: docSnap.id, ...docSnap.data() };
+        console.log('📋 Equipment data:', equipmentData);
         
-        // Validate equipment is available for rent
-        if (equipmentData.status !== 'available') {
-          throw new Error('This equipment is not currently available for rent');
+        // Check if equipment is available for rent (fixed the availability check)
+        if (!equipmentData.available) {
+          throw new Error('This equipment is currently not available for rent');
         }
         
-        setEquipment({ id: docSnap.id, ...equipmentData });
+        if (equipmentData.status !== 'approved') {
+          throw new Error('This equipment is pending approval and cannot be rented yet');
+        }
+        
+        setEquipment(equipmentData);
       } catch (err) {
         setError(err.message || 'Failed to fetch equipment details');
         console.error('Fetch equipment error:', err);
@@ -45,7 +58,9 @@ function RentEquipment() {
       }
     };
 
-    fetchEquipment();
+    if (equipmentId) {
+      fetchEquipment();
+    }
   }, [equipmentId]);
 
   useEffect(() => {
@@ -56,6 +71,8 @@ function RentEquipment() {
       // Validate dates
       if (start >= end) {
         setError('End date must be after start date');
+        setTotalDays(0);
+        setTotalPrice(0);
         return;
       }
       
@@ -65,8 +82,18 @@ function RentEquipment() {
       setTotalDays(days);
       setTotalPrice(price);
       setError('');
+    } else {
+      setTotalDays(0);
+      setTotalPrice(0);
     }
   }, [startDate, endDate, equipment]);
+
+  const handleContactInfoChange = (field, value) => {
+    setContactInfo(prev => ({
+      ...prev,
+      [field]: value
+    }));
+  };
 
   const handleBooking = async (e) => {
     e.preventDefault();
@@ -79,30 +106,49 @@ function RentEquipment() {
       return setError('Start date cannot be in the past');
     }
 
+    if (!contactInfo.phone.trim()) {
+      return setError('Please provide your phone number');
+    }
+
+    if (!contactInfo.address.trim()) {
+      return setError('Please provide your address');
+    }
+
     setIsSubmitting(true);
     setError('');
 
     try {
       const rentalRef = collection(db, 'rentals');
       
-      await addDoc(rentalRef, {
+      const rentalData = {
         equipmentId: equipment.id,
         equipmentName: equipment.name,
         equipmentImage: equipment.imageUrl || null,
         renterId: currentUser.uid,
         renterEmail: currentUser.email,
+        renterName: currentUser.displayName || currentUser.email.split('@')[0],
+        renterPhone: contactInfo.phone,
+        renterAddress: contactInfo.address,
+        notes: contactInfo.notes,
         ownerId: equipment.ownerId,
         ownerName: equipment.ownerName,
         startDate: Timestamp.fromDate(new Date(startDate)),
         endDate: Timestamp.fromDate(new Date(endDate)),
-        totalPrice,
+        totalDays: totalDays,
+        dailyRate: equipment.ratePerDay,
+        totalPrice: totalPrice,
         status: 'pending', // Start as pending for owner approval
         createdAt: Timestamp.now(),
         updatedAt: Timestamp.now(),
-      });
+      };
 
-      // Show success message before redirect
-      alert('Booking request submitted successfully!');
+      console.log('💾 Creating rental:', rentalData);
+      await addDoc(rentalRef, rentalData);
+
+      // Show success message
+      alert('🎉 Rental request submitted successfully! The equipment owner will review your request.');
+      
+      // Redirect to dashboard
       navigate('/renter-dashboard');
     } catch (err) {
       console.error('Booking error:', err);
@@ -114,34 +160,34 @@ function RentEquipment() {
 
   if (loading) {
     return (
-      <div className="flex justify-center items-center min-h-screen">
-        <div className="text-center py-6">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500 mx-auto mb-4"></div>
-          <p>Loading equipment details...</p>
+      <div className="container py-5">
+        <div className="text-center">
+          <div className="spinner-border text-primary" role="status">
+            <span className="visually-hidden">Loading...</span>
+          </div>
+          <p className="mt-3">Loading equipment details...</p>
         </div>
       </div>
     );
   }
 
-  if (error) {
+  if (error && !equipment) {
     return (
-      <div className="max-w-3xl mx-auto p-6">
-        <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative" role="alert">
-          <strong className="font-bold">Error: </strong>
-          <span className="block sm:inline">{error}</span>
+      <div className="container py-5">
+        <div className="alert alert-danger">
+          <h4>
+            <i className="bi bi-exclamation-triangle me-2"></i>
+            Equipment Not Available
+          </h4>
+          <p className="mb-3">{error}</p>
           <button 
-            onClick={() => navigate(-1)} 
-            className="absolute top-0 right-0 px-4 py-3"
+            className="btn btn-primary" 
+            onClick={() => navigate('/renter-dashboard')}
           >
-            &times;
+            <i className="bi bi-arrow-left me-2"></i>
+            Back to Dashboard
           </button>
         </div>
-        <button
-          onClick={() => navigate(-1)}
-          className="mt-4 bg-gray-500 text-white px-4 py-2 rounded hover:bg-gray-600"
-        >
-          Back to Equipment
-        </button>
       </div>
     );
   }
@@ -149,122 +195,246 @@ function RentEquipment() {
   if (!equipment) return null;
 
   return (
-    <div className="max-w-3xl mx-auto p-6 bg-white rounded-lg shadow-md">
-      <h2 className="text-3xl font-bold mb-6 text-gray-800">Rent Equipment</h2>
-      
-      <div className="flex flex-col md:flex-row gap-8 mb-8">
-        {equipment.imageUrl && (
-          <div className="md:w-1/3">
-            <img 
-              src={equipment.imageUrl} 
-              alt={equipment.name} 
-              className="w-full h-auto rounded-lg object-cover"
-            />
+    <div className="container py-4">
+      <div className="row justify-content-center">
+        <div className="col-lg-8">
+          {/* Header */}
+          <div className="mb-4">
+            <nav aria-label="breadcrumb">
+              <ol className="breadcrumb">
+                <li className="breadcrumb-item">
+                  <button 
+                    className="btn btn-link p-0 text-decoration-none"
+                    onClick={() => navigate('/renter-dashboard')}
+                  >
+                    Dashboard
+                  </button>
+                </li>
+                <li className="breadcrumb-item active" aria-current="page">Rent Equipment</li>
+              </ol>
+            </nav>
+            <h2 className="h3 fw-bold">Rent Equipment</h2>
+            <p className="text-muted">Complete the form below to submit your rental request</p>
           </div>
-        )}
-        
-        <div className={`${equipment.imageUrl ? 'md:w-2/3' : 'w-full'}`}>
-          <h3 className="text-2xl font-semibold mb-2">{equipment.name}</h3>
-          <div className="flex items-center mb-4">
-            <span className="bg-blue-100 text-blue-800 text-xs font-semibold px-2.5 py-0.5 rounded">
-              {equipment.category}
-            </span>
-            <span className="ml-4 text-gray-600">
-              ${equipment.ratePerDay} / day
-            </span>
-          </div>
-          
-          <p className="text-gray-700 mb-4">{equipment.description}</p>
-          
-          <div className="bg-gray-50 p-4 rounded-lg mb-4">
-            <h4 className="font-medium mb-2">Owner Information</h4>
-            <p className="text-gray-600">{equipment.ownerName}</p>
+
+          {error && (
+            <div className="alert alert-danger mb-4">
+              <i className="bi bi-exclamation-triangle me-2"></i>
+              {error}
+            </div>
+          )}
+
+          <div className="row">
+            {/* Equipment Info Card */}
+            <div className="col-md-5 mb-4">
+              <div className="card h-100">
+                <div className="card-header bg-primary text-white">
+                  <h5 className="mb-0">
+                    <i className="bi bi-tools me-2"></i>
+                    Equipment Details
+                  </h5>
+                </div>
+                <div className="card-body">
+                  {equipment.imageUrl && (
+                    <img 
+                      src={equipment.imageUrl} 
+                      alt={equipment.name} 
+                      className="img-fluid rounded mb-3"
+                      style={{ maxHeight: '200px', width: '100%', objectFit: 'cover' }}
+                      onError={(e) => {
+                        e.target.onerror = null;
+                        e.target.src = 'https://via.placeholder.com/300x200?text=No+Image';
+                      }}
+                    />
+                  )}
+                  
+                  <h6 className="fw-bold">{equipment.name}</h6>
+                  <p className="text-muted mb-2">{equipment.description}</p>
+                  
+                  <div className="mb-3">
+                    <span className="badge bg-primary me-2">{equipment.category}</span>
+                    <span className="badge bg-success">Available</span>
+                  </div>
+                  
+                  <div className="border-top pt-3">
+                    <div className="row text-center">
+                      <div className="col-6">
+                        <div className="fw-bold text-success">${equipment.ratePerDay}</div>
+                        <small className="text-muted">per day</small>
+                      </div>
+                      <div className="col-6">
+                        <div className="fw-bold text-info">{equipment.views || 0}</div>
+                        <small className="text-muted">views</small>
+                      </div>
+                    </div>
+                  </div>
+                  
+                  <div className="mt-3">
+                    <small className="text-muted">
+                      <i className="bi bi-person me-1"></i>
+                      Owner: {equipment.ownerName}
+                    </small>
+                    <br />
+                    <small className="text-muted">
+                      <i className="bi bi-geo-alt me-1"></i>
+                      Location: {equipment.location}
+                    </small>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Rental Form */}
+            <div className="col-md-7">
+              <div className="card">
+                <div className="card-header">
+                  <h5 className="mb-0">
+                    <i className="bi bi-calendar-check me-2"></i>
+                    Rental Request Form
+                  </h5>
+                </div>
+                <div className="card-body">
+                  <form onSubmit={handleBooking}>
+                    {/* Rental Dates */}
+                    <div className="row mb-3">
+                      <div className="col-sm-6 mb-3">
+                        <label className="form-label fw-semibold">
+                          Start Date <span className="text-danger">*</span>
+                        </label>
+                        <input
+                          type="date"
+                          value={startDate}
+                          min={format(new Date(), 'yyyy-MM-dd')}
+                          onChange={(e) => setStartDate(e.target.value)}
+                          className="form-control"
+                          required
+                        />
+                      </div>
+                      
+                      <div className="col-sm-6 mb-3">
+                        <label className="form-label fw-semibold">
+                          End Date <span className="text-danger">*</span>
+                        </label>
+                        <input
+                          type="date"
+                          value={endDate}
+                          min={startDate || format(new Date(), 'yyyy-MM-dd')}
+                          onChange={(e) => setEndDate(e.target.value)}
+                          className="form-control"
+                          required
+                        />
+                      </div>
+                    </div>
+
+                    {/* Contact Information */}
+                    <div className="mb-3">
+                      <label className="form-label fw-semibold">
+                        Phone Number <span className="text-danger">*</span>
+                      </label>
+                      <input
+                        type="tel"
+                        value={contactInfo.phone}
+                        onChange={(e) => handleContactInfoChange('phone', e.target.value)}
+                        className="form-control"
+                        placeholder="e.g., +64 21 123 4567"
+                        required
+                      />
+                    </div>
+
+                    <div className="mb-3">
+                      <label className="form-label fw-semibold">
+                        Address <span className="text-danger">*</span>
+                      </label>
+                      <textarea
+                        value={contactInfo.address}
+                        onChange={(e) => handleContactInfoChange('address', e.target.value)}
+                        className="form-control"
+                        rows="2"
+                        placeholder="Your full address for equipment delivery/pickup"
+                        required
+                      />
+                    </div>
+
+                    <div className="mb-4">
+                      <label className="form-label fw-semibold">
+                        Additional Notes (Optional)
+                      </label>
+                      <textarea
+                        value={contactInfo.notes}
+                        onChange={(e) => handleContactInfoChange('notes', e.target.value)}
+                        className="form-control"
+                        rows="3"
+                        placeholder="Any special requirements or questions for the owner..."
+                      />
+                    </div>
+
+                    {/* Price Summary */}
+                    {totalDays > 0 && (
+                      <div className="alert alert-info">
+                        <h6 className="alert-heading">
+                          <i className="bi bi-calculator me-2"></i>
+                          Rental Summary
+                        </h6>
+                        <div className="d-flex justify-content-between mb-1">
+                          <span>Rental Period:</span>
+                          <span className="fw-semibold">{totalDays} day{totalDays !== 1 ? 's' : ''}</span>
+                        </div>
+                        <div className="d-flex justify-content-between mb-1">
+                          <span>Daily Rate:</span>
+                          <span>${equipment.ratePerDay}</span>
+                        </div>
+                        <hr className="my-2" />
+                        <div className="d-flex justify-content-between">
+                          <span className="fw-bold">Total Price:</span>
+                          <span className="fw-bold text-success">${totalPrice.toFixed(2)}</span>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Submit Buttons */}
+                    <div className="d-flex gap-3">
+                      <button
+                        type="button"
+                        onClick={() => navigate('/renter-dashboard')}
+                        className="btn btn-outline-secondary flex-fill"
+                        disabled={isSubmitting}
+                      >
+                        <i className="bi bi-arrow-left me-2"></i>
+                        Cancel
+                      </button>
+                      
+                      <button
+                        type="submit"
+                        disabled={isSubmitting || !startDate || !endDate || totalDays <= 0}
+                        className="btn btn-success flex-fill"
+                      >
+                        {isSubmitting ? (
+                          <>
+                            <span className="spinner-border spinner-border-sm me-2" role="status"></span>
+                            Submitting...
+                          </>
+                        ) : (
+                          <>
+                            <i className="bi bi-send me-2"></i>
+                            Submit Rental Request
+                          </>
+                        )}
+                      </button>
+                    </div>
+
+                    <div className="mt-3 text-center">
+                      <small className="text-muted">
+                        <i className="bi bi-info-circle me-1"></i>
+                        Your request will be sent to the equipment owner for approval
+                      </small>
+                    </div>
+                  </form>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
       </div>
-
-      <form onSubmit={handleBooking} className="space-y-6">
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Start Date <span className="text-red-500">*</span>
-            </label>
-            <input
-              type="date"
-              value={startDate}
-              min={format(new Date(), 'yyyy-MM-dd')}
-              onChange={(e) => setStartDate(e.target.value)}
-              className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
-              required
-            />
-          </div>
-          
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              End Date <span className="text-red-500">*</span>
-            </label>
-            <input
-              type="date"
-              value={endDate}
-              min={startDate || format(new Date(), 'yyyy-MM-dd')}
-              onChange={(e) => setEndDate(e.target.value)}
-              className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
-              required
-            />
-          </div>
-        </div>
-
-        {totalDays > 0 && (
-          <div className="bg-blue-50 p-4 rounded-lg">
-            <div className="flex justify-between mb-2">
-              <span className="text-gray-600">Rental Period:</span>
-              <span className="font-medium">{totalDays} day{totalDays !== 1 ? 's' : ''}</span>
-            </div>
-            <div className="flex justify-between text-lg">
-              <span className="text-gray-800">Total Price:</span>
-              <span className="font-bold text-blue-600">${totalPrice.toFixed(2)}</span>
-            </div>
-          </div>
-        )}
-
-        {error && (
-          <div className="bg-red-100 border-l-4 border-red-500 text-red-700 p-4">
-            <p>{error}</p>
-          </div>
-        )}
-
-        <div className="flex items-center justify-between pt-4">
-          <button
-            type="button"
-            onClick={() => navigate(-1)}
-            className="px-6 py-2 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50"
-          >
-            Cancel
-          </button>
-          
-          <button
-            type="submit"
-            disabled={isSubmitting || !startDate || !endDate || totalDays <= 0}
-            className={`px-6 py-2 rounded-md text-white ${isSubmitting || !startDate || !endDate || totalDays <= 0 
-              ? 'bg-blue-400 cursor-not-allowed' 
-              : 'bg-blue-600 hover:bg-blue-700'}`}
-          >
-            {isSubmitting ? (
-              <>
-                <span className="inline-block mr-2">
-                  <svg className="animate-spin h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                  </svg>
-                </span>
-                Processing...
-              </>
-            ) : (
-              'Confirm Booking'
-            )}
-          </button>
-        </div>
-      </form>
     </div>
   );
 }

@@ -17,7 +17,6 @@ function RenterDashboard() {
   const [selectedEquipment, setSelectedEquipment] = useState(null);
   const [showDetailModal, setShowDetailModal] = useState(false);
   const [stats, setStats] = useState({
-    
     totalRentals: 0,
     activeRentals: 0,
     totalSpent: 0
@@ -522,6 +521,7 @@ function EquipmentCard({ item, currentUserId, onViewDetails }) {
         </div>
         
         <div className="mt-auto">
+          {/* Price and Views Section - SINGLE INSTANCE */}
           <div className="d-flex justify-content-between align-items-center mb-3">
             <div>
               <span className="h5 text-success fw-bold">${item.ratePerDay}</span>
@@ -534,17 +534,6 @@ function EquipmentCard({ item, currentUserId, onViewDetails }) {
           </div>
           
           {/* Action Buttons */}
-          <div className="d-flex justify-content-between align-items-center mb-3">
-            <div>
-              <span className="h5 text-success fw-bold">${item.ratePerDay}</span>
-              <small className="text-muted">/day</small>
-            </div>
-            <div className="d-flex align-items-center text-muted small">
-              <i className="bi bi-eye me-1"></i>
-              <span>{item.views || 0}</span>
-            </div>
-          </div>
-          
           <div className="d-flex gap-2">
             <button
               className="btn btn-outline-info btn-sm"
@@ -575,6 +564,7 @@ function EquipmentCard({ item, currentUserId, onViewDetails }) {
             )}
           </div>
           
+          {/* Location and Owner Info */}
           <div className="text-muted small mt-2">
             <div className="d-flex align-items-center">
               <i className="bi bi-geo-alt me-1"></i>
