@@ -95,24 +95,8 @@
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 1.5rem;
-}
-
-.add-equipment-btn {
-  display: inline-flex;
-  align-items: center;
-  background-color: #3b82f6;
-  color: white;
-  padding: 0.5rem 1rem;
-  border-radius: 6px;
-  font-weight: 600;
-  text-decoration: none;
-  transition: background-color 0.2s;
-}
-
-.add-equipment-btn:hover {
-  background-color: #2563eb;
-  color: white;
+  margin-top: 2rem;
+  margin-bottom: 2.5rem;
 }
 
 .equipment-grid {
@@ -201,36 +185,23 @@
   gap: 0.5rem;
 }
 
-.details-btn, .edit-btn {
-  flex: 1;
-  padding: 0.5rem 0;
-  text-align: center;
-  border-radius: 6px;
-  font-weight: 500;
-  text-decoration: none;
-  transition: all 0.2s;
-}
-
-.details-btn {
-  background-color: #e5e7eb;
-  color: #1f2937;
-  border: none;
-  cursor: pointer;
-}
-
-.details-btn:hover {
-  background-color: #d1d5db;
-}
-
-.edit-btn {
+/* Button Utility Class - BLUE */
+.btn-blue {
   background-color: #3b82f6;
   color: white;
+  border: none;
+  border-radius: 6px;
+  font-weight: 500;
+  padding: 0.5rem 1rem;
+  cursor: pointer;
+  transition: background-color 0.2s;
+  text-decoration: none;
+  display: inline-block;
 }
 
-.edit-btn:hover {
+.btn-blue:hover {
   background-color: #2563eb;
   color: white;
-  text-decoration: none;
 }
 
 /* Empty States */
@@ -259,22 +230,6 @@
   margin-bottom: 1.5rem;
 }
 
-.empty-action-btn {
-  display: inline-block;
-  background-color: #3b82f6;
-  color: white;
-  padding: 0.5rem 1.5rem;
-  border-radius: 6px;
-  font-weight: 500;
-  text-decoration: none;
-  transition: background-color 0.2s;
-}
-
-.empty-action-btn:hover {
-  background-color: #2563eb;
-  color: white;
-}
-
 /* Loader */
 .loader-container {
   text-align: center;
@@ -293,11 +248,11 @@
   .equipment-modal-content {
     flex-direction: row;
   }
-  
+
   .equipment-modal-image {
     flex: 1;
   }
-  
+
   .equipment-modal-details {
     flex: 1;
   }
@@ -408,33 +363,6 @@
   gap: 0.5rem;
 }
 
-.contact-btn, .track-btn {
-  padding: 0.5rem 1rem;
-  border-radius: 6px;
-  font-weight: 500;
-  border: none;
-  cursor: pointer;
-  transition: background-color 0.2s;
-}
-
-.contact-btn {
-  background-color: #e5e7eb;
-  color: #1f2937;
-}
-
-.contact-btn:hover {
-  background-color: #d1d5db;
-}
-
-.track-btn {
-  background-color: #3b82f6;
-  color: white;
-}
-
-.track-btn:hover {
-  background-color: #2563eb;
-}
-
 /* Quick Links */
 .dashboard-quick-links {
   display: grid;
@@ -470,19 +398,7 @@
 }
 
 .card-link {
-  display: inline-block;
-  padding: 0.5rem 1rem;
-  background-color: #f3f4f6;
-  color: #4b5563;
-  border-radius: 6px;
-  text-decoration: none;
-  font-weight: 500;
-  transition: all 0.2s;
-}
-
-.card-link:hover {
-  background-color: #3b82f6;
-  color: white;
+  @extend .btn-blue;
 }
 
 /* Responsive adjustments */
@@ -490,26 +406,26 @@
   .dashboard-header {
     flex-direction: column;
   }
-  
+
   .dashboard-stats {
     width: 100%;
     overflow-x: auto;
     padding-bottom: 0.5rem;
   }
-  
+
   .stat-card {
     min-width: 120px;
   }
-  
+
   .rental-primary, .rental-secondary {
     flex-direction: column;
     align-items: flex-start;
   }
-  
+
   .rental-primary h4 {
     margin-bottom: 0.5rem;
   }
-  
+
   .rental-actions {
     width: 100%;
     justify-content: flex-end;
