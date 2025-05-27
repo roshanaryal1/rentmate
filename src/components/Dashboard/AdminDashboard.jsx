@@ -8,14 +8,17 @@ import {
   limit, 
   onSnapshot, 
   getDocs,
+  doc,
+  getDoc,
+  updateDoc
 } from 'firebase/firestore';
 import { db } from '../../firebase';
 import { useAuth } from '../../contexts/AuthContext';
 import { equipmentService } from '../../services/equipmentService';
-import { Container, Row, Col, Card, Badge, Dropdown, Button, Form, InputGroup } from 'react-bootstrap';
+import { Container, Row, Col, Card, Badge, Dropdown, Button, Form, InputGroup, Modal } from 'react-bootstrap';
 import { LineChart, Line, XAxis, YAxis, Tooltip, CartesianGrid, ResponsiveContainer } from 'recharts';
 import { 
-  Bell, Flag, Building, People, Tools, FileEarmark, HouseDoor, Gear, GraphUp, CheckCircle, Person, Search, BoxArrowRight
+  Bell, Flag, Building, People, Tools, FileEarmark, HouseDoor, Gear, GraphUp, CheckCircle, Person, Search, BoxArrowRight, PencilSquare, Eye, Envelope, Calendar, Shield
 } from 'react-bootstrap-icons';
 import { startOfMonth, endOfMonth, subMonths } from 'date-fns';
 
@@ -34,6 +37,253 @@ function getLastNMonths(n = 6) {
     });
   }
   return arr;
+}
+
+// ----------- USER PROFILE MODAL ----------
+function UserProfileModal({ user, isOpen, onClose }) {
+  const [userDetails, setUserDetails] = useState(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    if (isOpen && user) {
+      fetchUserDetails();
+    }
+    // eslint-disable-next-line
+  }, [isOpen, user]);
+
+  const fetchUserDetails = async () => {
+    try {
+      setLoading(true);
+      const userDoc = await getDoc(doc(db, 'users', user.id));
+      if (userDoc.exists()) {
+        setUserDetails({ id: userDoc.id, ...userDoc.data() });
+      }
+    } catch (error) {
+      setUserDetails(null);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const formatDate = (timestamp) => {
+    if (!timestamp) return 'Unknown';
+    if (timestamp.toDate) return timestamp.toDate().toLocaleDateString();
+    return new Date(timestamp).toLocaleDateString();
+  };
+
+  if (!isOpen || !user) return null;
+
+  return (
+    <Modal show={isOpen} onHide={onClose} size="lg" centered>
+      <Modal.Header closeButton className="bg-primary text-white">
+        <Modal.Title>
+          <Person className="me-2" />
+          User Profile
+        </Modal.Title>
+      </Modal.Header>
+      <Modal.Body>
+        {loading ? (
+          <div className="text-center py-4">
+            <div className="spinner-border text-primary" role="status">
+              <span className="visually-hidden">Loading...</span>
+            </div>
+          </div>
+        ) : userDetails ? (
+          <div>
+            <div className="text-center mb-4">
+              <img 
+                src={userDetails.photoURL || 'https://via.placeholder.com/120'} 
+                alt={userDetails.displayName || 'User'}
+                className="rounded-circle mb-3"
+                width="120"
+                height="120"
+                onError={(e) => {
+                  e.target.onerror = null;
+                  e.target.src = 'https://via.placeholder.com/120?text=User';
+                }}
+              />
+              <h4>{userDetails.displayName || 'No Name'}</h4>
+              <Badge bg={
+                userDetails.role === 'admin' ? 'danger' :
+                userDetails.role === 'owner' ? 'success' : 'primary'
+              } className="fs-6">
+                {userDetails.role === 'renter' ? 'Renter' : 
+                 userDetails.role === 'owner' ? 'Owner' : 
+                 userDetails.role === 'admin' ? 'Admin' : 'Unknown'}
+              </Badge>
+            </div>
+            <Row>
+              <Col md={6}>
+                <div className="mb-3">
+                  <strong className="d-flex align-items-center">
+                    <Envelope className="me-2 text-primary" />
+                    Email:
+                  </strong>
+                  <p className="mb-0 ms-4">{userDetails.email}</p>
+                </div>
+              </Col>
+              <Col md={6}>
+                <div className="mb-3">
+                  <strong className="d-flex align-items-center">
+                    <Calendar className="me-2 text-success" />
+                    Joined:
+                  </strong>
+                  <p className="mb-0 ms-4">{formatDate(userDetails.createdAt)}</p>
+                </div>
+              </Col>
+              <Col md={6}>
+                <div className="mb-3">
+                  <strong className="d-flex align-items-center">
+                    <Shield className="me-2 text-warning" />
+                    Email Verified:
+                  </strong>
+                  <p className="mb-0 ms-4">
+                    <Badge bg={userDetails.emailVerified ? 'success' : 'warning'}>
+                      {userDetails.emailVerified ? 'Yes' : 'No'}
+                    </Badge>
+                  </p>
+                </div>
+              </Col>
+              <Col md={6}>
+                <div className="mb-3">
+                  <strong>User ID:</strong>
+                  <p className="mb-0 text-muted small">{userDetails.id}</p>
+                </div>
+              </Col>
+            </Row>
+            {userDetails.phone && (
+              <div className="mb-3">
+                <strong>Phone:</strong>
+                <p className="mb-0">{userDetails.phone}</p>
+              </div>
+            )}
+            {userDetails.address && (
+              <div className="mb-3">
+                <strong>Address:</strong>
+                <p className="mb-0">{userDetails.address}</p>
+              </div>
+            )}
+            <div className="bg-light p-3 rounded">
+              <h6 className="mb-2">Account Status</h6>
+              <div className="d-flex justify-content-between">
+                <span>Status:</span>
+                <Badge bg="success">Active</Badge>
+              </div>
+            </div>
+          </div>
+        ) : (
+          <div className="text-center py-4">
+            <p>User details not found</p>
+          </div>
+        )}
+      </Modal.Body>
+      <Modal.Footer>
+        <Button variant="secondary" onClick={onClose}>
+          Close
+        </Button>
+      </Modal.Footer>
+    </Modal>
+  );
+}
+
+// ----------- EDIT ROLE MODAL ----------
+function EditRoleModal({ user, isOpen, onClose, onRoleUpdate }) {
+  const [selectedRole, setSelectedRole] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+
+  useEffect(() => {
+    if (isOpen && user) {
+      setSelectedRole(user.role || 'renter');
+      setError('');
+    }
+  }, [isOpen, user]);
+
+  const handleSave = async () => {
+    if (!selectedRole || selectedRole === user.role) {
+      onClose();
+      return;
+    }
+
+    setLoading(true);
+    setError('');
+
+    try {
+      await updateDoc(doc(db, 'users', user.id), {
+        role: selectedRole
+      });
+      onRoleUpdate(user.id, selectedRole);
+      onClose();
+    } catch (error) {
+      setError('Failed to update user role. Please try again.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  if (!isOpen || !user) return null;
+
+  return (
+    <Modal show={isOpen} onHide={onClose} centered>
+      <Modal.Header closeButton>
+        <Modal.Title>
+          <PencilSquare className="me-2" />
+          Edit User Role
+        </Modal.Title>
+      </Modal.Header>
+      <Modal.Body>
+        {error && (
+          <div className="alert alert-danger" role="alert">
+            {error}
+          </div>
+        )}
+        <div className="mb-3">
+          <p><strong>User:</strong> {user.displayName || user.email}</p>
+          <p><strong>Current Role:</strong> 
+            <Badge bg={
+              user.role === 'admin' ? 'danger' :
+              user.role === 'owner' ? 'success' : 'primary'
+            } className="ms-2">
+              {user.role === 'renter' ? 'Renter' : 
+               user.role === 'owner' ? 'Owner' : 
+               user.role === 'admin' ? 'Admin' : 'Unknown'}
+            </Badge>
+          </p>
+        </div>
+        <Form.Group>
+          <Form.Label>New Role:</Form.Label>
+          <Form.Select
+            value={selectedRole}
+            onChange={(e) => setSelectedRole(e.target.value)}
+            disabled={loading}
+          >
+            <option value="renter">Renter</option>
+            <option value="owner">Owner</option>
+            <option value="admin">Admin</option>
+          </Form.Select>
+        </Form.Group>
+      </Modal.Body>
+      <Modal.Footer>
+        <Button variant="secondary" onClick={onClose} disabled={loading}>
+          Cancel
+        </Button>
+        <Button 
+          variant="primary" 
+          onClick={handleSave} 
+          disabled={loading || selectedRole === user.role}
+        >
+          {loading ? (
+            <>
+              <span className="spinner-border spinner-border-sm me-2" role="status"></span>
+              Updating...
+            </>
+          ) : (
+            'Save Changes'
+          )}
+        </Button>
+      </Modal.Footer>
+    </Modal>
+  );
 }
 
 export default function AdminDashboard() {
@@ -59,7 +309,11 @@ export default function AdminDashboard() {
   const { currentUser, logout } = useAuth();
   const navigate = useNavigate();
 
-  // Fetch main data & chart data from Firestore
+  // User profile/edit role modal
+  const [showUserProfile, setShowUserProfile] = useState(false);
+  const [showEditRole, setShowEditRole] = useState(false);
+  const [selectedUser, setSelectedUser] = useState(null);
+
   useEffect(() => {
     const unsubs = [];
     const fetchData = async () => {
@@ -177,6 +431,7 @@ export default function AdminDashboard() {
     } catch (err) {}
 
     return () => unsubs.forEach(unsub => unsub && unsub());
+    // eslint-disable-next-line
   }, []);
 
   const handleLogout = async () => {
@@ -230,8 +485,57 @@ export default function AdminDashboard() {
             user.role?.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
+  // Modal handlers
+  const handleViewProfile = (user) => {
+    setSelectedUser(user);
+    setShowUserProfile(true);
+  };
+  const handleEditRole = (user) => {
+    setSelectedUser(user);
+    setShowEditRole(true);
+  };
+  const handleRoleUpdate = (userId, newRole) => {
+    setAllUsers(prevUsers => 
+      prevUsers.map(user => 
+        user.id === userId ? { ...user, role: newRole } : user
+      )
+    );
+    // update metrics
+    const updatedUsers = allUsers.map(user =>
+      user.id === userId ? { ...user, role: newRole } : user
+    );
+    const activeRenters = updatedUsers.filter(user => user.role === 'renter').length;
+    const equipmentOwners = updatedUsers.filter(user => user.role === 'owner').length;
+    setMetrics(prev => ({
+      ...prev,
+      activeRenters,
+      equipmentOwners
+    }));
+  };
+
   return (
-    <div className="dashboard-container d-flex">
+    <>
+      {/* Modals for user actions */}
+      <UserProfileModal
+        user={selectedUser}
+        isOpen={showUserProfile}
+        onClose={() => {
+          setShowUserProfile(false);
+          setSelectedUser(null);
+        }}
+      />
+
+      <EditRoleModal
+        user={selectedUser}
+        isOpen={showEditRole}
+        onClose={() => {
+          setShowEditRole(false);
+          setSelectedUser(null);
+        }}
+        onRoleUpdate={handleRoleUpdate}
+      />
+
+      <div className="dashboard-container d-flex">
       {/* Sidebar */}
       <div className="sidebar bg-dark text-white">
         <div className="d-flex align-items-center p-3 mb-3">
@@ -686,10 +990,12 @@ export default function AdminDashboard() {
                                 }
                               </td>
                               <td>
-                                <Button variant="outline-primary" size="sm" className="me-2">
+                                <Button variant="outline-primary" size="sm" className="me-2" onClick={() => handleViewProfile(user)}>
+                                  <Eye className="me-1" size={14} />
                                   View Profile
                                 </Button>
-                                <Button variant="outline-secondary" size="sm">
+                                <Button variant="outline-secondary" size="sm" onClick={() => handleEditRole(user)}>
+                                  <PencilSquare className="me-1" size={14} />
                                   Edit Role
                                 </Button>
                               </td>
@@ -818,5 +1124,6 @@ export default function AdminDashboard() {
         .activity-list li:last-child { border-bottom: none; }
       `}</style>
     </div>
+    </>
   );
 }
