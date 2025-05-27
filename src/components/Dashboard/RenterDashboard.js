@@ -498,25 +498,22 @@ function EquipmentCard({ item, currentUserId }) {
               <span className="h5 text-success fw-bold">${item.ratePerDay}</span>
               <small className="text-muted">/day</small>
             </div>
-            {item.available && !isOwnEquipment ? (
-              <Link
-                to={`/rent/${item.id}`}
-                className="btn btn-primary btn-sm"
-              >
-                Rent Now
-              </Link>
-            ) : isOwnEquipment ? (
-              <Link
-                to={`/edit-equipment/${item.id}`}
-                className="btn btn-outline-secondary btn-sm"
-              >
-                Edit
-              </Link>
-            ) : (
-              <button className="btn btn-secondary btn-sm" disabled>
-                Unavailable
-              </button>
-            )}
+
+            {item.available ? (
+  <Link
+    to={`/payment/${item.id}`}
+    className="btn btn-primary btn-sm"
+  >
+    Rent Now
+  </Link>
+) : (
+  <button className="btn btn-secondary btn-sm" disabled>
+    Unavailable
+  </button>
+)}
+
+            
+
           </div>
           
           <div className="text-muted small">

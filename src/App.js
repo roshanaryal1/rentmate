@@ -3,6 +3,8 @@ import { BrowserRouter as Router, Routes, Route, Navigate, Link, useNavigate } f
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import LoadingSpinner from './components/common/LoadingSpinner';
 import AuthDebug from './components/AuthDebug';
+import PaymentPage from './components/Dashboard/PaymentPage';
+
 
 // Lazy load components for better performance
 const Signup = React.lazy(() => import('./components/auth/Signup'));
@@ -145,6 +147,9 @@ function AppContent() {
     </Routes>
   );
 }
+
+<Route path="/payment/:equipmentId" element={<PaymentPage />} />
+
 
 // Helper component for role-based redirects
 function RoleBasedRedirect({ currentUser, userRole }) {
