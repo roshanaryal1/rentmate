@@ -3,8 +3,6 @@ import { BrowserRouter as Router, Routes, Route, Navigate, Link, useNavigate } f
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import LoadingSpinner from './components/common/LoadingSpinner';
 import AuthDebug from './components/AuthDebug';
-import PaymentPage from './components/Dashboard/PaymentPage';
-
 
 // Lazy load components for better performance
 const Signup = React.lazy(() => import('./components/auth/Signup'));
@@ -15,6 +13,8 @@ const OwnerDashboard = React.lazy(() => import('./components/Dashboard/OwnerDash
 const AdminDashboard = React.lazy(() => import('./components/Dashboard/AdminDashboard'));
 const AddEquipment = React.lazy(() => import('./components/Dashboard/AddEquipment'));
 const PopulateFirebase = React.lazy(() => import('./components/admin/PopulateFirebase'));
+const RentEquipment = React.lazy(() => import('./components/Equipment/RentEquipment'));
+const RentalHistory = React.lazy(() => import('./components/Rental/RentalHistory'));
 
 function App() {
   return (
@@ -116,6 +116,18 @@ function AppContent() {
         } 
       />
       
+      {/* Equipment rental route - Available to all authenticated users */}
+      <Route 
+        path="/rent/:equipmentId" 
+        element={
+          <ProtectedRoute role="renter" currentUser={currentUser} userRole={userRole}>
+            <DashboardLayout title="Rent Equipment">
+              <RentEquipment />
+            </DashboardLayout>
+          </ProtectedRoute>
+        } 
+      />
+      
       {/* Owner-specific routes */}
       <Route 
         path="/add-equipment" 
@@ -123,6 +135,18 @@ function AppContent() {
           <ProtectedRoute role="owner" currentUser={currentUser} userRole={userRole}>
             <DashboardLayout title="Add Equipment">
               <AddEquipment />
+            </DashboardLayout>
+          </ProtectedRoute>
+        } 
+      />
+      
+      {/* Rental History route - Available to all authenticated users */}
+      <Route 
+        path="/rental-history" 
+        element={
+          <ProtectedRoute role="renter" currentUser={currentUser} userRole={userRole}>
+            <DashboardLayout title="Rental History">
+              <RentalHistory />
             </DashboardLayout>
           </ProtectedRoute>
         } 
@@ -147,9 +171,6 @@ function AppContent() {
     </Routes>
   );
 }
-
-<Route path="/payment/:equipmentId" element={<PaymentPage />} />
-
 
 // Helper component for role-based redirects
 function RoleBasedRedirect({ currentUser, userRole }) {
@@ -256,6 +277,34 @@ function DashboardLayout({ children, title }) {
             <div className="flex">
               <div className="flex-shrink-0 flex items-center">
                 <Link to="/" className="text-xl font-bold text-blue-600">RentMate</Link>
+              </div>
+              {/* Navigation Links */}
+              <div className="hidden md:ml-6 md:flex md:space-x-8">
+                {userRole === 'renter' && (
+                  <>
+                    <Link to="/renter-dashboard" className="text-gray-700 hover:text-blue-600 px-3 py-2 text-sm font-medium">
+                      Dashboard
+                    </Link>
+                    <Link to="/rental-history" className="text-gray-700 hover:text-blue-600 px-3 py-2 text-sm font-medium">
+                      My Rentals
+                    </Link>
+                  </>
+                )}
+                {userRole === 'owner' && (
+                  <>
+                    <Link to="/owner-dashboard" className="text-gray-700 hover:text-blue-600 px-3 py-2 text-sm font-medium">
+                      Dashboard
+                    </Link>
+                    <Link to="/add-equipment" className="text-gray-700 hover:text-blue-600 px-3 py-2 text-sm font-medium">
+                      Add Equipment
+                    </Link>
+                  </>
+                )}
+                {userRole === 'admin' && (
+                  <Link to="/admin-dashboard" className="text-gray-700 hover:text-blue-600 px-3 py-2 text-sm font-medium">
+                    Admin Panel
+                  </Link>
+                )}
               </div>
             </div>
             <div className="flex items-center">
