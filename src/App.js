@@ -14,6 +14,7 @@ const RenterDashboard = React.lazy(() => import('./components/Dashboard/RenterDa
 const OwnerDashboard = React.lazy(() => import('./components/Dashboard/OwnerDashboard'));
 const AdminDashboard = React.lazy(() => import('./components/Dashboard/AdminDashboard'));
 const AddEquipment = React.lazy(() => import('./components/Dashboard/AddEquipment'));
+const PopulateFirebase = React.lazy(() => import('./components/admin/PopulateFirebase'));
 
 function App() {
   return (
@@ -124,6 +125,16 @@ function AppContent() {
               <AddEquipment />
             </DashboardLayout>
           </ProtectedRoute>
+        } 
+      />
+      
+      {/* Populate Firebase route (temporary - for populating sample data) */}
+      <Route 
+        path="/populate-firebase" 
+        element={
+          <DashboardLayout title="Populate Firebase">
+            <PopulateFirebase />
+          </DashboardLayout>
         } 
       />
       
