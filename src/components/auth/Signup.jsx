@@ -9,11 +9,11 @@ export default function Signup() {
     email: '',
     password: '',
     passwordConfirm: '',
-    role: 'renter',
+    role: 'renter', // Default role
     termsChecked: false,
-    privacyChecked: false
+    privacyChecked: false,
   });
-  
+
   // UI state
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
@@ -22,18 +22,17 @@ export default function Signup() {
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [touched, setTouched] = useState({});
   const [formErrors, setFormErrors] = useState({});
-  
-  const { signup, signInWithGoogle } = useAuth();
+
+  const { signup, signInWithGoogle, currentUser } = useAuth();
   const navigate = useNavigate();
 
   // Handle input changes
   const handleChange = (e) => {
     const { name, value, type, checked } = e.target;
     const newValue = type === 'checkbox' ? checked : value;
-    
     setFormData(prev => ({
       ...prev,
-      [name]: newValue
+      [name]: newValue,
     }));
   };
 
@@ -41,7 +40,7 @@ export default function Signup() {
   const handleBlur = (field) => {
     setTouched(prev => ({
       ...prev,
-      [field]: true
+      [field]: true,
     }));
   };
 
@@ -66,11 +65,9 @@ export default function Signup() {
   // Form validation
   useEffect(() => {
     const errors = {};
-    
     if (touched.fullName && !formData.fullName.trim()) {
       errors.fullName = 'Name is required';
     }
-    
     if (touched.email) {
       if (!formData.email) {
         errors.email = 'Email is required';
@@ -78,7 +75,6 @@ export default function Signup() {
         errors.email = 'Please enter a valid email address';
       }
     }
-    
     if (touched.password) {
       if (!formData.password) {
         errors.password = 'Password is required';
@@ -92,7 +88,6 @@ export default function Signup() {
         errors.password = 'Password must contain at least one special character';
       }
     }
-    
     if (touched.passwordConfirm) {
       if (!formData.passwordConfirm) {
         errors.passwordConfirm = 'Please confirm your password';
@@ -100,7 +95,6 @@ export default function Signup() {
         errors.passwordConfirm = 'Passwords do not match';
       }
     }
-    
     setFormErrors(errors);
   }, [formData, touched]);
 
@@ -123,30 +117,28 @@ export default function Signup() {
   // Continue to next step
   const handleContinue = (e) => {
     e.preventDefault();
-    
     // Mark all fields in current step as touched
-    const stepFields = step === 1 
-      ? ['fullName', 'email'] 
+    const stepFields = step === 1
+      ? ['fullName', 'email']
       : ['password', 'passwordConfirm', 'termsChecked', 'privacyChecked'];
-    
     const newTouched = { ...touched };
     stepFields.forEach(field => {
       newTouched[field] = true;
     });
     setTouched(newTouched);
-    
+
     // Check for errors in current step
     const hasErrors = stepFields.some(field => {
       if (field === 'termsChecked' && !formData.termsChecked) return true;
       if (field === 'privacyChecked' && !formData.privacyChecked) return true;
       return formErrors[field];
     });
-    
+
     // For step 1, check if terms/privacy would be valid
     if (step === 1 && !hasErrors) {
       setStep(2);
     }
-    
+
     // For final step, submit the form
     if (step === 2 && !hasErrors) {
       handleSubmit(e);
@@ -161,24 +153,24 @@ export default function Signup() {
   // Form submission
   const handleSubmit = async (e) => {
     if (e) e.preventDefault();
-    
+
     // Check terms and privacy
     if (!formData.termsChecked || !formData.privacyChecked) {
       setError('You must accept the Terms of Service and Privacy Policy');
       return;
     }
-    
+
     setLoading(true);
     setError('');
 
     try {
       const result = await signup(
-        formData.email, 
-        formData.password, 
-        formData.fullName, 
+        formData.email,
+        formData.password,
+        formData.fullName,
         formData.role
       );
-      
+
       // Redirect based on role
       if (result.role) {
         redirectUserByRole(result.role);
@@ -198,10 +190,8 @@ export default function Signup() {
   const handleGoogleSignUp = async () => {
     setLoading(true);
     setError('');
-
     try {
       const result = await signInWithGoogle(formData.role);
-      
       // Redirect based on role
       if (result.role) {
         redirectUserByRole(result.role);
@@ -228,33 +218,31 @@ export default function Signup() {
               {/* Card Header */}
               <div className="card-header bg-primary text-white p-4 border-0">
                 <div className="text-center">
-                  <img 
-                    src="/logo192.png" 
-                    alt="RentMate Logo" 
-                    width="60" 
-                    className="mb-3 bg-white p-2 rounded-circle shadow-sm" 
+                  <img
+                    src="/logo192.png"
+                    alt="RentMate Logo"
+                    width="60"
+                    className="mb-3 bg-white p-2 rounded-circle shadow-sm"
                   />
                   <h2 className="fw-bold mb-1">Create your account</h2>
                   <p className="mb-0 opacity-75 small">Join RentMate today to start renting equipment</p>
                 </div>
               </div>
-              
               <div className="card-body p-4">
                 {/* Progress Steps */}
                 <div className="d-flex justify-content-center mb-4">
                   <div className="position-relative d-flex align-items-center w-75">
-                    <div className={`position-relative rounded-circle bg-${step >= 1 ? 'primary' : 'secondary'} text-white d-flex align-items-center justify-content-center`} style={{width: '36px', height: '36px', zIndex: 1}}>
+                    <div className={`position-relative rounded-circle bg-${step >= 1 ? 'primary' : 'secondary'} text-white d-flex align-items-center justify-content-center`} style={{ width: '36px', height: '36px', zIndex: 1 }}>
                       <i className="bi bi-person-fill"></i>
                     </div>
-                    <div className={`flex-grow-1 mx-3 progress`} style={{height: '4px'}}>
-                      <div className={`progress-bar bg-${step >= 2 ? 'primary' : 'secondary'}`} style={{width: step >= 2 ? '100%' : '0%', transition: 'width 0.5s'}}></div>
+                    <div className={`flex-grow-1 mx-3 progress`} style={{ height: '4px' }}>
+                      <div className={`progress-bar bg-${step >= 2 ? 'primary' : 'secondary'}`} style={{ width: step >= 2 ? '100%' : '0%', transition: 'width 0.5s' }}></div>
                     </div>
-                    <div className={`position-relative rounded-circle bg-${step >= 2 ? 'primary' : 'secondary'} text-white d-flex align-items-center justify-content-center`} style={{width: '36px', height: '36px', zIndex: 1}}>
+                    <div className={`position-relative rounded-circle bg-${step >= 2 ? 'primary' : 'secondary'} text-white d-flex align-items-center justify-content-center`} style={{ width: '36px', height: '36px', zIndex: 1 }}>
                       <i className="bi bi-shield-lock-fill"></i>
                     </div>
                   </div>
                 </div>
-                
                 {/* Error Display */}
                 {error && (
                   <div className="alert alert-danger d-flex align-items-center mb-4" role="alert">
@@ -262,7 +250,6 @@ export default function Signup() {
                     <div>{error}</div>
                   </div>
                 )}
-                
                 {/* Step 1: Account Info */}
                 {step === 1 && (
                   <>
@@ -281,10 +268,12 @@ export default function Signup() {
                       >
                         <option value="renter">Rent Equipment</option>
                         <option value="owner">List My Equipment</option>
-                        <option value="admin">Admin Access</option>
+                        {/* Restrict Admin Access to logged-in admins */}
+                        {currentUser && currentUser.role === 'admin' && (
+                          <option value="admin">Admin Access</option>
+                        )}
                       </select>
                     </div>
-                    
                     {/* Social Sign Up */}
                     <div className="d-grid gap-2 mb-4">
                       <button
@@ -293,11 +282,11 @@ export default function Signup() {
                         onClick={handleGoogleSignUp}
                         disabled={loading}
                       >
-                        <img 
-                          src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" 
-                          alt="Google" 
-                          width="22" 
-                          height="22" 
+                        <img
+                          src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg "
+                          alt="Google"
+                          width="22"
+                          height="22"
                         />
                         <span>Sign up with Google</span>
                       </button>
@@ -310,7 +299,6 @@ export default function Signup() {
                         <span>Sign up with Apple</span>
                       </button>
                     </div>
-                    
                     {/* Divider */}
                     <div className="position-relative my-4">
                       <hr />
@@ -318,7 +306,6 @@ export default function Signup() {
                         or with email
                       </div>
                     </div>
-                    
                     {/* Form */}
                     <form onSubmit={handleContinue}>
                       {/* Full Name Field */}
@@ -349,7 +336,6 @@ export default function Signup() {
                           )}
                         </div>
                       </div>
-                      
                       {/* Email Field */}
                       <div className="mb-4">
                         <label htmlFor="email" className="form-label fw-semibold">
@@ -377,7 +363,6 @@ export default function Signup() {
                           )}
                         </div>
                       </div>
-                      
                       <div className="d-grid">
                         <button
                           type="submit"
@@ -390,7 +375,6 @@ export default function Signup() {
                     </form>
                   </>
                 )}
-                
                 {/* Step 2: Password and Terms */}
                 {step === 2 && (
                   <form onSubmit={handleContinue}>
@@ -415,8 +399,8 @@ export default function Signup() {
                           disabled={loading}
                           autoComplete="new-password"
                         />
-                        <button 
-                          className="input-group-text bg-light" 
+                        <button
+                          className="input-group-text bg-light"
                           type="button"
                           onClick={() => setShowPassword(!showPassword)}
                           tabIndex="-1"
@@ -429,7 +413,6 @@ export default function Signup() {
                           </div>
                         )}
                       </div>
-                      
                       {/* Password Strength Meter */}
                       {formData.password && (
                         <div className="mt-2 mb-3">
@@ -449,7 +432,6 @@ export default function Signup() {
                           </div>
                         </div>
                       )}
-                      
                       {/* Password Requirements */}
                       <div className="card bg-light border-0 p-3 mb-3">
                         <small className="text-muted mb-2">Password requirements:</small>
@@ -473,7 +455,6 @@ export default function Signup() {
                         </div>
                       </div>
                     </div>
-                    
                     {/* Confirm Password Field */}
                     <div className="mb-4">
                       <label htmlFor="passwordConfirm" className="form-label fw-semibold">
@@ -495,8 +476,8 @@ export default function Signup() {
                           disabled={loading}
                           autoComplete="new-password"
                         />
-                        <button 
-                          className="input-group-text bg-light" 
+                        <button
+                          className="input-group-text bg-light"
                           type="button"
                           onClick={() => setShowConfirmPassword(!showConfirmPassword)}
                           tabIndex="-1"
@@ -510,7 +491,6 @@ export default function Signup() {
                         )}
                       </div>
                     </div>
-                    
                     {/* Terms and Privacy */}
                     <div className="mb-4">
                       <div className="form-check mb-2">
@@ -550,7 +530,6 @@ export default function Signup() {
                         </label>
                       </div>
                     </div>
-                    
                     {/* Action Buttons */}
                     <div className="d-grid gap-2">
                       <button
@@ -578,7 +557,6 @@ export default function Signup() {
                     </div>
                   </form>
                 )}
-                
                 {/* Login Link */}
                 <div className="mt-4 text-center">
                   <p className="mb-0 text-muted">
@@ -589,7 +567,6 @@ export default function Signup() {
                   </p>
                 </div>
               </div>
-              
               {/* Card Footer */}
               <div className="card-footer bg-white p-3 text-center border-0">
                 <Link to="/" className="text-secondary text-decoration-none d-inline-flex align-items-center">
@@ -598,7 +575,6 @@ export default function Signup() {
                 </Link>
               </div>
             </div>
-            
             {/* Security Notice */}
             <div className="text-center mt-3">
               <small className="text-muted d-flex align-items-center justify-content-center">
