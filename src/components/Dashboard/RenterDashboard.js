@@ -24,7 +24,8 @@ function RenterDashboard() {
       try {
         setLoading(true);
         
-        // Fetch equipment from Firebase (added by owners through Add Equipment page)
+        // Fetch ALL equipment from Firebase (added by owners through Add Equipment page)
+        console.log('🔍 Fetching ALL equipment for renter dashboard...');
         try {
           const equipmentSnapshot = await getDocs(collection(db, 'equipment'));
           const equipment = equipmentSnapshot.docs.map(doc => {
@@ -47,19 +48,21 @@ function RenterDashboard() {
             };
           });
           
-          console.log('Fetched equipment from Firebase:', equipment.length, 'items');
+          console.log('✅ Fetched equipment from Firebase:', equipment.length, 'items');
           
           // Filter to show only approved equipment
           const approvedEquipment = equipment.filter(item => item.status === 'approved');
           
           setEquipmentList(approvedEquipment);
           
-          // If no equipment found, show a message but don't add sample data
+          // If no equipment found, show a message
           if (approvedEquipment.length === 0) {
-            console.log('No approved equipment found in Firebase');
+            console.log('ℹ️ No approved equipment found in Firebase');
+          } else {
+            console.log(`✅ Showing ${approvedEquipment.length} approved equipment items`);
           }
         } catch (error) {
-          console.error('Error fetching equipment from Firebase:', error);
+          console.error('❌ Error fetching equipment from Firebase:', error);
           // On error, set empty array - this will show "no equipment" message
           setEquipmentList([]);
         }
@@ -86,8 +89,9 @@ function RenterDashboard() {
             const totalSpent = rentals.reduce((sum, r) => sum + (r.totalPrice || 0), 0);
             
             setStats({ totalRentals, activeRentals, totalSpent });
+            console.log(`✅ Loaded ${totalRentals} rental records`);
           } catch (error) {
-            console.log('Error fetching rentals:', error);
+            console.log('ℹ️ No rentals found or error fetching rentals:', error);
             // Use sample rental data if Firebase fails
             const sampleRentals = [
               {
@@ -105,7 +109,7 @@ function RenterDashboard() {
           }
         }
       } catch (error) {
-        console.error('Error fetching data:', error);
+        console.error('❌ Error fetching renter dashboard data:', error);
       } finally {
         setLoading(false);
       }
@@ -154,7 +158,7 @@ function RenterDashboard() {
           <h2 className="h3 fw-bold text-dark mb-1">
             Welcome back, {currentUser?.displayName || currentUser?.email?.split('@')[0]}!
           </h2>
-          <p className="text-muted mb-0">Find and rent the equipment you need for your projects.</p>
+          <p className="text-muted mb-0">Browse all available equipment and manage your rentals.</p>
         </div>
       </div>
 
@@ -168,8 +172,8 @@ function RenterDashboard() {
                   <i className="bi bi-box text-primary fs-4"></i>
                 </div>
                 <div>
-                  <h6 className="text-muted mb-1 small">Total Rentals</h6>
-                  <h3 className="mb-0 fw-bold">{stats.totalRentals}</h3>
+                  <h6 className="text-muted mb-1 small">Available Equipment</h6>
+                  <h3 className="mb-0 fw-bold">{equipmentList.filter(item => item.available).length}</h3>
                 </div>
               </div>
             </div>
@@ -184,7 +188,7 @@ function RenterDashboard() {
                   <i className="bi bi-check-circle text-success fs-4"></i>
                 </div>
                 <div>
-                  <h6 className="text-muted mb-1 small">Active Rentals</h6>
+                  <h6 className="text-muted mb-1 small">My Active Rentals</h6>
                   <h3 className="mb-0 fw-bold">{stats.activeRentals}</h3>
                 </div>
               </div>
@@ -219,7 +223,7 @@ function RenterDashboard() {
                 onClick={() => setActiveTab('browse')}
               >
                 <i className="bi bi-search me-2"></i>
-                Browse Equipment
+                Browse All Equipment ({equipmentList.length})
               </button>
             </li>
             <li className="nav-item">
@@ -228,7 +232,7 @@ function RenterDashboard() {
                 onClick={() => setActiveTab('rentals')}
               >
                 <i className="bi bi-calendar me-2"></i>
-                My Rentals
+                My Rentals ({stats.totalRentals})
                 {stats.activeRentals > 0 && (
                   <span className="badge bg-primary ms-2">{stats.activeRentals}</span>
                 )}
@@ -289,7 +293,7 @@ function RenterDashboard() {
           <div className="row mb-3">
             <div className="col">
               <small className="text-muted">
-                Showing {filteredEquipment.length} of {equipmentList.length} items
+                Showing {filteredEquipment.length} of {equipmentList.length} equipment items
                 {searchTerm && <span> for "{searchTerm}"</span>}
               </small>
             </div>
@@ -301,13 +305,13 @@ function RenterDashboard() {
               <div className="spinner-border text-primary" role="status">
                 <span className="visually-hidden">Loading...</span>
               </div>
-              <p className="text-muted mt-3">Loading equipment...</p>
+              <p className="text-muted mt-3">Loading available equipment...</p>
             </div>
           ) : filteredEquipment.length > 0 ? (
             <div className="row">
               {filteredEquipment.map(item => (
                 <div key={item.id} className="col-md-6 col-lg-4 mb-4">
-                  <EquipmentCard item={item} />
+                  <EquipmentCard item={item} currentUserId={currentUser?.uid} />
                 </div>
               ))}
             </div>
@@ -321,7 +325,7 @@ function RenterDashboard() {
               <div className="alert alert-info">
                 <h6 className="alert-heading">
                   <i className="bi bi-info-circle me-2"></i>
-                  For Equipment Owners
+                  Want to List Equipment?
                 </h6>
                 <p className="mb-2">Have equipment to rent out? You can:</p>
                 <ul className="mb-3 text-start">
@@ -445,7 +449,10 @@ function RenterDashboard() {
   );
 }
 
-function EquipmentCard({ item }) {
+function EquipmentCard({ item, currentUserId }) {
+  // Show if this equipment belongs to the current user
+  const isOwnEquipment = item.ownerId === currentUserId;
+  
   return (
     <div className="card h-100 border-0 shadow-sm">
       <div style={{ height: '200px', position: 'relative', overflow: 'hidden', backgroundColor: '#f8f9fa' }}>
@@ -465,6 +472,9 @@ function EquipmentCard({ item }) {
           <span className={`badge ${item.available ? 'bg-success' : 'bg-danger'}`}>
             {item.available ? 'Available' : 'Unavailable'}
           </span>
+          {isOwnEquipment && (
+            <span className="badge bg-info ms-1">Your Equipment</span>
+          )}
         </div>
       </div>
       
@@ -488,12 +498,19 @@ function EquipmentCard({ item }) {
               <span className="h5 text-success fw-bold">${item.ratePerDay}</span>
               <small className="text-muted">/day</small>
             </div>
-            {item.available ? (
+            {item.available && !isOwnEquipment ? (
               <Link
                 to={`/rent/${item.id}`}
                 className="btn btn-primary btn-sm"
               >
                 Rent Now
+              </Link>
+            ) : isOwnEquipment ? (
+              <Link
+                to={`/edit-equipment/${item.id}`}
+                className="btn btn-outline-secondary btn-sm"
+              >
+                Edit
               </Link>
             ) : (
               <button className="btn btn-secondary btn-sm" disabled>
@@ -509,7 +526,7 @@ function EquipmentCard({ item }) {
             </div>
             <div className="d-flex align-items-center mt-1">
               <i className="bi bi-person me-1"></i>
-              <span>{item.ownerName}</span>
+              <span>{isOwnEquipment ? 'Your Equipment' : item.ownerName}</span>
             </div>
           </div>
         </div>
