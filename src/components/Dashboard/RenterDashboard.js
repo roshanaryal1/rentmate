@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import { collection, getDocs, query, where, orderBy } from 'firebase/firestore';
 import { db } from '../../firebase';
+import EquipmentDetailModal from '../Equipment/EquipmentDetailModal';
 
 function RenterDashboard() {
   const { currentUser } = useAuth();
@@ -13,6 +14,8 @@ function RenterDashboard() {
   const [selectedCategory, setSelectedCategory] = useState('all');
   const [showAvailableOnly, setShowAvailableOnly] = useState(true);
   const [activeTab, setActiveTab] = useState('browse');
+  const [selectedEquipment, setSelectedEquipment] = useState(null);
+  const [showDetailModal, setShowDetailModal] = useState(false);
   const [stats, setStats] = useState({
     totalRentals: 0,
     activeRentals: 0,
@@ -44,7 +47,10 @@ function RenterDashboard() {
               features: data.features || [],
               imageUrl: data.imageUrl || null,
               status: data.status || 'approved',
-              createdAt: data.createdAt || null
+              createdAt: data.createdAt || null,
+              views: data.views || 0,
+              rentals: data.rentals || 0,
+              rating: data.rating || null
             };
           });
           
@@ -150,8 +156,26 @@ function RenterDashboard() {
     );
   };
 
+  const handleViewDetails = (equipment) => {
+    setSelectedEquipment(equipment);
+    setShowDetailModal(true);
+  };
+
+  const handleCloseDetailModal = () => {
+    setShowDetailModal(false);
+    setSelectedEquipment(null);
+  };
+
   return (
     <div className="container-fluid py-4">
+      {/* Equipment Detail Modal */}
+      <EquipmentDetailModal
+        equipment={selectedEquipment}
+        isOpen={showDetailModal}
+        onClose={handleCloseDetailModal}
+        currentUserId={currentUser?.uid}
+      />
+
       {/* Welcome Header */}
       <div className="row mb-4">
         <div className="col">
@@ -311,7 +335,11 @@ function RenterDashboard() {
             <div className="row">
               {filteredEquipment.map(item => (
                 <div key={item.id} className="col-md-6 col-lg-4 mb-4">
-                  <EquipmentCard item={item} currentUserId={currentUser?.uid} />
+                  <EquipmentCard 
+                    item={item} 
+                    currentUserId={currentUser?.uid} 
+                    onViewDetails={handleViewDetails}
+                  />
                 </div>
               ))}
             </div>
@@ -449,7 +477,7 @@ function RenterDashboard() {
   );
 }
 
-function EquipmentCard({ item, currentUserId }) {
+function EquipmentCard({ item, currentUserId, onViewDetails }) {
   // Show if this equipment belongs to the current user
   const isOwnEquipment = item.ownerId === currentUserId;
   
@@ -498,28 +526,55 @@ function EquipmentCard({ item, currentUserId }) {
               <span className="h5 text-success fw-bold">${item.ratePerDay}</span>
               <small className="text-muted">/day</small>
             </div>
+            <div className="d-flex align-items-center text-muted small">
+              <i className="bi bi-eye me-1"></i>
+              <span>{item.views || 0}</span>
+            </div>
+          </div>
+          
+          {/* Action Buttons */}
+          <div className="d-flex justify-content-between align-items-center mb-3">
+            <div>
+              <span className="h5 text-success fw-bold">${item.ratePerDay}</span>
+              <small className="text-muted">/day</small>
+            </div>
+            <div className="d-flex align-items-center text-muted small">
+              <i className="bi bi-eye me-1"></i>
+              <span>{item.views || 0}</span>
+            </div>
+          </div>
+          
+          <div className="d-flex gap-2">
+            <button
+              className="btn btn-outline-info btn-sm"
+              onClick={() => onViewDetails(item)}
+              title="View Equipment Details"
+            >
+              <i className="bi bi-info-circle"></i>
+            </button>
+            
             {item.available && !isOwnEquipment ? (
               <Link
                 to={`/rent/${item.id}`}
-                className="btn btn-primary btn-sm"
+                className="btn btn-primary btn-sm flex-fill"
               >
                 Rent Now
               </Link>
             ) : isOwnEquipment ? (
               <Link
                 to={`/edit-equipment/${item.id}`}
-                className="btn btn-outline-secondary btn-sm"
+                className="btn btn-outline-secondary btn-sm flex-fill"
               >
                 Edit
               </Link>
             ) : (
-              <button className="btn btn-secondary btn-sm" disabled>
+              <button className="btn btn-secondary btn-sm flex-fill" disabled>
                 Unavailable
               </button>
             )}
           </div>
           
-          <div className="text-muted small">
+          <div className="text-muted small mt-2">
             <div className="d-flex align-items-center">
               <i className="bi bi-geo-alt me-1"></i>
               <span>{item.location}</span>
