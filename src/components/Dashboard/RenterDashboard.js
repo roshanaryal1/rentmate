@@ -490,11 +490,12 @@ function EquipmentCard({ item }) {
             </div>
             {item.available ? (
               <Link
-                to={`/rent/${item.id}`}
-                className="btn btn-primary btn-sm"
-              >
-                Rent Now
-              </Link>
+  to={`/payment/${item.id}`}
+  className="btn btn-primary btn-sm"
+>
+  Rent Now
+</Link>
+
             ) : (
               <button className="btn btn-secondary btn-sm" disabled>
                 Unavailable
