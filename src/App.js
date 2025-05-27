@@ -135,6 +135,9 @@ function AppContent() {
   );
 }
 
+<Route path="/payment/:equipmentId" element={<PaymentPage />} />
+
+
 // Helper component for role-based redirects
 function RoleBasedRedirect({ currentUser, userRole }) {
   console.log('🚀 RoleBasedRedirect:', { 
