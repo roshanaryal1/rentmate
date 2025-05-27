@@ -3,7 +3,8 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
 
-function EquipmentDetailModal({ equipment, isOpen, onClose, currentUserId }) {
+function EquipmentDetailModal({ equipment, isOpen, onClose, currentUserId }) 
+{
   if (!isOpen || !equipment) return null;
 
   const isOwnEquipment = equipment.ownerId === currentUserId;
