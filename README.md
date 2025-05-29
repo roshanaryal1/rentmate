@@ -68,12 +68,13 @@ Before running this project, make sure you have:
 4. **Environment Configuration**
    Create a `.env` file in the root directory:
    ```env
-   REACT_APP_FIREBASE_API_KEY=your_api_key
-   REACT_APP_FIREBASE_AUTH_DOMAIN=your_auth_domain
-   REACT_APP_FIREBASE_PROJECT_ID=your_project_id
-   REACT_APP_FIREBASE_STORAGE_BUCKET=your_storage_bucket
-   REACT_APP_FIREBASE_MESSAGING_SENDER_ID=your_messaging_sender_id
-   REACT_APP_FIREBASE_APP_ID=your_app_id
+   apiKey: "AIzaSyBcxPcu_CZtwWhhbBgFiJkRmgtcRW3FQs4",
+  authDomain: "rentmate-c7360.firebaseapp.com",
+  projectId: "rentmate-c7360",
+  storageBucket: "rentmate-c7360.firebasestorage.app",
+  messagingSenderId: "184718582938",
+  appId: "1:184718582938:web:7990263a98ec92526aeb23",
+  measurementId: "G-8W0V0Y8MJX"
    ```
 
 5. **Start the development server**
