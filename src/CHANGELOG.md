@@ -1,5 +1,3 @@
-# Changelog
-
 All notable changes to RentMate will be documented in this file.
 
 ## [Unreleased]
@@ -9,6 +7,76 @@ All notable changes to RentMate will be documented in this file.
 - [ ] Maintenance scheduling
 - [ ] Review and rating system
 - [ ] Multi-language support
+
+## [1.2.0] - 2025-05-29
+
+### 🚀 New Features
+- **Enhanced User Dashboards**
+  - Role-specific dashboards for renters, owners, and admins
+  - Improved dashboard statistics and metrics
+  - Quick action buttons for common tasks
+  - Summary statistics for each user type
+
+- **Equipment Management**
+  - Detailed equipment viewing modal
+  - Status badges (available/unavailable)
+  - Equipment statistics tracking
+  - Enhanced filter and search capabilities
+  - Equipment categories organization
+
+- **Rental History**
+  - Comprehensive rental history page
+  - Filtering and sorting capabilities
+  - Rental statistics and insights
+  - Timeline view of past rentals
+  - Export functionality for rental records
+
+- **Admin Panel**
+  - User role management interface
+  - Platform analytics dashboard
+  - Equipment approval workflow
+  - User profile viewing and editing
+  - System-wide statistics
+
+### 🔧 Improvements
+- Upgraded to React 19.1.0
+- Migrated to React Router 7.6.0
+- Enhanced authentication flows
+- Improved form validation
+- Better error handling
+- Optimized loading states
+- Streamlined rental request process
+- Modernized UI components
+- Improved mobile responsiveness
+- Enhanced theming system with dark mode support
+- Better form validation with real-time feedback
+- Optimized Firebase queries for better performance
+
+### 🐛 Bug Fixes
+- Fixed authentication state persistence issues
+- Corrected routing and navigation flows
+- Addressed responsive design issues on mobile devices
+- Improved error messaging for failed actions
+- Fixed form submission edge cases
+- Resolved issues with date selection in rental forms
+- Fixed inconsistent loading states
+- Corrected statistical calculations in dashboards
+- Addressed equipment availability status bugs
+- Fixed user role permission issues
+
+### 💻 Technical Updates
+- Updated to latest Firebase SDK (9.23.0)
+- Improved component structure for better maintainability
+- Added theme context for consistent styling
+- Implemented code splitting for better performance
+- Enhanced service layer for Firebase interactions
+- Added proper error boundaries for graceful failure handling
+- Improved state management with Context API
+- Optimized bundle size with code splitting
+- Enhanced security rules for Firebase
+- Implemented better logging and debugging tools
+
+---
 
 ## [1.1.0] - 2025-05-26
 
@@ -143,11 +211,3 @@ All notable changes to RentMate will be documented in this file.
 - Node.js 16+ required
 - Firebase project configuration needed
 - Environment variables must be set for production deployment
-
----
-
-**Release Date**: May 26, 2025  
-**Contributors**: ROSHAN, DHRUB, APKSHYA  
-**Total Commits**: 120+  
-**Files Changed**: 75+  
-**Lines of Code**: 9000+
