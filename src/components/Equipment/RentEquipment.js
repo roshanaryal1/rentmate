@@ -541,4 +541,4 @@ export default RentEquipment;="bi bi-person me-1"></i>
                     </small>
                     <br />
                     <small className="text-muted">
-                      <i className
+                      <i classNam
