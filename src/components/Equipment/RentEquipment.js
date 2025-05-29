@@ -3,7 +3,10 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { doc, getDoc, addDoc, collection, Timestamp } from 'firebase/firestore';
 import { db } from '../../firebase';
 import { useAuth } from '../../contexts/AuthContext';
+import { notificationService } from '../../services/notificationService'; 
+
 import { format } from 'date-fns';
+
 
 function RentEquipment() {
   const { equipmentId } = useParams();
@@ -40,13 +43,18 @@ function RentEquipment() {
         const equipmentData = { id: docSnap.id, ...docSnap.data() };
         console.log('📋 Equipment data:', equipmentData);
         
-        // Check if equipment is available for rent (fixed the availability check)
+        // Check if equipment is available for rent
         if (!equipmentData.available) {
           throw new Error('This equipment is currently not available for rent');
         }
         
         if (equipmentData.status !== 'approved') {
           throw new Error('This equipment is pending approval and cannot be rented yet');
+        }
+        
+        // Check if user is trying to rent their own equipment
+        if (equipmentData.ownerId === currentUser?.uid) {
+          throw new Error('You cannot rent your own equipment');
         }
         
         setEquipment(equipmentData);
@@ -61,7 +69,7 @@ function RentEquipment() {
     if (equipmentId) {
       fetchEquipment();
     }
-  }, [equipmentId]);
+  }, [equipmentId, currentUser]);
 
   useEffect(() => {
     if (startDate && endDate && equipment) {
@@ -142,14 +150,51 @@ function RentEquipment() {
         updatedAt: Timestamp.now(),
       };
 
-      console.log('💾 Creating rental:', rentalData);
-      await addDoc(rentalRef, rentalData);
+      console.log('💾 Creating rental request:', rentalData);
+      const rentalDoc = await addDoc(rentalRef, rentalData);
+      
+      // Add the rental ID to the rental data for notification
+      const rentalWithId = {
+        id: rentalDoc.id,
+        ...rentalData
+      };
 
-      // Show success message
-      alert('🎉 Rental request submitted successfully! The equipment owner will review your request.');
+      // Send notification to equipment owner
+      try {
+        await notificationService.sendNewRentalRequestNotification(
+          rentalWithId, 
+          equipment.ownerId
+        );
+        console.log('✅ Notification sent to equipment owner');
+      } catch (notificationError) {
+        console.error('❌ Failed to send notification to owner:', notificationError);
+        // Don't fail the rental request if notification fails
+      }
+
+      // Show success message with improved UI
+      setError('');
+      
+      // Create a success modal or redirect with success state
+      const successMessage = `
+        🎉 Rental request submitted successfully!
+        
+        Your request for "${equipment.name}" has been sent to ${equipment.ownerName}.
+        
+        📧 You'll receive a notification once the owner reviews your request.
+        
+        📋 Request Details:
+        • Dates: ${format(new Date(startDate), 'MMM dd, yyyy')} - ${format(new Date(endDate), 'MMM dd, yyyy')}
+        • Duration: ${totalDays} day${totalDays !== 1 ? 's' : ''}
+        • Total Cost: $${totalPrice}
+        
+        ⏰ Most owners respond within 24 hours.
+      `;
+      
+      alert(successMessage);
       
       // Redirect to dashboard
       navigate('/renter-dashboard');
+      
     } catch (err) {
       console.error('Booking error:', err);
       setError(err.message || 'Booking failed. Please try again.');
@@ -270,11 +315,6 @@ function RentEquipment() {
                   </div>
                   
                   <div className="mt-3">
-                    <small className="text-muted">
-                      <i className="bi bi-person me-1"></i>
-                      Owner: {equipment.ownerName}
-                    </small>
-                    <br />
                     <small className="text-muted">
                       <i className="bi bi-geo-alt me-1"></i>
                       Location: {equipment.location}
@@ -429,6 +469,64 @@ function RentEquipment() {
                       </small>
                     </div>
                   </form>
+                </div>
+              </div>
+              
+              {/* Additional Information Card */}
+              <div className="card mt-4">
+                <div className="card-header">
+                  <h6 className="mb-0">
+                    <i className="bi bi-info-circle me-2"></i>
+                    What happens next?
+                  </h6>
+                </div>
+                <div className="card-body">
+                  <div className="row g-3">
+                    <div className="col-md-6">
+                      <div className="d-flex align-items-start">
+                        <div className="bg-primary bg-opacity-10 rounded-circle p-2 me-3 flex-shrink-0">
+                          <i className="bi bi-1-circle text-primary"></i>
+                        </div>
+                        <div>
+                          <h6 className="mb-1">Request Sent</h6>
+                          <small className="text-muted">Your rental request is sent to the equipment owner</small>
+                        </div>
+                      </div>
+                    </div>
+                    <div className="col-md-6">
+                      <div className="d-flex align-items-start">
+                        <div className="bg-warning bg-opacity-10 rounded-circle p-2 me-3 flex-shrink-0">
+                          <i className="bi bi-2-circle text-warning"></i>
+                        </div>
+                        <div>
+                          <h6 className="mb-1">Owner Review</h6>
+                          <small className="text-muted">The owner reviews your request (usually within 24 hours)</small>
+                        </div>
+                      </div>
+                    </div>
+                    <div className="col-md-6">
+                      <div className="d-flex align-items-start">
+                        <div className="bg-success bg-opacity-10 rounded-circle p-2 me-3 flex-shrink-0">
+                          <i className="bi bi-3-circle text-success"></i>
+                        </div>
+                        <div>
+                          <h6 className="mb-1">Get Notified</h6>
+                          <small className="text-muted">You'll receive a notification with the owner's decision</small>
+                        </div>
+                      </div>
+                    </div>
+                    <div className="col-md-6">
+                      <div className="d-flex align-items-start">
+                        <div className="bg-info bg-opacity-10 rounded-circle p-2 me-3 flex-shrink-0">
+                          <i className="bi bi-4-circle text-info"></i>
+                        </div>
+                        <div>
+                          <h6 className="mb-1">Arrange Pickup</h6>
+                          <small className="text-muted">If approved, coordinate pickup/delivery with the owner</small>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
                 </div>
               </div>
             </div>

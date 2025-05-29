@@ -1,3 +1,4 @@
+// src/components/Dashboard/OwnerDashboard.js - Updated with Rental Approval Integration
 import React, { useState, useEffect } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
@@ -5,21 +6,25 @@ import { collection, query, where, getDocs } from 'firebase/firestore';
 import { db } from '../../firebase';
 import { equipmentService } from '../../services/equipmentService';
 import FeedbackModal from '../FeedbackModal';
+import RentalApprovalSystem from '../Rental/RentalApprovalSystem';
 import './OwnerDashboard.css';
 
 function OwnerDashboard() {
   const { currentUser } = useAuth();
   const [equipmentItems, setEquipmentItems] = useState([]);
   const [activeRentals, setActiveRentals] = useState([]);
+  const [pendingRequests, setPendingRequests] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showFeedback, setShowFeedback] = useState(false);
   const [selectedEquipment, setSelectedEquipment] = useState(null);
   const [showEquipmentModal, setShowEquipmentModal] = useState(false);
+  const [activeTab, setActiveTab] = useState('overview');
   const [stats, setStats] = useState({
     totalEquipment: 0,
     availableEquipment: 0,
     rentedEquipment: 0,
-    totalEarnings: 0
+    totalEarnings: 0,
+    pendingRequests: 0
   });
   const location = useLocation();
   const navigate = useNavigate();
@@ -37,30 +42,47 @@ function OwnerDashboard() {
       if (!currentUser) return;
       try {
         setLoading(true);
+        
+        // Fetch equipment
         const equipment = await equipmentService.getEquipmentForOwner(currentUser.uid);
         setEquipmentItems(equipment);
+        
         const totalEquipment = equipment.length;
         const availableEquipment = equipment.filter(item => item.available).length;
         const rentedEquipment = equipment.filter(item => !item.available).length;
         const equipmentIds = equipment.map(item => item.id);
+        
         let rentals = [];
         let totalEarnings = 0;
+        let pendingRequestsCount = 0;
 
         if (equipmentIds.length > 0) {
+          // Fetch rentals in chunks due to Firebase 'in' query limitation
           const chunks = [];
           for (let i = 0; i < equipmentIds.length; i += 10) {
             chunks.push(equipmentIds.slice(i, i + 10));
           }
 
           for (const chunk of chunks) {
-            const rentalsQuery = query(
+            // Active rentals
+            const activeRentalsQuery = query(
               collection(db, "rentals"),
               where("equipmentId", "in", chunk),
-              where("status", "==", "active")
+              where("status", "==", "approved")
             );
-            const rentalsSnapshot = await getDocs(rentalsQuery);
-            rentalsSnapshot.forEach(doc => rentals.push({ id: doc.id, ...doc.data() }));
+            const activeRentalsSnapshot = await getDocs(activeRentalsQuery);
+            activeRentalsSnapshot.forEach(doc => rentals.push({ id: doc.id, ...doc.data() }));
 
+            // Pending requests
+            const pendingQuery = query(
+              collection(db, "rentals"),
+              where("equipmentId", "in", chunk),
+              where("status", "==", "pending")
+            );
+            const pendingSnapshot = await getDocs(pendingQuery);
+            pendingRequestsCount += pendingSnapshot.size;
+
+            // All rentals for earnings calculation
             const allRentalsQuery = query(
               collection(db, "rentals"),
               where("equipmentId", "in", chunk)
@@ -76,7 +98,14 @@ function OwnerDashboard() {
         }
 
         setActiveRentals(rentals);
-        setStats({ totalEquipment, availableEquipment, rentedEquipment, totalEarnings });
+        setStats({ 
+          totalEquipment, 
+          availableEquipment, 
+          rentedEquipment, 
+          totalEarnings,
+          pendingRequests: pendingRequestsCount
+        });
+        
       } catch (error) {
         console.error("Error fetching owner data:", error);
       } finally {
@@ -113,137 +142,194 @@ function OwnerDashboard() {
       <div className="dashboard-header">
         <div className="dashboard-title">
           <h2>Equipment Owner Dashboard</h2>
-          <p className="dashboard-subtitle">Manage your equipment listings and track rental performance.</p>
+          <p className="dashboard-subtitle">Manage your equipment listings and rental requests.</p>
         </div>
         <div className="dashboard-stats">
-          <div className="stat-card"><span className="stat-number">{stats.totalEquipment}</span><span className="stat-label">Total Equipment</span></div>
-          <div className="stat-card"><span className="stat-number">{stats.availableEquipment}</span><span className="stat-label">Available</span></div>
-          <div className="stat-card"><span className="stat-number">{stats.rentedEquipment}</span><span className="stat-label">Rented Out</span></div>
-          <div className="stat-card"><span className="stat-number">${stats.totalEarnings}</span><span className="stat-label">Total Earnings</span></div>
+          <div className="stat-card">
+            <span className="stat-number">{stats.totalEquipment}</span>
+            <span className="stat-label">Total Equipment</span>
+          </div>
+          <div className="stat-card">
+            <span className="stat-number">{stats.availableEquipment}</span>
+            <span className="stat-label">Available</span>
+          </div>
+          <div className="stat-card">
+            <span className="stat-number">{stats.rentedEquipment}</span>
+            <span className="stat-label">Rented Out</span>
+          </div>
+          <div className="stat-card">
+            <span className="stat-number" style={{color: stats.pendingRequests > 0 ? '#f59e0b' : '#3b82f6'}}>
+              {stats.pendingRequests}
+            </span>
+            <span className="stat-label">Pending Requests</span>
+          </div>
+          <div className="stat-card">
+            <span className="stat-number">${stats.totalEarnings}</span>
+            <span className="stat-label">Total Earnings</span>
+          </div>
         </div>
       </div>
 
-      <div className="section-header">
-        <h3>Quick Actions</h3>
-        <Link to="/add-equipment" className="btn-blue">
-          <i className="bi bi-plus-circle me-2"></i>
-          Add New Equipment
-        </Link>
+      {/* Tab Navigation */}
+      <div className="dashboard-tabs">
+        <nav className="nav nav-tabs">
+          <button 
+            className={`nav-link ${activeTab === 'overview' ? 'active' : ''}`}
+            onClick={() => setActiveTab('overview')}
+          >
+            <i className="bi bi-house-door me-2"></i>
+            Overview
+          </button>
+          <button 
+            className={`nav-link ${activeTab === 'approvals' ? 'active' : ''}`}
+            onClick={() => setActiveTab('approvals')}
+          >
+            <i className="bi bi-check-circle me-2"></i>
+            Rental Requests
+            {stats.pendingRequests > 0 && (
+              <span className="badge bg-warning text-dark ms-2">{stats.pendingRequests}</span>
+            )}
+          </button>
+        </nav>
       </div>
 
-      <div className="mt-6">
-        <div className="section-header mb-4">
-          <h4>Your Equipment ({equipmentItems.length})</h4>
-          <Link to="/equipment-analytics" className="btn-blue btn-sm">
-            <i className="bi bi-graph-up me-1"></i>
-            Analytics
-          </Link>
-        </div>
-
-        {loading ? (
-          <div className="loader-container">
-            <div className="spinner-border text-primary" role="status">
-              <span className="visually-hidden">Loading...</span>
-            </div>
-            <p className="mt-3">Loading your equipment...</p>
-          </div>
-        ) : equipmentItems.length > 0 ? (
-          <div className="equipment-grid">
-            {equipmentItems.map(item => (
-              <div key={item.id} className="equipment-card">
-                <div className="equipment-image">
-                  <img src={item.imageUrl || 'https://via.placeholder.com/300x180?text=No+Image'} alt={item.name} />
-                  <div className={`status-badge ${item.available ? 'available' : 'unavailable'}`}>
-                    {item.available ? 'Available' : 'Rented Out'}
-                  </div>
-                </div>
-                <div className="equipment-details">
-                  <h5 className="equipment-name">{item.name}</h5>
-                  <p className="equipment-category">{item.category}</p>
-                  <p className="equipment-rate">${item.ratePerDay}/day</p>
-                  <div className="equipment-actions">
-                    <button className="btn-blue" onClick={() => handleViewDetails(item)}>View Details</button>
-                    <Link to={`/edit-equipment/${item.id}`} className="btn-blue">Edit</Link>
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
-        ) : (
-          <div className="empty-state">
-            <i className="bi bi-tools empty-icon text-muted"></i>
-            <h4>No Equipment Listed Yet</h4>
-            <p>Start earning rental income by listing your first piece of equipment.</p>
-            <Link to="/add-equipment" className="btn-blue mt-3">
+      {/* Tab Content */}
+      {activeTab === 'overview' && (
+        <div>
+          {/* Quick Actions */}
+          <div className="section-header">
+            <h3>Quick Actions</h3>
+            <Link to="/add-equipment" className="btn-blue">
               <i className="bi bi-plus-circle me-2"></i>
-              Add Your First Equipment
+              Add New Equipment
             </Link>
           </div>
-        )}
-      </div>
 
-      <div className="mt-8">
-        <h4 className="mb-4">Active Rentals ({activeRentals.length})</h4>
-        {loading ? (
-          <div className="loader-container">
-            <div className="spinner-border text-primary" role="status">
-              <span className="visually-hidden">Loading...</span>
+          {/* Equipment Section */}
+          <div className="mt-6">
+            <div className="section-header mb-4">
+              <h4>Your Equipment ({equipmentItems.length})</h4>
+              <Link to="/equipment-analytics" className="btn-blue btn-sm">
+                <i className="bi bi-graph-up me-1"></i>
+                Analytics
+              </Link>
             </div>
-            <p className="mt-3">Loading active rentals...</p>
-          </div>
-        ) : activeRentals.length > 0 ? (
-          <div className="rentals-list">
-            {activeRentals.map(rental => (
-              <div key={rental.id} className="rental-card">
-                <div className="rental-info">
-                  <div className="rental-primary">
-                    <h4>{rental.equipmentName}</h4>
-                    <div className="rental-dates">{formatDate(rental.startDate)} - {formatDate(rental.endDate)}</div>
-                  </div>
-                  <div className="rental-secondary">
-                    <span>Rented by: {rental.renterName || rental.renterEmail}</span>
-                    <span className="rental-price">${rental.totalPrice}</span>
-                  </div>
-                </div>
-                <div className="rental-actions">
-                  <button className="btn-blue">
-                    <i className="bi bi-chat-dots me-1"></i>
-                    Contact Renter
-                  </button>
-                  <button className="btn-blue">
-                    <i className="bi bi-geo-alt me-1"></i>
-                    Track Equipment
-                  </button>
-                </div>
-              </div>
-            ))}
-          </div>
-        ) : (
-          <div className="empty-state">
-            <i className="bi bi-calendar-x text-muted fs-1"></i>
-            <h5 className="mt-3">No Active Rentals</h5>
-            <p className="text-muted">Your equipment rentals will appear here when someone books them.</p>
-          </div>
-        )}
-      </div>
 
-      <div className="dashboard-quick-links">
-        <div className="quick-link-card">
-          <h5 className="card-title">Rental History</h5>
-          <p className="card-description">View past rentals and income from your equipment.</p>
-          <Link to="/rental-history" className="btn-blue">View History →</Link>
+            {loading ? (
+              <div className="loader-container">
+                <div className="spinner-border text-primary" role="status">
+                  <span className="visually-hidden">Loading...</span>
+                </div>
+                <p className="mt-3">Loading your equipment...</p>
+              </div>
+            ) : equipmentItems.length > 0 ? (
+              <div className="equipment-grid">
+                {equipmentItems.map(item => (
+                  <div key={item.id} className="equipment-card">
+                    <div className="equipment-image">
+                      <img src={item.imageUrl || 'https://via.placeholder.com/300x180?text=No+Image'} alt={item.name} />
+                      <div className={`status-badge ${item.available ? 'available' : 'unavailable'}`}>
+                        {item.available ? 'Available' : 'Rented Out'}
+                      </div>
+                    </div>
+                    <div className="equipment-details">
+                      <h5 className="equipment-name">{item.name}</h5>
+                      <p className="equipment-category">{item.category}</p>
+                      <p className="equipment-rate">${item.ratePerDay}/day</p>
+                      <div className="equipment-actions">
+                        <button className="btn-blue" onClick={() => handleViewDetails(item)}>View Details</button>
+                        <Link to={`/edit-equipment/${item.id}`} className="btn-blue">Edit</Link>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="empty-state">
+                <i className="bi bi-tools empty-icon text-muted"></i>
+                <h4>No Equipment Listed Yet</h4>
+                <p>Start earning rental income by listing your first piece of equipment.</p>
+                <Link to="/add-equipment" className="btn-blue mt-3">
+                  <i className="bi bi-plus-circle me-2"></i>
+                  Add Your First Equipment
+                </Link>
+              </div>
+            )}
+          </div>
+
+          {/* Active Rentals Section */}
+          <div className="mt-8">
+            <h4 className="mb-4">Active Rentals ({activeRentals.length})</h4>
+            {loading ? (
+              <div className="loader-container">
+                <div className="spinner-border text-primary" role="status">
+                  <span className="visually-hidden">Loading...</span>
+                </div>
+                <p className="mt-3">Loading active rentals...</p>
+              </div>
+            ) : activeRentals.length > 0 ? (
+              <div className="rentals-list">
+                {activeRentals.map(rental => (
+                  <div key={rental.id} className="rental-card">
+                    <div className="rental-info">
+                      <div className="rental-primary">
+                        <h4>{rental.equipmentName}</h4>
+                        <div className="rental-dates">{formatDate(rental.startDate)} - {formatDate(rental.endDate)}</div>
+                      </div>
+                      <div className="rental-secondary">
+                        <span>Rented by: {rental.renterName || rental.renterEmail}</span>
+                        <span className="rental-price">${rental.totalPrice}</span>
+                      </div>
+                    </div>
+                    <div className="rental-actions">
+                      <button className="btn-blue">
+                        <i className="bi bi-chat-dots me-1"></i>
+                        Contact Renter
+                      </button>
+                      <button className="btn-blue">
+                        <i className="bi bi-geo-alt me-1"></i>
+                        Track Equipment
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="empty-state">
+                <i className="bi bi-calendar-x text-muted fs-1"></i>
+                <h5 className="mt-3">No Active Rentals</h5>
+                <p className="text-muted">Your equipment rentals will appear here when someone books them.</p>
+              </div>
+            )}
+          </div>
+
+          {/* Quick Links */}
+          <div className="dashboard-quick-links">
+            <div className="quick-link-card">
+              <h5 className="card-title">Rental History</h5>
+              <p className="card-description">View past rentals and income from your equipment.</p>
+              <Link to="/rental-history" className="btn-blue">View History →</Link>
+            </div>
+            <div className="quick-link-card">
+              <h5 className="card-title">Equipment Analytics</h5>
+              <p className="card-description">Track performance metrics and optimize your listings.</p>
+              <Link to="/equipment-analytics" className="btn-blue">View Analytics →</Link>
+            </div>
+            <div className="quick-link-card">
+              <h5 className="card-title">Account Settings</h5>
+              <p className="card-description">Update your profile information and preferences.</p>
+              <Link to="/account-settings" className="btn-blue">Edit Settings →</Link>
+            </div>
+          </div>
         </div>
-        <div className="quick-link-card">
-          <h5 className="card-title">Equipment Analytics</h5>
-          <p className="card-description">Track performance metrics and optimize your listings.</p>
-          <Link to="/equipment-analytics" className="btn-blue">View Analytics →</Link>
+      )}
+
+      {/* Rental Approvals Tab */}
+      {activeTab === 'approvals' && (
+        <div className="mt-4">
+          <RentalApprovalSystem />
         </div>
-        <div className="quick-link-card">
-          <h5 className="card-title">Account Settings</h5>
-          <p className="card-description">Update your profile information and preferences.</p>
-          <Link to="/account-settings" className="btn-blue">Edit Settings →</Link>
-        </div>
-      </div>
+      )}
     </div>
   );
 }
