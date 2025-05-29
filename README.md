@@ -1,6 +1,6 @@
 # RentMate - Equipment Rental Platform
 
-[![Version](https://img.shields.io/badge/version-1.1.0-blue.svg)](https://github.com/roshanaryal1/rentmate/releases)
+[![Version](https://img.shields.io/badge/version-1.2.0-blue.svg)](https://github.com/roshanaryal1/rentmate/releases)
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 [![React](https://img.shields.io/badge/React-19.1.0-blue.svg)](https://reactjs.org/)
 [![Firebase](https://img.shields.io/badge/Firebase-9.23.0-orange.svg)](https://firebase.google.com/)
@@ -68,13 +68,12 @@ Before running this project, make sure you have:
 4. **Environment Configuration**
    Create a `.env` file in the root directory:
    ```env
-   apiKey: "AIzaSyBcxPcu_CZtwWhhbBgFiJkRmgtcRW3FQs4",
-  authDomain: "rentmate-c7360.firebaseapp.com",
-  projectId: "rentmate-c7360",
-  storageBucket: "rentmate-c7360.firebasestorage.app",
-  messagingSenderId: "184718582938",
-  appId: "1:184718582938:web:7990263a98ec92526aeb23",
-  measurementId: "G-8W0V0Y8MJX"
+   REACT_APP_FIREBASE_API_KEY=your_api_key
+   REACT_APP_FIREBASE_AUTH_DOMAIN=your_auth_domain
+   REACT_APP_FIREBASE_PROJECT_ID=your_project_id
+   REACT_APP_FIREBASE_STORAGE_BUCKET=your_storage_bucket
+   REACT_APP_FIREBASE_MESSAGING_SENDER_ID=your_messaging_sender_id
+   REACT_APP_FIREBASE_APP_ID=your_app_id
    ```
 
 5. **Start the development server**
@@ -205,19 +204,28 @@ If you encounter any issues or have questions:
 
 ## 🗺️ Roadmap
 
-### Version 1.2 (Future)
+### Version 1.3.0 (Future)
 - [ ] Multi-language support
 - [ ] Equipment insurance integration
 - [ ] Maintenance scheduling
 - [ ] Review and rating system
+- [ ] Advanced reporting features
 
-## 📊 Stats
+## 📊 What's New in v1.2.0 (May 29, 2025)
 
-- **Total Equipment Categories**: 15+
-- **Sample Equipment Items**: 50+
-- **User Roles**: 3 (Renter, Owner, Admin)
-- **Supported Browsers**: Chrome, Firefox, Safari, Edge
-- **Mobile Platforms**: Android, iOS
+### 🚀 New Features
+- **Enhanced User Dashboards** with role-specific features
+- **Improved Equipment Management** with better filtering and statistics
+- **Comprehensive Rental History** with filtering and insights
+- **Admin Panel** with user management and analytics
+
+### 🔧 Improvements
+- Upgraded to React 19.1.0 and React Router 7.6.0
+- Enhanced authentication flows and form validation
+- Better error handling and loading states
+- Improved mobile responsiveness
+
+For full details, see our [CHANGELOG](CHANGELOG.md).
 
 ## 🏆 Acknowledgments
 
