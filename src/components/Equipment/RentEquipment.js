@@ -536,9 +536,4 @@ function RentEquipment() {
   );
 }
 
-export default RentEquipment;="bi bi-person me-1"></i>
-                      Owner: {equipment.ownerName}
-                    </small>
-                    <br />
-                    <small className="text-muted">
-                      <i classNam
+export default RentEquipment;
