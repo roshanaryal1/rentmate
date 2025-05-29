@@ -1,4 +1,7 @@
 // src/services/notificationService.js
+// React Hook for managing notifications
+import { useState, useEffect } from 'react';
+import { useAuth } from '../contexts/AuthContext';
 import { 
   collection, 
   addDoc, 
@@ -227,9 +230,7 @@ export const notificationService = {
   }
 };
 
-// React Hook for managing notifications
-import { useState, useEffect } from 'react';
-import { useAuth } from '../contexts/AuthContext';
+
 
 export const useNotifications = (autoRefresh = true, refreshInterval = 30000) => {
   const { currentUser } = useAuth();
