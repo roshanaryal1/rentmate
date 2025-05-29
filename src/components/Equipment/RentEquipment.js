@@ -1,11 +1,12 @@
-// src/components/Equipment/RentEquipment.js - Updated with notification system
 import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { doc, getDoc, addDoc, collection, Timestamp } from 'firebase/firestore';
 import { db } from '../../firebase';
 import { useAuth } from '../../contexts/AuthContext';
-import { notificationService } from '../../services/notificationService';
+import { notificationService } from '../../services/notificationService'; 
+
 import { format } from 'date-fns';
+
 
 function RentEquipment() {
   const { equipmentId } = useParams();
