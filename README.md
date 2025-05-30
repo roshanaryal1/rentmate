@@ -1,9 +1,9 @@
 # RentMate - Equipment Rental Platform
 
-[![Version](https://img.shields.io/badge/version-1.2.0-blue.svg)](https://github.com/roshanaryal1/rentmate/releases)
+[![Version](https://img.shields.io/badge/version-1.2.1-blue.svg)](https://github.com/roshanaryal1/rentmate/releases)
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 [![React](https://img.shields.io/badge/React-19.1.0-blue.svg)](https://reactjs.org/)
-[![Firebase](https://img.shields.io/badge/Firebase-9.23.0-orange.svg)](https://firebase.google.com/)
+[![Firebase](https://img.shields.io/badge/Firebase-11.8.1-orange.svg)](https://firebase.google.com/)
 
 RentMate is a modern, full-featured equipment rental platform that connects equipment owners with renters. Built with React and Firebase, it provides a seamless experience for listing, browsing, and renting construction and industrial equipment.
 
@@ -12,30 +12,31 @@ RentMate is a modern, full-featured equipment rental platform that connects equi
 ### For Equipment Renters
 - **Browse Equipment**: Discover a wide variety of construction and industrial equipment
 - **Advanced Search**: Filter by category, location, price, and availability
-- **Rental Management**: Track current and past rentals
+- **Rental Management**: Track current and past rentals with detailed history
 - **User Dashboard**: Manage your rental history and preferences
 - **Secure Authentication**: Google OAuth and email/password login
-- **Mobile App**: Access RentMate on the go with our mobile application
-- **Real-time Chat**: Communicate directly with equipment owners
-- **Secure Payments**: Process rentals with integrated payment system
+- **Mobile Responsive**: Access RentMate seamlessly on any device
+- **Real-time Notifications**: Get updates on rental status and approvals
+- **Equipment Details Modal**: View detailed equipment information before renting
 
 ### For Equipment Owners
 - **List Equipment**: Add your equipment with detailed descriptions and pricing
 - **Inventory Management**: Track availability and rental status
+- **Rental Approval System**: Review and approve rental requests
 - **Earnings Dashboard**: Monitor rental income and performance
-- **Rental History**: View all past and current rentals
-- **Equipment Tracking**: Monitor location of your equipment with GPS
-- **Analytics Dashboard**: Gain insights into your rental business
+- **Equipment Analytics**: View equipment performance metrics
+- **Request Management**: Handle rental requests with approval/decline workflow
 
 ### For Administrators
-- **User Management**: Oversee user accounts and permissions
+- **User Management**: Oversee user accounts and permissions with role editing
 - **Equipment Approval**: Review and approve new equipment listings
-- **Platform Analytics**: Monitor platform usage and performance
+- **Platform Analytics**: Monitor platform usage with comprehensive charts
 - **Content Moderation**: Ensure quality and safety standards
+- **Advanced Dashboard**: Role-specific analytics and insights
 
 ## 🚀 Live Demo
 
-Visit the live application: [RentMate Demo](https://roshanaryal1.github.io/rentmate)
+Visit the live application: [RentMate Platform](https://rentmate-c7360.web.app)
 
 ## 📋 Prerequisites
 
@@ -43,7 +44,7 @@ Before running this project, make sure you have:
 
 - Node.js (v16 or higher)
 - npm or yarn package manager
-- Firebase account
+- Firebase account with Firestore and Authentication enabled
 - Git
 
 ## 🛠️ Installation
@@ -63,6 +64,7 @@ Before running this project, make sure you have:
    - Create a new Firebase project at [Firebase Console](https://console.firebase.google.com/)
    - Enable Authentication (Email/Password and Google)
    - Create a Firestore database
+   - Enable Firebase Hosting (optional)
    - Copy your Firebase configuration
 
 4. **Environment Configuration**
@@ -98,6 +100,7 @@ rentmate/
 │   │   ├── auth/           # Authentication components
 │   │   ├── Dashboard/      # Dashboard components
 │   │   ├── Equipment/      # Equipment-related components
+│   │   ├── Rental/         # Rental management components
 │   │   └── common/         # Shared components
 │   ├── contexts/           # React contexts
 │   ├── data/              # Sample data and constants
@@ -124,6 +127,28 @@ npm test -- --coverage
 
 ## 🚀 Deployment
 
+### Firebase Hosting
+1. Install Firebase CLI:
+   ```bash
+   npm install -g firebase-tools
+   ```
+
+2. Login to Firebase:
+   ```bash
+   firebase login
+   ```
+
+3. Initialize hosting:
+   ```bash
+   firebase init hosting
+   ```
+
+4. Deploy:
+   ```bash
+   npm run build
+   firebase deploy
+   ```
+
 ### GitHub Pages
 1. Install gh-pages:
    ```bash
@@ -133,23 +158,6 @@ npm test -- --coverage
 2. Deploy:
    ```bash
    npm run deploy
-   ```
-
-### Firebase Hosting
-1. Install Firebase CLI:
-   ```bash
-   npm install -g firebase-tools
-   ```
-
-2. Initialize hosting:
-   ```bash
-   firebase init hosting
-   ```
-
-3. Deploy:
-   ```bash
-   npm run build
-   firebase deploy
    ```
 
 ## 🔧 Configuration
@@ -169,6 +177,14 @@ service cloud.firestore {
       allow write: if request.auth != null && 
         (resource.data.ownerId == request.auth.uid || 
          get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin');
+    }
+    
+    match /rentals/{rentalId} {
+      allow read, write: if request.auth != null && (
+        resource.data.renterId == request.auth.uid ||
+        resource.data.ownerId == request.auth.uid ||
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin'
+      );
     }
   }
 }
@@ -205,27 +221,37 @@ If you encounter any issues or have questions:
 ## 🗺️ Roadmap
 
 ### Version 1.3.0 (Future)
-- [ ] Multi-language support
 - [ ] Equipment insurance integration
 - [ ] Maintenance scheduling
 - [ ] Review and rating system
+- [ ] Multi-language support
 - [ ] Advanced reporting features
+- [ ] Mobile app development
 
-## 📊 What's New in v1.2.0 (May 29, 2025)
+## 📊 What's New in v1.2.1 (January 2025)
 
-### 🚀 New Features
-- **Enhanced User Dashboards** with role-specific features
-- **Improved Equipment Management** with better filtering and statistics
-- **Comprehensive Rental History** with filtering and insights
-- **Admin Panel** with user management and analytics
+### 🐛 Bug Fixes
+- **Fixed authentication flow**: Resolved issues with user role assignment and persistent login
+- **Improved rental request system**: Fixed approval/decline workflow for equipment owners
+- **Enhanced error handling**: Better error messages and fallback states
+- **UI/UX improvements**: Fixed responsive design issues on mobile devices
+- **Performance optimizations**: Reduced bundle size and improved loading times
 
 ### 🔧 Improvements
-- Upgraded to React 19.1.0 and React Router 7.6.0
-- Enhanced authentication flows and form validation
-- Better error handling and loading states
-- Improved mobile responsiveness
+- **Better notification system**: Enhanced real-time notifications for rental updates
+- **Equipment detail modal**: Improved equipment viewing experience
+- **Admin dashboard**: Enhanced user management with role editing capabilities
+- **Search functionality**: Improved equipment search with better filtering
+- **Form validation**: Enhanced validation across all forms
 
-For full details, see our [CHANGELOG](CHANGELOG.md).
+### 💻 Technical Updates
+- Updated Firebase SDK integration
+- Improved component error boundaries
+- Enhanced TypeScript support preparation
+- Better code splitting for performance
+- Optimized Firebase security rules
+
+For previous version details, see our [CHANGELOG](CHANGELOG.md).
 
 ## 🏆 Acknowledgments
 
@@ -234,8 +260,9 @@ For full details, see our [CHANGELOG](CHANGELOG.md).
 - [Bootstrap](https://getbootstrap.com/) - CSS framework
 - [React Router](https://reactrouter.com/) - Client-side routing
 - [Bootstrap Icons](https://icons.getbootstrap.com/) - Icon library
-- [Stripe](https://stripe.com/) - Payment processing
+- [Chart.js](https://www.chartjs.org/) - Data visualization
+- [date-fns](https://date-fns.org/) - Date utility library
 
 ---
 
-**Made with ❤️ by ROSHAN, DHRUB, APKSHYA (https://github.com/roshanaryal1)**
+**Made with ❤️ by ROSHAN, DHRUB, APKSHYA** | [GitHub](https://github.com/roshanaryal1/rentmate)

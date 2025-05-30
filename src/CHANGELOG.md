@@ -1,3 +1,5 @@
+# Changelog
+
 All notable changes to RentMate will be documented in this file.
 
 ## [Unreleased]
@@ -7,6 +9,87 @@ All notable changes to RentMate will be documented in this file.
 - [ ] Maintenance scheduling
 - [ ] Review and rating system
 - [ ] Multi-language support
+- [ ] Mobile app development
+- [ ] Advanced analytics dashboard
+
+## [1.2.1] - 2025-05-30
+
+### 🐛 Bug Fixes
+- **Authentication Flow**
+  - Fixed persistent login issues across browser sessions
+  - Resolved user role assignment problems during signup
+  - Improved Google OAuth integration reliability
+  - Fixed redirect loops in protected routes
+
+- **Rental Management System**
+  - Fixed rental request approval/decline workflow
+  - Resolved notification delivery issues for rental status updates
+  - Fixed date validation in rental request forms
+  - Corrected total price calculations for multi-day rentals
+
+- **UI/UX Improvements**
+  - Fixed responsive design issues on mobile devices (iPhone/Android)
+  - Resolved modal positioning problems on smaller screens
+  - Fixed form validation error messages not displaying properly
+  - Improved loading states across all components
+
+- **Dashboard Issues**
+  - Fixed equipment stats not updating in real-time
+  - Resolved admin dashboard user management bugs
+  - Fixed role editing functionality for admin users
+  - Corrected chart data not loading properly
+
+### 🔧 Improvements
+- **Performance Optimizations**
+  - Reduced initial bundle size by 15% through better code splitting
+  - Implemented lazy loading for dashboard components
+  - Optimized Firebase queries to reduce read operations
+  - Enhanced image loading with proper fallbacks
+
+- **Enhanced User Experience**
+  - Improved equipment detail modal with better information layout
+  - Added breadcrumb navigation for better user orientation
+  - Enhanced search functionality with real-time filtering
+  - Better error messaging with actionable suggestions
+
+- **Notification System**
+  - Real-time notifications for rental status updates
+  - Improved notification UI with better visual hierarchy
+  - Added notification persistence across sessions
+  - Enhanced notification categorization
+
+- **Form Enhancements**
+  - Real-time form validation with better error messages
+  - Improved password strength indicator
+  - Enhanced equipment listing form with better UX
+  - Added form auto-save functionality
+
+### 💻 Technical Updates
+- **Firebase Integration**
+  - Updated to Firebase SDK 11.8.1
+  - Improved Firestore security rules
+  - Enhanced offline persistence
+  - Better error handling for network issues
+
+- **Code Quality**
+  - Fixed React warnings and deprecation notices
+  - Improved component prop validation
+  - Enhanced error boundaries for better error catching
+  - Better TypeScript support preparation
+
+- **Development Experience**
+  - Improved debugging tools in development mode
+  - Enhanced logging for better troubleshooting
+  - Better development build performance
+  - Improved hot reload functionality
+
+### 🔒 Security Enhancements
+- Updated Firebase security rules for better data protection
+- Enhanced input validation and sanitization
+- Improved authentication token handling
+- Better CORS configuration for API calls
+
+---
 
 ## [1.2.0] - 2025-05-29
 
@@ -185,7 +268,7 @@ All notable changes to RentMate will be documented in this file.
 #### Technical Stack
 - **Frontend**: React 19.1.0, React Router 7.6.0
 - **UI Framework**: Bootstrap 5.3.6, React Bootstrap 2.10.10
-- **Backend**: Firebase 9.23.0 (Auth + Firestore)
+- **Backend**: Firebase 11.8.1 (Auth + Firestore)
 - **Icons**: Bootstrap Icons 1.13.1, React Icons 5.5.0
 - **Charts**: Chart.js 4.4.9, Recharts 2.15.3
 - **Styling**: Styled Components 6.1.18, Tailwind CSS 4.1.7
