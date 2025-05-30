@@ -1,6 +1,7 @@
-// src/services/notificationService.js
+// src/services/notificationService.js - Fix useNotifications hook (complete version)
+
 // React Hook for managing notifications
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { 
   collection, 
@@ -230,15 +231,14 @@ export const notificationService = {
   }
 };
 
-
-
 export const useNotifications = (autoRefresh = true, refreshInterval = 30000) => {
   const { currentUser } = useAuth();
   const [notifications, setNotifications] = useState([]);
   const [unreadCount, setUnreadCount] = useState(0);
   const [loading, setLoading] = useState(true);
 
-  const fetchNotifications = async () => {
+  // Wrap fetchNotifications in useCallback to prevent recreation on every render
+  const fetchNotifications = useCallback(async () => {
     if (!currentUser) return;
 
     try {
@@ -255,9 +255,9 @@ export const useNotifications = (autoRefresh = true, refreshInterval = 30000) =>
     } finally {
       setLoading(false);
     }
-  };
+  }, [currentUser]); // Only depend on currentUser
 
-  const markAsRead = async (notificationId) => {
+  const markAsRead = useCallback(async (notificationId) => {
     try {
       await notificationService.markAsRead(notificationId);
       setNotifications(prev => 
@@ -271,9 +271,11 @@ export const useNotifications = (autoRefresh = true, refreshInterval = 30000) =>
     } catch (error) {
       console.error('Error marking notification as read:', error);
     }
-  };
+  }, []);
 
-  const markAllAsRead = async () => {
+  const markAllAsRead = useCallback(async () => {
+    if (!currentUser) return 0;
+    
     try {
       const markedCount = await notificationService.markAllAsRead(currentUser.uid);
       setNotifications(prev => 
@@ -289,7 +291,7 @@ export const useNotifications = (autoRefresh = true, refreshInterval = 30000) =>
       console.error('Error marking all notifications as read:', error);
       return 0;
     }
-  };
+  }, [currentUser]);
 
   useEffect(() => {
     fetchNotifications();
@@ -298,7 +300,7 @@ export const useNotifications = (autoRefresh = true, refreshInterval = 30000) =>
       const interval = setInterval(fetchNotifications, refreshInterval);
       return () => clearInterval(interval);
     }
-  }, [currentUser, autoRefresh, refreshInterval]);
+  }, [fetchNotifications, autoRefresh, refreshInterval]); // All dependencies properly included
 
   return {
     notifications,

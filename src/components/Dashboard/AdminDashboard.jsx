@@ -1,5 +1,14 @@
+// src/components/Dashboard/AdminDashboard.jsx - Remove unused Container import
+
 import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate } from 'react-router';
+// Remove unused Container import
+import { Row, Col, Card, Badge, Dropdown, Button, Form, InputGroup, Modal } from 'react-bootstrap';
+import { LineChart, Line, XAxis, YAxis, Tooltip, CartesianGrid, ResponsiveContainer } from 'recharts';
+import { 
+  Bell, Flag, Building, People, Tools, FileEarmark, HouseDoor, Gear, GraphUp, CheckCircle, Person, Search, BoxArrowRight, PencilSquare, Eye, Envelope, Calendar, Shield
+} from 'react-bootstrap-icons';
+import { startOfMonth, endOfMonth, subMonths } from 'date-fns';
 import { 
   collection, 
   query, 
@@ -15,12 +24,7 @@ import {
 import { db } from '../../firebase';
 import { useAuth } from '../../contexts/AuthContext';
 import { equipmentService } from '../../services/equipmentService';
-import { Container, Row, Col, Card, Badge, Dropdown, Button, Form, InputGroup, Modal } from 'react-bootstrap';
-import { LineChart, Line, XAxis, YAxis, Tooltip, CartesianGrid, ResponsiveContainer } from 'recharts';
-import { 
-  Bell, Flag, Building, People, Tools, FileEarmark, HouseDoor, Gear, GraphUp, CheckCircle, Person, Search, BoxArrowRight, PencilSquare, Eye, Envelope, Calendar, Shield
-} from 'react-bootstrap-icons';
-import { startOfMonth, endOfMonth, subMonths } from 'date-fns';
+import { notificationService } from '../../services/notificationService';
 
 function getLastNMonths(n = 6) {
   const monthsShort = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];

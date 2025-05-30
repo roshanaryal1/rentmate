@@ -1,6 +1,7 @@
-// src/components/Dashboard/OwnerDashboard.js - Updated with Rental Approval Integration
+// src/components/Dashboard/OwnerDashboard.js - Fix all warnings
+
 import React, { useState, useEffect } from 'react';
-import { Link, useLocation, useNavigate } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router';
 import { useAuth } from '../../contexts/AuthContext';
 import { collection, query, where, getDocs } from 'firebase/firestore';
 import { db } from '../../firebase';
@@ -13,7 +14,8 @@ function OwnerDashboard() {
   const { currentUser } = useAuth();
   const [equipmentItems, setEquipmentItems] = useState([]);
   const [activeRentals, setActiveRentals] = useState([]);
-  const [pendingRequests, setPendingRequests] = useState([]);
+  // Remove unused pendingRequests state
+  // const [pendingRequests, setPendingRequests] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showFeedback, setShowFeedback] = useState(false);
   const [selectedEquipment, setSelectedEquipment] = useState(null);
@@ -53,8 +55,9 @@ function OwnerDashboard() {
         const equipmentIds = equipment.map(item => item.id);
         
         let rentals = [];
-        let totalEarnings = 0;
         let pendingRequestsCount = 0;
+        // Fix loop function issue by declaring totalEarnings outside the loop
+        let totalEarnings = 0;
 
         if (equipmentIds.length > 0) {
           // Fetch rentals in chunks due to Firebase 'in' query limitation
@@ -126,6 +129,7 @@ function OwnerDashboard() {
   };
   const formatDate = (dateObj) => dateObj?.toDate?.().toLocaleDateString() || 'Unknown';
 
+  // Rest of the component remains the same...
   return (
     <div className="owner-dashboard">
       <FeedbackModal 

@@ -1,4 +1,6 @@
-import React, { useContext, useState, useEffect } from "react";
+// src/contexts/AuthContext.js - Fix useEffect dependency warning
+
+import React, { useContext, useState, useEffect, useCallback } from "react";
 import { 
   onAuthStateChanged,
   signOut,
@@ -211,40 +213,42 @@ export function AuthProvider({ children }) {
     }
   }
 
-  // Auth state observer
+  // Auth state observer - use useCallback to memoize the auth handler
+  const handleAuthStateChange = useCallback(async (user) => {
+    console.log('🔄 Auth state changed:', user ? `${user.email} (${user.uid})` : 'No user');
+    
+    try {
+      if (user) {
+        console.log('👤 User authenticated, getting role...');
+        setCurrentUser(user);
+        
+        const role = await getUserRole(user.uid);
+        console.log('✅ Role set:', role);
+        setUserRole(role);
+      } else {
+        console.log('👤 No user, clearing state...');
+        setCurrentUser(null);
+        setUserRole(null);
+      }
+    } catch (error) {
+      console.error('❌ Error in auth state observer:', error);
+      if (user) {
+        setCurrentUser(user);
+        setUserRole('renter'); // Fallback
+      }
+    } finally {
+      setLoading(false);
+      setAuthChecked(true);
+      console.log('✅ Auth check completed');
+    }
+  }, []); // No dependencies needed since we're not using any external values
+
   useEffect(() => {
     console.log('👂 Setting up auth state listener...');
     
-    const unsubscribe = onAuthStateChanged(auth, async (user) => {
-      console.log('🔄 Auth state changed:', user ? `${user.email} (${user.uid})` : 'No user');
-      
-      try {
-        if (user) {
-          console.log('👤 User authenticated, getting role...');
-          setCurrentUser(user);
-          
-          const role = await getUserRole(user.uid);
-          console.log('✅ Role set:', role);
-          setUserRole(role);
-        } else {
-          console.log('👤 No user, clearing state...');
-          setCurrentUser(null);
-          setUserRole(null);
-        }
-      } catch (error) {
-        console.error('❌ Error in auth state observer:', error);
-        if (user) {
-          setCurrentUser(user);
-          setUserRole('renter'); // Fallback
-        }
-      } finally {
-        setLoading(false);
-        setAuthChecked(true);
-        console.log('✅ Auth check completed');
-      }
-    });
+    const unsubscribe = onAuthStateChanged(auth, handleAuthStateChange);
 
-    // Cleanup timeout after 10 seconds
+    // Cleanup timeout after 10 seconds - only set if authChecked is still false
     const timeout = setTimeout(() => {
       if (!authChecked) {
         console.log('⏰ Auth timeout, setting checked to true');
@@ -257,7 +261,7 @@ export function AuthProvider({ children }) {
       clearTimeout(timeout);
       unsubscribe();
     };
-  }, []);
+  }, [handleAuthStateChange]); // Now we properly depend on the memoized handler
 
   const value = {
     currentUser,

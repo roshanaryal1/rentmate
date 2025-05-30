@@ -1,5 +1,6 @@
-// src/theme/ThemeContext.js
-import React, { createContext, useState, useContext, useEffect } from 'react';
+// src/theme/ThemeContext.js - Remove unused useEffect import
+
+import React, { createContext, useState, useContext } from 'react';
 import { ThemeProvider as StyledThemeProvider } from 'styled-components';
 import { themes, GlobalStyle } from './index';
 

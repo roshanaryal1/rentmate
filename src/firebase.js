@@ -1,17 +1,20 @@
-// src/firebase.js
+// src/firebase.js - Remove unused imports
 
 import { initializeApp } from "firebase/app";
 import {
   getAuth,
   GoogleAuthProvider,
   FacebookAuthProvider,
-  signInWithPopup,
-  connectAuthEmulator
+  signInWithPopup
+  // Remove unused emulator imports:
+  // connectAuthEmulator - not used
+  // connectFirestoreEmulator - not used
 } from "firebase/auth";
 import {
   getFirestore,
-  connectFirestoreEmulator,
   enableNetwork
+  // Remove unused emulator import:
+  // connectFirestoreEmulator - not used
 } from "firebase/firestore";
 
 const firebaseConfig = {
@@ -48,10 +51,13 @@ enableNetwork(db).catch((err) => {
   console.log("Failed to enable network persistence:", err);
 });
 
-// Optional: Connect to emulators
-if (process.env.NODE_ENV === 'development' && window.location.hostname === 'localhost') {
-  // connectAuthEmulator(auth, "http://localhost:9099");
-  // connectFirestoreEmulator(db, 'localhost', 8080);
-}
+// Optional: Connect to emulators (commented out since not used)
+// if (process.env.NODE_ENV === 'development' && window.location.hostname === 'localhost') {
+//   // Uncomment these lines if you want to use Firebase emulators in development
+//   // const { connectAuthEmulator } = require("firebase/auth");
+//   // const { connectFirestoreEmulator } = require("firebase/firestore");
+//   // connectAuthEmulator(auth, "http://localhost:9099");
+//   // connectFirestoreEmulator(db, 'localhost', 8080);
+// }
 
 export { auth, db };
