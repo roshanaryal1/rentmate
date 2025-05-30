@@ -43,7 +43,6 @@ export function AuthProvider({ children }) {
     timestamp: new Date().toISOString()
   });
 
-  // Create user document in Firestore
   async function createUserDocument(user, additionalData = {}) {
     if (!user) return null;
     
@@ -77,7 +76,6 @@ export function AuthProvider({ children }) {
     }
   }
 
-  // Get user role from Firestore
   async function getUserRole(uid) {
     if (!uid) return 'renter';
     
@@ -102,29 +100,21 @@ export function AuthProvider({ children }) {
     }
   }
 
-  // Signup function
   async function signup(email, password, fullName, role = 'renter') {
     console.log('🚀 Starting signup process:', { email, fullName, role });
     
     try {
       setLoading(true);
-      
-      // Create Firebase user
       const result = await createUserWithEmailAndPassword(auth, email, password);
       console.log('✅ Firebase user created:', result.user.uid);
       
-      // Update display name
       if (fullName) {
         await updateProfile(result.user, { displayName: fullName });
         console.log('✅ Display name updated');
       }
       
-      // Create user document and get role
       const actualRole = await createUserDocument(result.user, { role, fullName });
       console.log('✅ User document created with role:', actualRole);
-      
-      // The auth state observer will handle setting the user and role
-      // Don't set loading to false here, let the observer handle it
       
       return { user: result.user, role: actualRole };
     } catch (error) {
@@ -134,22 +124,16 @@ export function AuthProvider({ children }) {
     }
   }
 
-  // Login function
   async function login(email, password) {
     console.log('🔑 Starting login process for:', email);
     
     try {
       setLoading(true);
-      
       const result = await signInWithEmailAndPassword(auth, email, password);
       console.log('✅ Login successful:', result.user.uid);
       
-      // Get user role
       const role = await getUserRole(result.user.uid);
       console.log('✅ Role retrieved:', role);
-      
-      // The auth state observer will handle setting the user and role
-      // Don't set loading to false here, let the observer handle it
       
       return { user: result.user, role };
     } catch (error) {
@@ -159,27 +143,18 @@ export function AuthProvider({ children }) {
     }
   }
 
-  // Google sign-in
   async function signInWithGoogle(role = 'renter') {
     console.log('🔍 Starting Google signin with role:', role);
     
     try {
       setLoading(true);
-      
       const provider = new GoogleAuthProvider();
-      provider.setCustomParameters({
-        prompt: 'select_account'
-      });
-      
+      provider.setCustomParameters({ prompt: 'select_account' });
       const result = await signInWithPopup(auth, provider);
       console.log('✅ Google signin successful:', result.user.uid);
       
-      // Create or get user document
       const actualRole = await createUserDocument(result.user, { role });
       console.log('✅ Google user role:', actualRole);
-      
-      // The auth state observer will handle setting the user and role
-      // Don't set loading to false here, let the observer handle it
       
       return { user: result.user, role: actualRole };
     } catch (error) {
@@ -189,7 +164,6 @@ export function AuthProvider({ children }) {
     }
   }
 
-  // Reset password
   async function resetPassword(email) {
     try {
       await sendPasswordResetEmail(auth, email);
@@ -199,7 +173,6 @@ export function AuthProvider({ children }) {
     }
   }
 
-  // Logout
   async function logout() {
     try {
       console.log('🚪 Logging out...');
@@ -213,7 +186,6 @@ export function AuthProvider({ children }) {
     }
   }
 
-  // Auth state observer - use useCallback to memoize the auth handler
   const handleAuthStateChange = useCallback(async (user) => {
     console.log('🔄 Auth state changed:', user ? `${user.email} (${user.uid})` : 'No user');
     
@@ -241,14 +213,13 @@ export function AuthProvider({ children }) {
       setAuthChecked(true);
       console.log('✅ Auth check completed');
     }
-  }, []); // No dependencies needed since we're not using any external values
+  }, []);
 
   useEffect(() => {
     console.log('👂 Setting up auth state listener...');
     
     const unsubscribe = onAuthStateChanged(auth, handleAuthStateChange);
 
-    // Cleanup timeout after 10 seconds - only set if authChecked is still false
     const timeout = setTimeout(() => {
       if (!authChecked) {
         console.log('⏰ Auth timeout, setting checked to true');
@@ -261,7 +232,7 @@ export function AuthProvider({ children }) {
       clearTimeout(timeout);
       unsubscribe();
     };
-  }, [handleAuthStateChange]); // Now we properly depend on the memoized handler
+  }, [handleAuthStateChange, authChecked]);  // <-- Added authChecked here
 
   const value = {
     currentUser,
