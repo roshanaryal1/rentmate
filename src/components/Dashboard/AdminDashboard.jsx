@@ -24,7 +24,6 @@ import {
 import { db } from '../../firebase';
 import { useAuth } from '../../contexts/AuthContext';
 import { equipmentService } from '../../services/equipmentService';
-import { notificationService } from '../../services/notificationService';
 
 function getLastNMonths(n = 6) {
   const monthsShort = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
