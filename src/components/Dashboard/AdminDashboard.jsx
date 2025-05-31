@@ -1,11 +1,14 @@
-// src/components/Dashboard/AdminDashboard.jsx - Enhanced with Dispute Center, Review Moderation, and Export Features
+// src/components/Dashboard/AdminDashboard.jsx - Enhanced with Tooltips and Dark Mode
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, createContext, useContext } from 'react';
 import { useNavigate } from 'react-router';
-import { Row, Col, Card, Badge, Dropdown, Button, Form, InputGroup, Modal, Table, Alert, Spinner, ProgressBar } from 'react-bootstrap';
-import { LineChart, Line, XAxis, YAxis, Tooltip, CartesianGrid, ResponsiveContainer } from 'recharts';
 import { 
-  Bell, Flag, Building, People, Tools, FileEarmark, HouseDoor, Gear, GraphUp, CheckCircle, Person, Search, BoxArrowRight, PencilSquare, Eye, Envelope, Calendar, Shield, XCircle, Check, X, Trash, Ban, Download, Upload, Save, ChatText, StarFill, ExclamationTriangle, FileText, Archive
+  Row, Col, Card, Badge, Dropdown, Button, Form, InputGroup, Modal, Table, Alert, Spinner, ProgressBar,
+  OverlayTrigger, Tooltip
+} from 'react-bootstrap';
+import { LineChart, Line, XAxis, YAxis, Tooltip as RechartsTooltip, CartesianGrid, ResponsiveContainer } from 'recharts';
+import { 
+  Bell, Flag, Building, People, Tools, FileEarmark, HouseDoor, Gear, GraphUp, CheckCircle, Person, Search, BoxArrowRight, PencilSquare, Eye, Envelope, Calendar, Shield, XCircle, Check, X, Trash, Ban, Download, Upload, Save, ChatText, StarFill, ExclamationTriangle, FileText, Archive, Moon, Sun
 } from 'react-bootstrap-icons';
 import { startOfMonth, endOfMonth, subMonths } from 'date-fns';
 import { 
@@ -27,6 +30,54 @@ import {
 import { db } from '../../firebase';
 import { useAuth } from '../../contexts/AuthContext';
 import { equipmentService } from '../../services/equipmentService';
+
+// Dark Mode Context
+const DarkModeContext = createContext();
+
+const DarkModeProvider = ({ children }) => {
+  const [isDarkMode, setIsDarkMode] = useState(() => {
+    const savedTheme = localStorage.getItem('adminDashboard_darkMode');
+    return savedTheme ? JSON.parse(savedTheme) : false;
+  });
+
+  const toggleDarkMode = () => {
+    const newMode = !isDarkMode;
+    setIsDarkMode(newMode);
+    localStorage.setItem('adminDashboard_darkMode', JSON.stringify(newMode));
+  };
+
+  useEffect(() => {
+    if (isDarkMode) {
+      document.body.classList.add('dark-mode');
+    } else {
+      document.body.classList.remove('dark-mode');
+    }
+  }, [isDarkMode]);
+
+  return (
+    <DarkModeContext.Provider value={{ isDarkMode, toggleDarkMode }}>
+      {children}
+    </DarkModeContext.Provider>
+  );
+};
+
+const useDarkMode = () => {
+  const context = useContext(DarkModeContext);
+  if (!context) {
+    throw new Error('useDarkMode must be used within a DarkModeProvider');
+  }
+  return context;
+};
+
+// Enhanced Tooltip Wrapper Component
+const TooltipWrapper = ({ children, tooltip, placement = "top", ...props }) => (
+  <OverlayTrigger
+    placement={placement}
+    overlay={<Tooltip {...props}>{tooltip}</Tooltip>}
+  >
+    {children}
+  </OverlayTrigger>
+);
 
 function getLastNMonths(n = 6) {
   const monthsShort = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
@@ -68,6 +119,7 @@ function DisputeResolutionModal({ dispute, isOpen, onClose, onDisputeUpdate }) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const { currentUser } = useAuth();
+  const { isDarkMode } = useDarkMode();
 
   useEffect(() => {
     if (isOpen) {
@@ -142,21 +194,27 @@ function DisputeResolutionModal({ dispute, isOpen, onClose, onDisputeUpdate }) {
   if (!isOpen || !dispute) return null;
 
   return (
-    <Modal show={isOpen} onHide={onClose} size="lg" centered>
-      <Modal.Header closeButton>
+    <Modal 
+      show={isOpen} 
+      onHide={onClose} 
+      size="lg" 
+      centered
+      className={isDarkMode ? 'dark-mode' : ''}
+    >
+      <Modal.Header closeButton className={isDarkMode ? 'bg-dark text-light border-secondary' : ''}>
         <Modal.Title>
           <Flag className="me-2 text-warning" />
           Resolve Dispute
         </Modal.Title>
       </Modal.Header>
-      <Modal.Body>
+      <Modal.Body className={isDarkMode ? 'bg-dark text-light' : ''}>
         {error && (
           <Alert variant="danger">{error}</Alert>
         )}
         
         <div className="mb-4">
           <h6>Dispute Details</h6>
-          <Card className="bg-light">
+          <Card className={isDarkMode ? 'bg-secondary border-secondary' : 'bg-light'}>
             <Card.Body>
               <Row>
                 <Col md={6}>
@@ -196,6 +254,7 @@ function DisputeResolutionModal({ dispute, isOpen, onClose, onDisputeUpdate }) {
             value={action}
             onChange={(e) => setAction(e.target.value)}
             disabled={loading}
+            className={isDarkMode ? 'bg-dark text-light border-secondary' : ''}
           >
             <option value="resolve_favor_renter">Resolve in favor of renter</option>
             <option value="resolve_favor_owner">Resolve in favor of owner</option>
@@ -214,10 +273,11 @@ function DisputeResolutionModal({ dispute, isOpen, onClose, onDisputeUpdate }) {
             onChange={(e) => setResolution(e.target.value)}
             placeholder="Explain the resolution and any actions taken..."
             disabled={loading}
+            className={isDarkMode ? 'bg-dark text-light border-secondary' : ''}
           />
         </Form.Group>
       </Modal.Body>
-      <Modal.Footer>
+      <Modal.Footer className={isDarkMode ? 'bg-dark border-secondary' : ''}>
         <Button variant="secondary" onClick={onClose} disabled={loading}>
           Cancel
         </Button>
@@ -243,6 +303,7 @@ function ReviewModerationModal({ review, isOpen, onClose, onReviewUpdate }) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const { currentUser } = useAuth();
+  const { isDarkMode } = useDarkMode();
 
   useEffect(() => {
     if (isOpen) {
@@ -304,21 +365,27 @@ function ReviewModerationModal({ review, isOpen, onClose, onReviewUpdate }) {
   if (!isOpen || !review) return null;
 
   return (
-    <Modal show={isOpen} onHide={onClose} size="lg" centered>
-      <Modal.Header closeButton>
+    <Modal 
+      show={isOpen} 
+      onHide={onClose} 
+      size="lg" 
+      centered
+      className={isDarkMode ? 'dark-mode' : ''}
+    >
+      <Modal.Header closeButton className={isDarkMode ? 'bg-dark text-light border-secondary' : ''}>
         <Modal.Title>
           <StarFill className="me-2 text-warning" />
           Moderate Review
         </Modal.Title>
       </Modal.Header>
-      <Modal.Body>
+      <Modal.Body className={isDarkMode ? 'bg-dark text-light' : ''}>
         {error && (
           <Alert variant="danger">{error}</Alert>
         )}
         
         <div className="mb-4">
           <h6>Review Details</h6>
-          <Card className="bg-light">
+          <Card className={isDarkMode ? 'bg-secondary border-secondary' : 'bg-light'}>
             <Card.Body>
               <div className="d-flex justify-content-between align-items-start mb-2">
                 <div>
@@ -342,7 +409,9 @@ function ReviewModerationModal({ review, isOpen, onClose, onReviewUpdate }) {
               </div>
               <div className="mt-3">
                 <strong>Review Content:</strong>
-                <p className="mt-1 border p-2 rounded bg-white">{review.comment}</p>
+                <p className={`mt-1 border p-2 rounded ${isDarkMode ? 'bg-dark text-light border-secondary' : 'bg-white'}`}>
+                  {review.comment}
+                </p>
               </div>
               {review.images && review.images.length > 0 && (
                 <div className="mt-2">
@@ -380,6 +449,7 @@ function ReviewModerationModal({ review, isOpen, onClose, onReviewUpdate }) {
             value={action}
             onChange={(e) => setAction(e.target.value)}
             disabled={loading}
+            className={isDarkMode ? 'bg-dark text-light border-secondary' : ''}
           >
             <option value="approve">Approve Review</option>
             <option value="reject">Reject Review</option>
@@ -397,11 +467,12 @@ function ReviewModerationModal({ review, isOpen, onClose, onReviewUpdate }) {
               onChange={(e) => setReason(e.target.value)}
               placeholder="Explain why this review is being rejected/removed..."
               disabled={loading}
+              className={isDarkMode ? 'bg-dark text-light border-secondary' : ''}
             />
           </Form.Group>
         )}
       </Modal.Body>
-      <Modal.Footer>
+      <Modal.Footer className={isDarkMode ? 'bg-dark border-secondary' : ''}>
         <Button variant="secondary" onClick={onClose} disabled={loading}>
           Cancel
         </Button>
@@ -436,6 +507,7 @@ function ExportImportModal({ isOpen, onClose }) {
   const [importFile, setImportFile] = useState(null);
   const [importType, setImportType] = useState('equipment');
   const { currentUser } = useAuth();
+  const { isDarkMode } = useDarkMode();
 
   const handleExport = async () => {
     setLoading(true);
@@ -568,14 +640,20 @@ function ExportImportModal({ isOpen, onClose }) {
   if (!isOpen) return null;
 
   return (
-    <Modal show={isOpen} onHide={onClose} size="lg" centered>
-      <Modal.Header closeButton>
+    <Modal 
+      show={isOpen} 
+      onHide={onClose} 
+      size="lg" 
+      centered
+      className={isDarkMode ? 'dark-mode' : ''}
+    >
+      <Modal.Header closeButton className={isDarkMode ? 'bg-dark text-light border-secondary' : ''}>
         <Modal.Title>
           <Archive className="me-2" />
           Data Export & Import
         </Modal.Title>
       </Modal.Header>
-      <Modal.Body>
+      <Modal.Body className={isDarkMode ? 'bg-dark text-light' : ''}>
         <div className="d-flex mb-3">
           <Button
             variant={activeTab === 'export' ? 'primary' : 'outline-primary'}
@@ -598,7 +676,11 @@ function ExportImportModal({ isOpen, onClose }) {
           <div>
             <Form.Group className="mb-3">
               <Form.Label>Data Type:</Form.Label>
-              <Form.Select value={exportType} onChange={(e) => setExportType(e.target.value)}>
+              <Form.Select 
+                value={exportType} 
+                onChange={(e) => setExportType(e.target.value)}
+                className={isDarkMode ? 'bg-dark text-light border-secondary' : ''}
+              >
                 <option value="users">Users</option>
                 <option value="equipment">Equipment</option>
                 <option value="rentals">Rentals</option>
@@ -610,7 +692,11 @@ function ExportImportModal({ isOpen, onClose }) {
 
             <Form.Group className="mb-3">
               <Form.Label>Date Range:</Form.Label>
-              <Form.Select value={dateRange} onChange={(e) => setDateRange(e.target.value)}>
+              <Form.Select 
+                value={dateRange} 
+                onChange={(e) => setDateRange(e.target.value)}
+                className={isDarkMode ? 'bg-dark text-light border-secondary' : ''}
+              >
                 <option value="all">All Time</option>
                 <option value="last30days">Last 30 Days</option>
                 <option value="last90days">Last 90 Days</option>
@@ -627,6 +713,7 @@ function ExportImportModal({ isOpen, onClose }) {
                       type="date"
                       value={customStartDate}
                       onChange={(e) => setCustomStartDate(e.target.value)}
+                      className={isDarkMode ? 'bg-dark text-light border-secondary' : ''}
                     />
                   </Form.Group>
                 </Col>
@@ -637,6 +724,7 @@ function ExportImportModal({ isOpen, onClose }) {
                       type="date"
                       value={customEndDate}
                       onChange={(e) => setCustomEndDate(e.target.value)}
+                      className={isDarkMode ? 'bg-dark text-light border-secondary' : ''}
                     />
                   </Form.Group>
                 </Col>
@@ -659,7 +747,11 @@ function ExportImportModal({ isOpen, onClose }) {
           <div>
             <Form.Group className="mb-3">
               <Form.Label>Import Type:</Form.Label>
-              <Form.Select value={importType} onChange={(e) => setImportType(e.target.value)}>
+              <Form.Select 
+                value={importType} 
+                onChange={(e) => setImportType(e.target.value)}
+                className={isDarkMode ? 'bg-dark text-light border-secondary' : ''}
+              >
                 <option value="equipment">Equipment</option>
                 <option value="users">Users (Bulk Registration)</option>
               </Form.Select>
@@ -671,6 +763,7 @@ function ExportImportModal({ isOpen, onClose }) {
                 type="file"
                 accept=".csv"
                 onChange={(e) => setImportFile(e.target.files[0])}
+                className={isDarkMode ? 'bg-dark text-light border-secondary' : ''}
               />
               <Form.Text className="text-muted">
                 Upload a CSV file with the appropriate headers for {importType}.
@@ -697,7 +790,7 @@ function ExportImportModal({ isOpen, onClose }) {
           </div>
         )}
       </Modal.Body>
-      <Modal.Footer>
+      <Modal.Footer className={isDarkMode ? 'bg-dark border-secondary' : ''}>
         <Button variant="secondary" onClick={onClose} disabled={loading}>
           Cancel
         </Button>
@@ -735,10 +828,11 @@ function ExportImportModal({ isOpen, onClose }) {
   );
 }
 
-// ----------- EXISTING MODALS (keeping the ones you already have) ----------
+// ----------- USER PROFILE MODAL ----------
 function UserProfileModal({ user, isOpen, onClose }) {
   const [userDetails, setUserDetails] = useState(null);
   const [loading, setLoading] = useState(true);
+  const { isDarkMode } = useDarkMode();
 
   useEffect(() => {
     if (isOpen && user) {
@@ -769,14 +863,20 @@ function UserProfileModal({ user, isOpen, onClose }) {
   if (!isOpen || !user) return null;
 
   return (
-    <Modal show={isOpen} onHide={onClose} size="lg" centered>
-      <Modal.Header closeButton className="bg-primary text-white">
+    <Modal 
+      show={isOpen} 
+      onHide={onClose} 
+      size="lg" 
+      centered
+      className={isDarkMode ? 'dark-mode' : ''}
+    >
+      <Modal.Header closeButton className={isDarkMode ? 'bg-dark text-light border-secondary' : 'bg-primary text-white'}>
         <Modal.Title>
           <Person className="me-2" />
           User Profile
         </Modal.Title>
       </Modal.Header>
-      <Modal.Body>
+      <Modal.Body className={isDarkMode ? 'bg-dark text-light' : ''}>
         {loading ? (
           <div className="text-center py-4">
             <Spinner animation="border" variant="primary" />
@@ -859,7 +959,7 @@ function UserProfileModal({ user, isOpen, onClose }) {
                 <p className="mb-0">{userDetails.address}</p>
               </div>
             )}
-            <div className="bg-light p-3 rounded">
+            <div className={`p-3 rounded ${isDarkMode ? 'bg-secondary' : 'bg-light'}`}>
               <h6 className="mb-2">Account Status</h6>
               <div className="d-flex justify-content-between">
                 <span>Status:</span>
@@ -875,7 +975,7 @@ function UserProfileModal({ user, isOpen, onClose }) {
           </div>
         )}
       </Modal.Body>
-      <Modal.Footer>
+      <Modal.Footer className={isDarkMode ? 'bg-dark border-secondary' : ''}>
         <Button variant="secondary" onClick={onClose}>
           Close
         </Button>
@@ -884,11 +984,13 @@ function UserProfileModal({ user, isOpen, onClose }) {
   );
 }
 
+// ----------- EDIT ROLE MODAL ----------
 function EditRoleModal({ user, isOpen, onClose, onRoleUpdate }) {
   const [selectedRole, setSelectedRole] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const { currentUser } = useAuth();
+  const { isDarkMode } = useDarkMode();
 
   useEffect(() => {
     if (isOpen && user) {
@@ -932,14 +1034,19 @@ function EditRoleModal({ user, isOpen, onClose, onRoleUpdate }) {
   if (!isOpen || !user) return null;
 
   return (
-    <Modal show={isOpen} onHide={onClose} centered>
-      <Modal.Header closeButton>
+    <Modal 
+      show={isOpen} 
+      onHide={onClose} 
+      centered
+      className={isDarkMode ? 'dark-mode' : ''}
+    >
+      <Modal.Header closeButton className={isDarkMode ? 'bg-dark text-light border-secondary' : ''}>
         <Modal.Title>
           <PencilSquare className="me-2" />
           Edit User Role
         </Modal.Title>
       </Modal.Header>
-      <Modal.Body>
+      <Modal.Body className={isDarkMode ? 'bg-dark text-light' : ''}>
         {error && (
           <Alert variant="danger">{error}</Alert>
         )}
@@ -962,6 +1069,7 @@ function EditRoleModal({ user, isOpen, onClose, onRoleUpdate }) {
             value={selectedRole}
             onChange={(e) => setSelectedRole(e.target.value)}
             disabled={loading}
+            className={isDarkMode ? 'bg-dark text-light border-secondary' : ''}
           >
             <option value="renter">Renter</option>
             <option value="owner">Owner</option>
@@ -969,7 +1077,7 @@ function EditRoleModal({ user, isOpen, onClose, onRoleUpdate }) {
           </Form.Select>
         </Form.Group>
       </Modal.Body>
-      <Modal.Footer>
+      <Modal.Footer className={isDarkMode ? 'bg-dark border-secondary' : ''}>
         <Button variant="secondary" onClick={onClose} disabled={loading}>
           Cancel
         </Button>
@@ -992,12 +1100,14 @@ function EditRoleModal({ user, isOpen, onClose, onRoleUpdate }) {
   );
 }
 
+// ----------- BAN USER MODAL ----------
 function BanUserModal({ user, isOpen, onClose, onUserUpdate }) {
   const [reason, setReason] = useState('');
   const [duration, setDuration] = useState('permanent');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const { currentUser } = useAuth();
+  const { isDarkMode } = useDarkMode();
 
   useEffect(() => {
     if (isOpen) {
@@ -1054,14 +1164,19 @@ function BanUserModal({ user, isOpen, onClose, onUserUpdate }) {
   if (!isOpen || !user) return null;
 
   return (
-    <Modal show={isOpen} onHide={onClose} centered>
-      <Modal.Header closeButton>
+    <Modal 
+      show={isOpen} 
+      onHide={onClose} 
+      centered
+      className={isDarkMode ? 'dark-mode' : ''}
+    >
+      <Modal.Header closeButton className={isDarkMode ? 'bg-dark text-light border-secondary' : ''}>
         <Modal.Title className="text-danger">
           <Ban className="me-2" />
           Ban User
         </Modal.Title>
       </Modal.Header>
-      <Modal.Body>
+      <Modal.Body className={isDarkMode ? 'bg-dark text-light' : ''}>
         {error && (
           <Alert variant="danger">{error}</Alert>
         )}
@@ -1080,6 +1195,7 @@ function BanUserModal({ user, isOpen, onClose, onUserUpdate }) {
             onChange={(e) => setReason(e.target.value)}
             placeholder="Explain why this user is being banned..."
             disabled={loading}
+            className={isDarkMode ? 'bg-dark text-light border-secondary' : ''}
           />
         </Form.Group>
         <Form.Group>
@@ -1088,6 +1204,7 @@ function BanUserModal({ user, isOpen, onClose, onUserUpdate }) {
             value={duration}
             onChange={(e) => setDuration(e.target.value)}
             disabled={loading}
+            className={isDarkMode ? 'bg-dark text-light border-secondary' : ''}
           >
             <option value="7">7 days</option>
             <option value="30">30 days</option>
@@ -1096,7 +1213,7 @@ function BanUserModal({ user, isOpen, onClose, onUserUpdate }) {
           </Form.Select>
         </Form.Group>
       </Modal.Body>
-      <Modal.Footer>
+      <Modal.Footer className={isDarkMode ? 'bg-dark border-secondary' : ''}>
         <Button variant="secondary" onClick={onClose} disabled={loading}>
           Cancel
         </Button>
@@ -1115,12 +1232,14 @@ function BanUserModal({ user, isOpen, onClose, onUserUpdate }) {
   );
 }
 
+// ----------- EQUIPMENT APPROVAL MODAL ----------
 function EquipmentApprovalModal({ equipment, isOpen, onClose, onEquipmentUpdate }) {
   const [action, setAction] = useState('approve');
   const [reason, setReason] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const { currentUser } = useAuth();
+  const { isDarkMode } = useDarkMode();
 
   useEffect(() => {
     if (isOpen) {
@@ -1179,14 +1298,20 @@ function EquipmentApprovalModal({ equipment, isOpen, onClose, onEquipmentUpdate 
   if (!isOpen || !equipment) return null;
 
   return (
-    <Modal show={isOpen} onHide={onClose} size="lg" centered>
-      <Modal.Header closeButton>
+    <Modal 
+      show={isOpen} 
+      onHide={onClose} 
+      size="lg" 
+      centered
+      className={isDarkMode ? 'dark-mode' : ''}
+    >
+      <Modal.Header closeButton className={isDarkMode ? 'bg-dark text-light border-secondary' : ''}>
         <Modal.Title>
           <Tools className="me-2" />
           Review Equipment
         </Modal.Title>
       </Modal.Header>
-      <Modal.Body>
+      <Modal.Body className={isDarkMode ? 'bg-dark text-light' : ''}>
         {error && (
           <Alert variant="danger">{error}</Alert>
         )}
@@ -1217,6 +1342,7 @@ function EquipmentApprovalModal({ equipment, isOpen, onClose, onEquipmentUpdate 
             value={action}
             onChange={(e) => setAction(e.target.value)}
             disabled={loading}
+            className={isDarkMode ? 'bg-dark text-light border-secondary' : ''}
           >
             <option value="approve">Approve Equipment</option>
             <option value="reject">Reject Equipment</option>
@@ -1233,11 +1359,12 @@ function EquipmentApprovalModal({ equipment, isOpen, onClose, onEquipmentUpdate 
               onChange={(e) => setReason(e.target.value)}
               placeholder="Explain why this equipment is being rejected..."
               disabled={loading}
+              className={isDarkMode ? 'bg-dark text-light border-secondary' : ''}
             />
           </Form.Group>
         )}
       </Modal.Body>
-      <Modal.Footer>
+      <Modal.Footer className={isDarkMode ? 'bg-dark border-secondary' : ''}>
         <Button variant="secondary" onClick={onClose} disabled={loading}>
           Cancel
         </Button>
@@ -1260,6 +1387,7 @@ function EquipmentApprovalModal({ equipment, isOpen, onClose, onEquipmentUpdate 
   );
 }
 
+// ----------- SETTINGS MODAL ----------
 function SettingsModal({ isOpen, onClose }) {
   const [settings, setSettings] = useState({
     siteName: '',
@@ -1279,6 +1407,7 @@ function SettingsModal({ isOpen, onClose }) {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
   const { currentUser } = useAuth();
+  const { isDarkMode } = useDarkMode();
 
   useEffect(() => {
     if (isOpen) {
@@ -1324,14 +1453,23 @@ function SettingsModal({ isOpen, onClose }) {
   if (!isOpen) return null;
 
   return (
-    <Modal show={isOpen} onHide={onClose} size="lg" centered>
-      <Modal.Header closeButton>
+    <Modal 
+      show={isOpen} 
+      onHide={onClose} 
+      size="lg" 
+      centered
+      className={isDarkMode ? 'dark-mode' : ''}
+    >
+      <Modal.Header closeButton className={isDarkMode ? 'bg-dark text-light border-secondary' : ''}>
         <Modal.Title>
           <Gear className="me-2" />
           Platform Settings
         </Modal.Title>
       </Modal.Header>
-      <Modal.Body style={{ maxHeight: '70vh', overflowY: 'auto' }}>
+      <Modal.Body 
+        style={{ maxHeight: '70vh', overflowY: 'auto' }}
+        className={isDarkMode ? 'bg-dark text-light' : ''}
+      >
         {error && (
           <Alert variant="danger">{error}</Alert>
         )}
@@ -1352,6 +1490,7 @@ function SettingsModal({ isOpen, onClose }) {
                     value={settings.siteName}
                     onChange={(e) => setSettings({ ...settings, siteName: e.target.value })}
                     placeholder="RentMate"
+                    className={isDarkMode ? 'bg-dark text-light border-secondary' : ''}
                   />
                 </Form.Group>
               </Col>
@@ -1363,6 +1502,7 @@ function SettingsModal({ isOpen, onClose }) {
                     value={settings.supportEmail}
                     onChange={(e) => setSettings({ ...settings, supportEmail: e.target.value })}
                     placeholder="support@rentmate.com"
+                    className={isDarkMode ? 'bg-dark text-light border-secondary' : ''}
                   />
                 </Form.Group>
               </Col>
@@ -1376,6 +1516,7 @@ function SettingsModal({ isOpen, onClose }) {
                 value={settings.siteDescription}
                 onChange={(e) => setSettings({ ...settings, siteDescription: e.target.value })}
                 placeholder="Equipment rental platform"
+                className={isDarkMode ? 'bg-dark text-light border-secondary' : ''}
               />
             </Form.Group>
 
@@ -1426,6 +1567,7 @@ function SettingsModal({ isOpen, onClose }) {
                     max="100"
                     value={settings.maxEquipmentPerUser}
                     onChange={(e) => setSettings({ ...settings, maxEquipmentPerUser: parseInt(e.target.value) })}
+                    className={isDarkMode ? 'bg-dark text-light border-secondary' : ''}
                   />
                 </Form.Group>
                 <Form.Check
@@ -1445,6 +1587,7 @@ function SettingsModal({ isOpen, onClose }) {
                     max="50"
                     value={settings.maxFileUploadSize}
                     onChange={(e) => setSettings({ ...settings, maxFileUploadSize: parseInt(e.target.value) })}
+                    className={isDarkMode ? 'bg-dark text-light border-secondary' : ''}
                   />
                 </Form.Group>
                 <Form.Group className="mb-3">
@@ -1454,6 +1597,7 @@ function SettingsModal({ isOpen, onClose }) {
                     min="1"
                     value={settings.defaultRentalDuration}
                     onChange={(e) => setSettings({ ...settings, defaultRentalDuration: parseInt(e.target.value) })}
+                    className={isDarkMode ? 'bg-dark text-light border-secondary' : ''}
                   />
                 </Form.Group>
               </Col>
@@ -1471,6 +1615,7 @@ function SettingsModal({ isOpen, onClose }) {
                     step="0.1"
                     value={settings.platformFeePercentage}
                     onChange={(e) => setSettings({ ...settings, platformFeePercentage: parseFloat(e.target.value) })}
+                    className={isDarkMode ? 'bg-dark text-light border-secondary' : ''}
                   />
                 </Form.Group>
               </Col>
@@ -1478,7 +1623,7 @@ function SettingsModal({ isOpen, onClose }) {
           </Form>
         )}
       </Modal.Body>
-      <Modal.Footer>
+      <Modal.Footer className={isDarkMode ? 'bg-dark border-secondary' : ''}>
         <Button variant="secondary" onClick={onClose} disabled={saving}>
           Cancel
         </Button>
@@ -1500,7 +1645,8 @@ function SettingsModal({ isOpen, onClose }) {
   );
 }
 
-export default function AdminDashboard() {
+// ----------- MAIN ADMIN DASHBOARD COMPONENT ----------
+function AdminDashboard() {
   const [activeTab, setActiveTab] = useState('Dashboard');
   const [showNotifications, setShowNotifications] = useState(false);
   const [metrics, setMetrics] = useState({
@@ -1531,6 +1677,7 @@ export default function AdminDashboard() {
   const [error, setError] = useState(null);
   const [searchQuery, setSearchQuery] = useState('');
   const { currentUser, logout } = useAuth();
+  const { isDarkMode, toggleDarkMode } = useDarkMode();
   const navigate = useNavigate();
 
   // Modal states
@@ -1796,7 +1943,7 @@ export default function AdminDashboard() {
               review.comment?.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
-  // Modal handlers
+  // Modal handlers with tooltips
   const handleViewProfile = (user) => {
     setSelectedUser(user);
     setShowUserProfile(true);
@@ -1957,9 +2104,9 @@ export default function AdminDashboard() {
         onClose={() => setShowExportImport(false)}
       />
 
-      <div className="dashboard-container d-flex">
+      <div className={`dashboard-container d-flex ${isDarkMode ? 'dark-mode' : ''}`}>
       {/* Sidebar */}
-      <div className="sidebar bg-dark text-white">
+      <div className={`sidebar ${isDarkMode ? 'bg-dark' : 'bg-dark'} text-white`}>
         <div className="d-flex align-items-center p-3 mb-3">
           <Building size={24} className="text-primary me-2" />
           <h4 className="m-0">RentMate Admin</h4>
@@ -1967,22 +2114,27 @@ export default function AdminDashboard() {
         <ul className="nav flex-column">
           {navItems.map((item, index) => (
             <li key={index} className="nav-item">
-              <button
-                className={`nav-link d-flex align-items-center ${activeTab === item.label ? 'active' : ''}`}
-                onClick={() => setActiveTab(item.label)}
+              <TooltipWrapper 
+                tooltip={`Navigate to ${item.label}`}
+                placement="right"
               >
-                <span className="icon me-3">{item.icon}</span>
-                {item.label}
-                {item.label === 'Equipment' && metrics.pendingApproval > 0 && (
-                  <Badge bg="warning" className="ms-auto">{metrics.pendingApproval}</Badge>
-                )}
-                {item.label === 'Dispute Center' && metrics.activeDisputes > 0 && (
-                  <Badge bg="danger" className="ms-auto">{metrics.activeDisputes}</Badge>
-                )}
-                {item.label === 'Review Moderation' && metrics.flaggedReviews > 0 && (
-                  <Badge bg="warning" className="ms-auto">{metrics.flaggedReviews}</Badge>
-                )}
-              </button>
+                <button
+                  className={`nav-link d-flex align-items-center enhanced-hover ${activeTab === item.label ? 'active' : ''}`}
+                  onClick={() => setActiveTab(item.label)}
+                >
+                  <span className="icon me-3">{item.icon}</span>
+                  {item.label}
+                  {item.label === 'Equipment' && metrics.pendingApproval > 0 && (
+                    <Badge bg="warning" className="ms-auto">{metrics.pendingApproval}</Badge>
+                  )}
+                  {item.label === 'Dispute Center' && metrics.activeDisputes > 0 && (
+                    <Badge bg="danger" className="ms-auto">{metrics.activeDisputes}</Badge>
+                  )}
+                  {item.label === 'Review Moderation' && metrics.flaggedReviews > 0 && (
+                    <Badge bg="warning" className="ms-auto">{metrics.flaggedReviews}</Badge>
+                  )}
+                </button>
+              </TooltipWrapper>
             </li>
           ))}
         </ul>
@@ -1991,7 +2143,7 @@ export default function AdminDashboard() {
       {/* Main Content */}
       <div className="main-content flex-grow-1">
         {/* Header */}
-        <header className="dashboard-header bg-white d-flex justify-content-between align-items-center p-3 shadow-sm">
+        <header className={`dashboard-header d-flex justify-content-between align-items-center p-3 shadow-sm ${isDarkMode ? 'bg-dark text-light border-bottom border-secondary' : 'bg-white'}`}>
           <h4>{activeTab}</h4>
           <div className="d-flex align-items-center">
             {(activeTab === 'Equipment' || activeTab === 'Users' || activeTab === 'Rentals' || activeTab === 'Dispute Center' || activeTab === 'Review Moderation') && (
@@ -2000,36 +2152,41 @@ export default function AdminDashboard() {
                   placeholder={`Search ${activeTab.toLowerCase()}...`}
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
+                  className={isDarkMode ? 'bg-dark text-light border-secondary' : ''}
                 />
-                <Button variant="outline-secondary">
-                  <Search />
-                </Button>
+                <TooltipWrapper tooltip="Search items">
+                  <Button variant={isDarkMode ? "outline-light" : "outline-secondary"}>
+                    <Search />
+                  </Button>
+                </TooltipWrapper>
               </InputGroup>
             )}
             <div className="position-relative me-3">
-              <Button 
-                variant="link" 
-                className="position-relative"
-                onClick={toggleNotifications}
-              >
-                <Bell size={20} />
-                <Badge 
-                  bg="danger" 
-                  className="position-absolute top-0 start-100 translate-middle rounded-pill"
+              <TooltipWrapper tooltip="View notifications">
+                <Button 
+                  variant="link" 
+                  className={`position-relative enhanced-hover ${isDarkMode ? 'text-light' : ''}`}
+                  onClick={toggleNotifications}
                 >
-                  {notifications.length}
-                </Badge>
-              </Button>
+                  <Bell size={20} />
+                  <Badge 
+                    bg="danger" 
+                    className="position-absolute top-0 start-100 translate-middle rounded-pill"
+                  >
+                    {notifications.length}
+                  </Badge>
+                </Button>
+              </TooltipWrapper>
               {/* Notifications Panel */}
               {showNotifications && (
-                <div className="notifications-panel">
-                  <div className="d-flex justify-content-between align-items-center p-3 border-bottom">
+                <div className={`notifications-panel ${isDarkMode ? 'bg-dark border-secondary text-light' : ''}`}>
+                  <div className={`d-flex justify-content-between align-items-center p-3 ${isDarkMode ? 'border-bottom border-secondary' : 'border-bottom'}`}>
                     <h5 className="m-0">
                       <Bell className="me-2" /> Notifications
                     </h5>
                     <Button 
                       variant="link" 
-                      className="text-secondary p-0"
+                      className={`p-0 ${isDarkMode ? 'text-light' : 'text-secondary'}`}
                       onClick={toggleNotifications}
                     >
                       &times;
@@ -2037,7 +2194,7 @@ export default function AdminDashboard() {
                   </div>
                   <div className="notifications-body">
                     {notifications.map(notif => (
-                      <div key={notif.id} className="notification-item p-3 border-bottom">
+                      <div key={notif.id} className={`notification-item p-3 enhanced-hover ${isDarkMode ? 'border-bottom border-secondary' : 'border-bottom'}`}>
                         <div className="d-flex align-items-center">
                           {notif.severity === 'critical' ? <Flag className="text-danger me-2" /> : <Bell className="me-2 text-primary" />}
                           <div>
@@ -2059,27 +2216,45 @@ export default function AdminDashboard() {
               )}
             </div>
             <Dropdown>
-              <Dropdown.Toggle variant="link" className="p-0">
-                <img 
-                  src={currentUser?.photoURL || "/assets/default-avatar.png"} 
-                  alt="Profile" 
-                  className="avatar rounded-circle"
-                  onError={(e) => {
-                    e.target.onerror = null;
-                    e.target.src = "https://via.placeholder.com/32";
-                  }}
-                  style={{ width: 32, height: 32 }}
-                />
-              </Dropdown.Toggle>
-              <Dropdown.Menu align="end">
-                <Dropdown.Item onClick={() => navigate('/profile')}>
+              <TooltipWrapper tooltip="User menu">
+                <Dropdown.Toggle variant="link" className="p-0">
+                  <img 
+                    src={currentUser?.photoURL || "/assets/default-avatar.png"} 
+                    alt="Profile" 
+                    className="avatar rounded-circle enhanced-hover"
+                    onError={(e) => {
+                      e.target.onerror = null;
+                      e.target.src = "https://via.placeholder.com/32";
+                    }}
+                    style={{ width: 32, height: 32 }}
+                  />
+                </Dropdown.Toggle>
+              </TooltipWrapper>
+              <Dropdown.Menu align="end" className={isDarkMode ? 'bg-dark border-secondary' : ''}>
+                <Dropdown.Item 
+                  onClick={() => navigate('/profile')}
+                  className={isDarkMode ? 'text-light dropdown-item-dark' : ''}
+                >
                   <Person className="me-2" /> Profile
                 </Dropdown.Item>
-                <Dropdown.Item onClick={() => setShowSettings(true)}>
+                <Dropdown.Item 
+                  onClick={() => setShowSettings(true)}
+                  className={isDarkMode ? 'text-light dropdown-item-dark' : ''}
+                >
                   <Gear className="me-2" /> Settings
                 </Dropdown.Item>
-                <Dropdown.Divider />
-                <Dropdown.Item onClick={handleLogout}>
+                <Dropdown.Item 
+                  onClick={toggleDarkMode}
+                  className={isDarkMode ? 'text-light dropdown-item-dark' : ''}
+                >
+                  {isDarkMode ? <Sun className="me-2" /> : <Moon className="me-2" />} 
+                  {isDarkMode ? 'Light Mode' : 'Dark Mode'}
+                </Dropdown.Item>
+                <Dropdown.Divider className={isDarkMode ? 'border-secondary' : ''} />
+                <Dropdown.Item 
+                  onClick={handleLogout}
+                  className={isDarkMode ? 'text-light dropdown-item-dark' : ''}
+                >
                   <BoxArrowRight className="me-2" /> Logout
                 </Dropdown.Item>
               </Dropdown.Menu>
@@ -2088,7 +2263,7 @@ export default function AdminDashboard() {
         </header>
 
         {/* Main Dashboard Content */}
-        <div className="dashboard-body p-4">
+        <div className={`dashboard-body p-4 ${isDarkMode ? 'bg-dark text-light' : ''}`}>
           {error && (
             <Alert variant="danger" dismissible onClose={() => setError(null)}>
               {error}
@@ -2101,7 +2276,7 @@ export default function AdminDashboard() {
               {/* Enhanced Stats Cards */}
               <Row className="mb-4">
                 <Col md={6} lg={3} className="mb-3">
-                  <Card className="stats-card h-100">
+                  <Card className={`stats-card h-100 enhanced-hover ${isDarkMode ? 'bg-dark border-secondary text-light' : ''}`}>
                     <Card.Body>
                       <div className="d-flex align-items-center">
                         <div className="p-3 bg-primary bg-opacity-10 rounded-3 me-3">
@@ -2119,7 +2294,7 @@ export default function AdminDashboard() {
                   </Card>
                 </Col>
                 <Col md={6} lg={3} className="mb-3">
-                  <Card className="stats-card h-100">
+                  <Card className={`stats-card h-100 enhanced-hover ${isDarkMode ? 'bg-dark border-secondary text-light' : ''}`}>
                     <Card.Body>
                       <div className="d-flex align-items-center">
                         <div className="p-3 bg-warning bg-opacity-10 rounded-3 me-3">
@@ -2137,7 +2312,7 @@ export default function AdminDashboard() {
                   </Card>
                 </Col>
                 <Col md={6} lg={3} className="mb-3">
-                  <Card className="stats-card h-100">
+                  <Card className={`stats-card h-100 enhanced-hover ${isDarkMode ? 'bg-dark border-secondary text-light' : ''}`}>
                     <Card.Body>
                       <div className="d-flex align-items-center">
                         <div className="p-3 bg-info bg-opacity-10 rounded-3 me-3">
@@ -2153,7 +2328,7 @@ export default function AdminDashboard() {
                   </Card>
                 </Col>
                 <Col md={6} lg={3} className="mb-3">
-                  <Card className="stats-card h-100">
+                  <Card className={`stats-card h-100 enhanced-hover ${isDarkMode ? 'bg-dark border-secondary text-light' : ''}`}>
                     <Card.Body>
                       <div className="d-flex align-items-center">
                         <div className="p-3 bg-success bg-opacity-10 rounded-3 me-3">
@@ -2172,7 +2347,7 @@ export default function AdminDashboard() {
               {/* New Stats for Disputes and Reviews */}
               <Row className="mb-4">
                 <Col md={6} lg={3} className="mb-3">
-                  <Card className="stats-card h-100">
+                  <Card className={`stats-card h-100 enhanced-hover ${isDarkMode ? 'bg-dark border-secondary text-light' : ''}`}>
                     <Card.Body>
                       <div className="d-flex align-items-center">
                         <div className="p-3 bg-danger bg-opacity-10 rounded-3 me-3">
@@ -2190,7 +2365,7 @@ export default function AdminDashboard() {
                   </Card>
                 </Col>
                 <Col md={6} lg={3} className="mb-3">
-                  <Card className="stats-card h-100">
+                  <Card className={`stats-card h-100 enhanced-hover ${isDarkMode ? 'bg-dark border-secondary text-light' : ''}`}>
                     <Card.Body>
                       <div className="d-flex align-items-center">
                         <div className="p-3 bg-warning bg-opacity-10 rounded-3 me-3">
@@ -2212,17 +2387,23 @@ export default function AdminDashboard() {
               {/* Platform Overview */}
               <Row className="mb-4">
                 <Col md={8}>
-                  <Card>
-                    <Card.Header className="bg-white">
+                  <Card className={isDarkMode ? 'bg-dark border-secondary text-light' : ''}>
+                    <Card.Header className={isDarkMode ? 'bg-dark border-secondary' : 'bg-white'}>
                       <h5 className="mb-0">Platform Analytics</h5>
                     </Card.Header>
                     <Card.Body>
                       <ResponsiveContainer width="100%" height={300}>
                         <LineChart data={chartData}>
-                          <CartesianGrid stroke="#eee" strokeDasharray="5 5" />
-                          <XAxis dataKey="month" />
-                          <YAxis />
-                          <Tooltip />
+                          <CartesianGrid stroke={isDarkMode ? "#4a5568" : "#eee"} strokeDasharray="5 5" />
+                          <XAxis dataKey="month" stroke={isDarkMode ? "#e2e8f0" : "#333"} />
+                          <YAxis stroke={isDarkMode ? "#e2e8f0" : "#333"} />
+                          <RechartsTooltip 
+                            contentStyle={{
+                              backgroundColor: isDarkMode ? '#2d3748' : '#fff',
+                              border: isDarkMode ? '1px solid #4a5568' : '1px solid #e2e8f0',
+                              color: isDarkMode ? '#e2e8f0' : '#333'
+                            }}
+                          />
                           <Line type="monotone" dataKey="equipment" stroke="#3b82f6" name="Equipment" />
                           <Line type="monotone" dataKey="rentals" stroke="#10b981" name="Rentals" />
                         </LineChart>
@@ -2231,8 +2412,8 @@ export default function AdminDashboard() {
                   </Card>
                 </Col>
                 <Col md={4}>
-                  <Card className="h-100">
-                    <Card.Header className="bg-white">
+                  <Card className={`h-100 ${isDarkMode ? 'bg-dark border-secondary text-light' : ''}`}>
+                    <Card.Header className={isDarkMode ? 'bg-dark border-secondary' : 'bg-white'}>
                       <h5 className="mb-0">User Distribution</h5>
                     </Card.Header>
                     <Card.Body>
@@ -2287,15 +2468,15 @@ export default function AdminDashboard() {
               {/* Recent Activity */}
               <Row className="mb-4">
                 <Col md={12}>
-                  <Card>
-                    <Card.Header className="bg-white">
+                  <Card className={isDarkMode ? 'bg-dark border-secondary text-light' : ''}>
+                    <Card.Header className={isDarkMode ? 'bg-dark border-secondary' : 'bg-white'}>
                       <h5 className="mb-0">Recent Activity</h5>
                     </Card.Header>
                     <Card.Body>
                       {recentActivity.length > 0 ? (
                         <ul className="activity-list list-unstyled">
                           {recentActivity.map(activity => (
-                            <li key={activity.id} className="d-flex align-items-center mb-3">
+                            <li key={activity.id} className="d-flex align-items-center mb-3 enhanced-hover">
                               {getActivityIcon(activity.type)}
                               <div>
                                 <div>
@@ -2340,7 +2521,7 @@ export default function AdminDashboard() {
                   {filteredEquipment.length > 0 ? (
                     filteredEquipment.map(equipment => (
                       <Col key={equipment.id} md={6} lg={4} className="mb-4">
-                        <Card className="h-100">
+                        <Card className={`h-100 enhanced-hover ${isDarkMode ? 'bg-dark border-secondary text-light' : ''}`}>
                           <div style={{ height: '200px', overflow: 'hidden' }}>
                             <Card.Img 
                               variant="top" 
@@ -2379,28 +2560,36 @@ export default function AdminDashboard() {
                                 <span className="fw-bold text-success">${equipment.ratePerDay}/day</span>
                               </div>
                               <div className="d-flex gap-1">
-                                <Button variant="outline-primary" size="sm">
-                                  <Eye className="me-1" size={12} />
-                                  View
-                                </Button>
-                                {equipment.approvalStatus === 'pending' && (
-                                  <Button 
-                                    variant="outline-warning" 
-                                    size="sm"
-                                    onClick={() => handleApproveEquipment(equipment)}
-                                  >
-                                    <Check className="me-1" size={12} />
-                                    Review
+                                <TooltipWrapper tooltip="View details">
+                                  <Button variant="outline-primary" size="sm" className="enhanced-hover">
+                                    <Eye className="me-1" size={12} />
+                                    View
                                   </Button>
+                                </TooltipWrapper>
+                                {equipment.approvalStatus === 'pending' && (
+                                  <TooltipWrapper tooltip="Review equipment">
+                                    <Button 
+                                      variant="outline-warning" 
+                                      size="sm"
+                                      className="enhanced-hover"
+                                      onClick={() => handleApproveEquipment(equipment)}
+                                    >
+                                      <Check className="me-1" size={12} />
+                                      Review
+                                    </Button>
+                                  </TooltipWrapper>
                                 )}
-                                <Button 
-                                  variant="outline-danger" 
-                                  size="sm"
-                                  onClick={() => handleRemoveEquipment(equipment.id)}
-                                >
-                                  <Trash className="me-1" size={12} />
-                                  Remove
-                                </Button>
+                                <TooltipWrapper tooltip="Remove equipment">
+                                  <Button 
+                                    variant="outline-danger" 
+                                    size="sm"
+                                    className="enhanced-hover"
+                                    onClick={() => handleRemoveEquipment(equipment.id)}
+                                  >
+                                    <Trash className="me-1" size={12} />
+                                    Remove
+                                  </Button>
+                                </TooltipWrapper>
                               </div>
                             </div>
                           </Card.Body>
@@ -2443,10 +2632,10 @@ export default function AdminDashboard() {
                   <Spinner animation="border" variant="primary" />
                 </div>
               ) : (
-                <Card>
+                <Card className={isDarkMode ? 'bg-dark border-secondary' : ''}>
                   <div className="table-responsive">
-                    <Table hover className="mb-0">
-                      <thead className="table-light">
+                    <Table hover className={`mb-0 ${isDarkMode ? 'table-dark' : ''}`}>
+                      <thead className={isDarkMode ? 'table-dark' : 'table-light'}>
                         <tr>
                           <th>User</th>
                           <th>Email</th>
@@ -2459,7 +2648,7 @@ export default function AdminDashboard() {
                       <tbody>
                         {filteredUsers.length > 0 ? (
                           filteredUsers.map(user => (
-                            <tr key={user.id}>
+                            <tr key={user.id} className="enhanced-hover">
                               <td>
                                 <div className="d-flex align-items-center">
                                   <img 
@@ -2506,19 +2695,25 @@ export default function AdminDashboard() {
                               </td>
                               <td>
                                 <div className="d-flex gap-1">
-                                  <Button variant="outline-primary" size="sm" onClick={() => handleViewProfile(user)}>
-                                    <Eye className="me-1" size={12} />
-                                    View
-                                  </Button>
-                                  <Button variant="outline-secondary" size="sm" onClick={() => handleEditRole(user)}>
-                                    <PencilSquare className="me-1" size={12} />
-                                    Edit Role
-                                  </Button>
-                                  {!user.banned && (
-                                    <Button variant="outline-danger" size="sm" onClick={() => handleBanUser(user)}>
-                                      <Ban className="me-1" size={12} />
-                                      Ban
+                                  <TooltipWrapper tooltip="View profile">
+                                    <Button variant="outline-primary" size="sm" onClick={() => handleViewProfile(user)} className="enhanced-hover">
+                                      <Eye className="me-1" size={12} />
+                                      View
                                     </Button>
+                                  </TooltipWrapper>
+                                  <TooltipWrapper tooltip="Edit user role">
+                                    <Button variant="outline-secondary" size="sm" onClick={() => handleEditRole(user)} className="enhanced-hover">
+                                      <PencilSquare className="me-1" size={12} />
+                                      Edit Role
+                                    </Button>
+                                  </TooltipWrapper>
+                                  {!user.banned && (
+                                    <TooltipWrapper tooltip="Ban user">
+                                      <Button variant="outline-danger" size="sm" onClick={() => handleBanUser(user)} className="enhanced-hover">
+                                        <Ban className="me-1" size={12} />
+                                        Ban
+                                      </Button>
+                                    </TooltipWrapper>
                                   )}
                                 </div>
                               </td>
@@ -2558,10 +2753,10 @@ export default function AdminDashboard() {
                   <Spinner animation="border" variant="primary" />
                 </div>
               ) : (
-                <Card>
+                <Card className={isDarkMode ? 'bg-dark border-secondary' : ''}>
                   <div className="table-responsive">
-                    <Table hover className="mb-0">
-                      <thead className="table-light">
+                    <Table hover className={`mb-0 ${isDarkMode ? 'table-dark' : ''}`}>
+                      <thead className={isDarkMode ? 'table-dark' : 'table-light'}>
                         <tr>
                           <th>Rental ID</th>
                           <th>Equipment</th>
@@ -2577,7 +2772,7 @@ export default function AdminDashboard() {
                       <tbody>
                         {filteredRentals.length > 0 ? (
                           filteredRentals.map(rental => (
-                            <tr key={rental.id}>
+                            <tr key={rental.id} className="enhanced-hover">
                               <td className="text-muted small">#{rental.id.slice(-8)}</td>
                               <td>
                                 <div className="d-flex align-items-center">
@@ -2626,15 +2821,19 @@ export default function AdminDashboard() {
                               </td>
                               <td>
                                 <div className="d-flex gap-1">
-                                  <Button variant="outline-primary" size="sm">
-                                    <Eye className="me-1" size={12} />
-                                    View
-                                  </Button>
-                                  {rental.status === 'disputed' && (
-                                    <Button variant="outline-warning" size="sm">
-                                      <Flag className="me-1" size={12} />
-                                      Resolve
+                                  <TooltipWrapper tooltip="View rental details">
+                                    <Button variant="outline-primary" size="sm" className="enhanced-hover">
+                                      <Eye className="me-1" size={12} />
+                                      View
                                     </Button>
+                                  </TooltipWrapper>
+                                  {rental.status === 'disputed' && (
+                                    <TooltipWrapper tooltip="Resolve dispute">
+                                      <Button variant="outline-warning" size="sm" className="enhanced-hover">
+                                        <Flag className="me-1" size={12} />
+                                        Resolve
+                                      </Button>
+                                    </TooltipWrapper>
                                   )}
                                 </div>
                               </td>
@@ -2677,10 +2876,10 @@ export default function AdminDashboard() {
                   <Spinner animation="border" variant="primary" />
                 </div>
               ) : (
-                <Card>
+                <Card className={isDarkMode ? 'bg-dark border-secondary' : ''}>
                   <div className="table-responsive">
-                    <Table hover className="mb-0">
-                      <thead className="table-light">
+                    <Table hover className={`mb-0 ${isDarkMode ? 'table-dark' : ''}`}>
+                      <thead className={isDarkMode ? 'table-dark' : 'table-light'}>
                         <tr>
                           <th>Dispute ID</th>
                           <th>Type</th>
@@ -2695,7 +2894,7 @@ export default function AdminDashboard() {
                       <tbody>
                         {filteredDisputes.length > 0 ? (
                           filteredDisputes.map(dispute => (
-                            <tr key={dispute.id}>
+                            <tr key={dispute.id} className="enhanced-hover">
                               <td className="text-muted small">#{dispute.id.slice(-8)}</td>
                               <td>
                                 <Badge bg={
@@ -2746,24 +2945,31 @@ export default function AdminDashboard() {
                               </td>
                               <td>
                                 <div className="d-flex gap-1">
-                                  <Button variant="outline-primary" size="sm">
-                                    <Eye className="me-1" size={12} />
-                                    View
-                                  </Button>
-                                  {(dispute.status === 'open' || dispute.status === 'investigating') && (
-                                    <Button 
-                                      variant="outline-success" 
-                                      size="sm"
-                                      onClick={() => handleResolveDispute(dispute)}
-                                    >
-                                      <Check className="me-1" size={12} />
-                                      Resolve
+                                  <TooltipWrapper tooltip="View dispute details">
+                                    <Button variant="outline-primary" size="sm" className="enhanced-hover">
+                                      <Eye className="me-1" size={12} />
+                                      View
                                     </Button>
+                                  </TooltipWrapper>
+                                  {(dispute.status === 'open' || dispute.status === 'investigating') && (
+                                    <TooltipWrapper tooltip="Resolve dispute">
+                                      <Button 
+                                        variant="outline-success" 
+                                        size="sm"
+                                        className="enhanced-hover"
+                                        onClick={() => handleResolveDispute(dispute)}
+                                      >
+                                        <Check className="me-1" size={12} />
+                                        Resolve
+                                      </Button>
+                                    </TooltipWrapper>
                                   )}
-                                  <Button variant="outline-warning" size="sm">
-                                    <ChatText className="me-1" size={12} />
-                                    Messages
-                                  </Button>
+                                  <TooltipWrapper tooltip="View messages">
+                                    <Button variant="outline-warning" size="sm" className="enhanced-hover">
+                                      <ChatText className="me-1" size={12} />
+                                      Messages
+                                    </Button>
+                                  </TooltipWrapper>
                                 </div>
                               </td>
                             </tr>
@@ -2806,10 +3012,10 @@ export default function AdminDashboard() {
                   <Spinner animation="border" variant="primary" />
                 </div>
               ) : (
-                <Card>
+                <Card className={isDarkMode ? 'bg-dark border-secondary' : ''}>
                   <div className="table-responsive">
-                    <Table hover className="mb-0">
-                      <thead className="table-light">
+                    <Table hover className={`mb-0 ${isDarkMode ? 'table-dark' : ''}`}>
+                      <thead className={isDarkMode ? 'table-dark' : 'table-light'}>
                         <tr>
                           <th>Review</th>
                           <th>Equipment</th>
@@ -2824,9 +3030,10 @@ export default function AdminDashboard() {
                       <tbody>
                         {filteredReviews.length > 0 ? (
                           filteredReviews.map(review => (
-                            <tr key={review.id} className={
-                              (review.flagged || review.flaggedCount > 0 || review.moderationStatus === 'pending') ? 'table-warning' : ''
-                            }>
+                            <tr key={review.id} className={`enhanced-hover ${
+                              (review.flagged || review.flaggedCount > 0 || review.moderationStatus === 'pending') ? 
+                              (isDarkMode ? 'table-warning-dark' : 'table-warning') : ''
+                            }`}>
                               <td>
                                 <div className="d-flex align-items-center">
                                   <div>
@@ -2905,25 +3112,32 @@ export default function AdminDashboard() {
                               </td>
                               <td>
                                 <div className="d-flex gap-1">
-                                  <Button variant="outline-primary" size="sm">
-                                    <Eye className="me-1" size={12} />
-                                    View
-                                  </Button>
-                                  {(review.flagged || review.flaggedCount > 0 || review.moderationStatus === 'pending') && (
-                                    <Button 
-                                      variant="outline-warning" 
-                                      size="sm"
-                                      onClick={() => handleModerateReview(review)}
-                                    >
-                                      <ExclamationTriangle className="me-1" size={12} />
-                                      Moderate
+                                  <TooltipWrapper tooltip="View review details">
+                                    <Button variant="outline-primary" size="sm" className="enhanced-hover">
+                                      <Eye className="me-1" size={12} />
+                                      View
                                     </Button>
+                                  </TooltipWrapper>
+                                  {(review.flagged || review.flaggedCount > 0 || review.moderationStatus === 'pending') && (
+                                    <TooltipWrapper tooltip="Moderate review">
+                                      <Button 
+                                        variant="outline-warning" 
+                                        size="sm"
+                                        className="enhanced-hover"
+                                        onClick={() => handleModerateReview(review)}
+                                      >
+                                        <ExclamationTriangle className="me-1" size={12} />
+                                        Moderate
+                                      </Button>
+                                    </TooltipWrapper>
                                   )}
                                   {review.moderationStatus === 'approved' && (
-                                    <Button variant="outline-danger" size="sm">
-                                      <X className="me-1" size={12} />
-                                      Remove
-                                    </Button>
+                                    <TooltipWrapper tooltip="Remove review">
+                                      <Button variant="outline-danger" size="sm" className="enhanced-hover">
+                                        <X className="me-1" size={12} />
+                                        Remove
+                                      </Button>
+                                    </TooltipWrapper>
                                   )}
                                 </div>
                               </td>
@@ -2956,14 +3170,20 @@ export default function AdminDashboard() {
               <h5>Platform Analytics</h5>
               <Row className="mb-4">
                 <Col md={12}>
-                  <Card>
+                  <Card className={isDarkMode ? 'bg-dark border-secondary text-light' : ''}>
                     <Card.Body>
                       <ResponsiveContainer width="100%" height={400}>
                         <LineChart data={chartData}>
-                          <CartesianGrid stroke="#eee" strokeDasharray="5 5" />
-                          <XAxis dataKey="month" />
-                          <YAxis />
-                          <Tooltip />
+                          <CartesianGrid stroke={isDarkMode ? "#4a5568" : "#eee"} strokeDasharray="5 5" />
+                          <XAxis dataKey="month" stroke={isDarkMode ? "#e2e8f0" : "#333"} />
+                          <YAxis stroke={isDarkMode ? "#e2e8f0" : "#333"} />
+                          <RechartsTooltip 
+                            contentStyle={{
+                              backgroundColor: isDarkMode ? '#2d3748' : '#fff',
+                              border: isDarkMode ? '1px solid #4a5568' : '1px solid #e2e8f0',
+                              color: isDarkMode ? '#e2e8f0' : '#333'
+                            }}
+                          />
                           <Line type="monotone" dataKey="equipment" stroke="#3b82f6" name="Equipment Added" />
                           <Line type="monotone" dataKey="rentals" stroke="#10b981" name="Rentals Completed" />
                         </LineChart>
@@ -2976,8 +3196,8 @@ export default function AdminDashboard() {
               {/* Additional Analytics Cards */}
               <Row>
                 <Col md={6}>
-                  <Card>
-                    <Card.Header>
+                  <Card className={isDarkMode ? 'bg-dark border-secondary text-light' : ''}>
+                    <Card.Header className={isDarkMode ? 'border-secondary' : ''}>
                       <h6 className="mb-0">Equipment Categories</h6>
                     </Card.Header>
                     <Card.Body>
@@ -2986,8 +3206,8 @@ export default function AdminDashboard() {
                   </Card>
                 </Col>
                 <Col md={6}>
-                  <Card>
-                    <Card.Header>
+                  <Card className={isDarkMode ? 'bg-dark border-secondary text-light' : ''}>
+                    <Card.Header className={isDarkMode ? 'border-secondary' : ''}>
                       <h6 className="mb-0">Revenue Insights</h6>
                     </Card.Header>
                     <Card.Body>
@@ -3005,71 +3225,85 @@ export default function AdminDashboard() {
               <div className="d-flex justify-content-between align-items-center mb-4">
                 <h5>Admin Settings</h5>
                 <div className="d-flex gap-2">
-                  <Button variant="primary" onClick={() => setShowSettings(true)}>
-                    <Gear className="me-2" />
-                    Configure Platform
-                  </Button>
-                  <Button variant="outline-primary" onClick={() => setShowExportImport(true)}>
-                    <Archive className="me-2" />
-                    Export/Import
-                  </Button>
+                  <TooltipWrapper tooltip="Configure platform settings">
+                    <Button variant="primary" onClick={() => setShowSettings(true)} className="enhanced-hover">
+                      <Gear className="me-2" />
+                      Configure Platform
+                    </Button>
+                  </TooltipWrapper>
+                  <TooltipWrapper tooltip="Export or import data">
+                    <Button variant="outline-primary" onClick={() => setShowExportImport(true)} className="enhanced-hover">
+                      <Archive className="me-2" />
+                      Export/Import
+                    </Button>
+                  </TooltipWrapper>
                 </div>
               </div>
               <Row>
                 <Col md={8}>
-                  <Card>
-                    <Card.Header>
+                  <Card className={isDarkMode ? 'bg-dark border-secondary text-light' : ''}>
+                    <Card.Header className={isDarkMode ? 'border-secondary' : ''}>
                       <h6 className="mb-0">Quick Actions</h6>
                     </Card.Header>
                     <Card.Body>
                       <div className="d-grid gap-2">
-                        <Button 
-                          variant="outline-primary" 
-                          className="d-flex align-items-center justify-content-start"
-                          onClick={() => setShowExportImport(true)}
-                        >
-                          <Download className="me-2" />
-                          Export User Data
-                        </Button>
-                        <Button 
-                          variant="outline-primary" 
-                          className="d-flex align-items-center justify-content-start"
-                          onClick={() => setShowExportImport(true)}
-                        >
-                          <Download className="me-2" />
-                          Export Equipment Data
-                        </Button>
-                        <Button 
-                          variant="outline-primary" 
-                          className="d-flex align-items-center justify-content-start"
-                          onClick={() => setShowExportImport(true)}
-                        >
-                          <Download className="me-2" />
-                          Export Rental Reports
-                        </Button>
-                        <Button 
-                          variant="outline-warning" 
-                          className="d-flex align-items-center justify-content-start"
-                          onClick={() => setShowExportImport(true)}
-                        >
-                          <Upload className="me-2" />
-                          Bulk Import Equipment
-                        </Button>
-                        <Button 
-                          variant="outline-info" 
-                          className="d-flex align-items-center justify-content-start"
-                          onClick={() => setShowExportImport(true)}
-                        >
-                          <FileText className="me-2" />
-                          Export Admin Actions Log
-                        </Button>
+                        <TooltipWrapper tooltip="Export user data to CSV">
+                          <Button 
+                            variant="outline-primary" 
+                            className="d-flex align-items-center justify-content-start enhanced-hover"
+                            onClick={() => setShowExportImport(true)}
+                          >
+                            <Download className="me-2" />
+                            Export User Data
+                          </Button>
+                        </TooltipWrapper>
+                        <TooltipWrapper tooltip="Export equipment data to CSV">
+                          <Button 
+                            variant="outline-primary" 
+                            className="d-flex align-items-center justify-content-start enhanced-hover"
+                            onClick={() => setShowExportImport(true)}
+                          >
+                            <Download className="me-2" />
+                            Export Equipment Data
+                          </Button>
+                        </TooltipWrapper>
+                        <TooltipWrapper tooltip="Export rental reports">
+                          <Button 
+                            variant="outline-primary" 
+                            className="d-flex align-items-center justify-content-start enhanced-hover"
+                            onClick={() => setShowExportImport(true)}
+                          >
+                            <Download className="me-2" />
+                            Export Rental Reports
+                          </Button>
+                        </TooltipWrapper>
+                        <TooltipWrapper tooltip="Bulk import equipment from CSV">
+                          <Button 
+                            variant="outline-warning" 
+                            className="d-flex align-items-center justify-content-start enhanced-hover"
+                            onClick={() => setShowExportImport(true)}
+                          >
+                            <Upload className="me-2" />
+                            Bulk Import Equipment
+                          </Button>
+                        </TooltipWrapper>
+                        <TooltipWrapper tooltip="Export admin actions log">
+                          <Button 
+                            variant="outline-info" 
+                            className="d-flex align-items-center justify-content-start enhanced-hover"
+                            onClick={() => setShowExportImport(true)}
+                          >
+                            <FileText className="me-2" />
+                            Export Admin Actions Log
+                          </Button>
+                        </TooltipWrapper>
                       </div>
                     </Card.Body>
                   </Card>
                 </Col>
                 <Col md={4}>
-                  <Card>
-                    <Card.Header>
+                  <Card className={isDarkMode ? 'bg-dark border-secondary text-light' : ''}>
+                    <Card.Header className={isDarkMode ? 'border-secondary' : ''}>
                       <h6 className="mb-0">System Status</h6>
                     </Card.Header>
                     <Card.Body>
@@ -3091,11 +3325,24 @@ export default function AdminDashboard() {
                           {metrics.activeDisputes}
                         </Badge>
                       </div>
-                      <div className="d-flex justify-content-between align-items-center">
+                      <div className="d-flex justify-content-between align-items-center mb-3">
                         <span>Flagged Reviews:</span>
                         <Badge bg={metrics.flaggedReviews > 0 ? "warning" : "success"}>
                           {metrics.flaggedReviews}
                         </Badge>
+                      </div>
+                      <div className="d-flex justify-content-between align-items-center">
+                        <span>Theme Mode:</span>
+                        <TooltipWrapper tooltip={`Switch to ${isDarkMode ? 'light' : 'dark'} mode`}>
+                          <Button 
+                            variant={isDarkMode ? "outline-light" : "outline-dark"} 
+                            size="sm" 
+                            onClick={toggleDarkMode}
+                            className="enhanced-hover"
+                          >
+                            {isDarkMode ? <Sun size={16} /> : <Moon size={16} />}
+                          </Button>
+                        </TooltipWrapper>
                       </div>
                     </Card.Body>
                   </Card>
@@ -3106,20 +3353,249 @@ export default function AdminDashboard() {
         </div>
       </div>
       
-      {/* CSS Styles */}
+      {/* Enhanced CSS Styles with Dark Mode and Hover Effects */}
       <style jsx>{`
-        .sidebar { width: 250px; min-height: 100vh; }
-        .sidebar .nav-link { color: rgba(255, 255, 255, 0.8); padding: 0.75rem 1rem; border: none; background: none; width: 100%; text-align: left; border-radius: 0; transition: all 0.2s; }
-        .sidebar .nav-link:hover { color: white; background-color: rgba(255, 255, 255, 0.1); }
-        .sidebar .nav-link.active { color: white; background-color: #3b82f6; }
-        .notifications-panel { position: absolute; top: 100%; right: 0; width: 350px; background: white; border: 1px solid #e5e7eb; border-radius: 0.5rem; box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1); z-index: 1000; max-height: 400px; overflow-y: auto; }
-        .notification-item:hover { background-color: #f8f9fa; }
-        .stats-card:hover { transform: translateY(-2px); transition: transform 0.2s; }
-        .activity-list li { padding: 0.5rem 0; border-bottom: 1px solid #f1f3f4; }
-        .activity-list li:last-child { border-bottom: none; }
-        .table-warning { background-color: rgba(255, 193, 7, 0.1) !important; }
+        /* Dark Mode Styles */
+        .dark-mode {
+          background-color: #1a202c !important;
+          color: #e2e8f0 !important;
+        }
+        
+        .dark-mode .card {
+          background-color: #2d3748 !important;
+          border-color: #4a5568 !important;
+          color: #e2e8f0 !important;
+        }
+        
+        .dark-mode .modal-content {
+          background-color: #2d3748 !important;
+          border-color: #4a5568 !important;
+          color: #e2e8f0 !important;
+        }
+        
+        .dark-mode .form-control {
+          background-color: #2d3748 !important;
+          border-color: #4a5568 !important;
+          color: #e2e8f0 !important;
+        }
+        
+        .dark-mode .form-control:focus {
+          background-color: #2d3748 !important;
+          border-color: #63b3ed !important;
+          color: #e2e8f0 !important;
+          box-shadow: 0 0 0 0.2rem rgba(99, 179, 237, 0.25) !important;
+        }
+        
+        .dark-mode .form-select {
+          background-color: #2d3748 !important;
+          border-color: #4a5568 !important;
+          color: #e2e8f0 !important;
+        }
+        
+        .dark-mode .table-warning-dark {
+          background-color: rgba(255, 193, 7, 0.2) !important;
+        }
+        
+        .dark-mode .dropdown-item-dark:hover {
+          background-color: #4a5568 !important;
+        }
+        
+        /* Enhanced Hover Effects */
+        .enhanced-hover {
+          transition: all 0.3s ease !important;
+        }
+        
+        .enhanced-hover:hover {
+          transform: translateY(-2px) !important;
+          box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15) !important;
+        }
+        
+        .dark-mode .enhanced-hover:hover {
+          box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3) !important;
+        }
+        
+        /* Sidebar Styles */
+        .sidebar { 
+          width: 250px; 
+          min-height: 100vh; 
+        }
+        
+        .sidebar .nav-link { 
+          color: rgba(255, 255, 255, 0.8); 
+          padding: 0.75rem 1rem; 
+          border: none; 
+          background: none; 
+          width: 100%; 
+          text-align: left; 
+          border-radius: 0; 
+          transition: all 0.3s ease !important;
+        }
+        
+        .sidebar .nav-link:hover { 
+          color: white; 
+          background-color: rgba(255, 255, 255, 0.1); 
+          transform: translateX(5px) !important;
+        }
+        
+        .sidebar .nav-link.active { 
+          color: white; 
+          background-color: #3b82f6; 
+        }
+        
+        /* Notifications Panel */
+        .notifications-panel { 
+          position: absolute; 
+          top: 100%; 
+          right: 0; 
+          width: 350px; 
+          background: white; 
+          border: 1px solid #e5e7eb; 
+          border-radius: 0.5rem; 
+          box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1); 
+          z-index: 1000; 
+          max-height: 400px; 
+          overflow-y: auto; 
+        }
+        
+        .notification-item:hover { 
+          background-color: #f8f9fa; 
+        }
+        
+        .dark-mode .notification-item:hover {
+          background-color: #4a5568 !important;
+        }
+        
+        /* Stats Cards */
+        .stats-card:hover { 
+          transform: translateY(-4px) !important; 
+          transition: transform 0.3s ease !important;
+          box-shadow: 0 8px 16px rgba(0, 0, 0, 0.1) !important;
+        }
+        
+        .dark-mode .stats-card:hover {
+          box-shadow: 0 8px 16px rgba(0, 0, 0, 0.3) !important;
+        }
+        
+        /* Activity List */
+        .activity-list li { 
+          padding: 0.5rem 0; 
+          border-bottom: 1px solid #f1f3f4; 
+          transition: all 0.2s ease !important;
+        }
+        
+        .activity-list li:last-child { 
+          border-bottom: none; 
+        }
+        
+        .activity-list li:hover {
+          background-color: rgba(59, 130, 246, 0.05) !important;
+          border-radius: 0.375rem !important;
+          padding-left: 1rem !important;
+        }
+        
+        .dark-mode .activity-list li {
+          border-bottom-color: #4a5568 !important;
+        }
+        
+        .dark-mode .activity-list li:hover {
+          background-color: rgba(99, 179, 237, 0.1) !important;
+        }
+        
+        /* Table Row Hover */
+        .table-hover tbody tr:hover {
+          background-color: rgba(59, 130, 246, 0.05) !important;
+        }
+        
+        .dark-mode .table-hover tbody tr:hover {
+          background-color: rgba(99, 179, 237, 0.1) !important;
+        }
+        
+        /* Button Hover Effects */
+        .btn.enhanced-hover:hover {
+          transform: translateY(-1px) !important;
+          box-shadow: 0 2px 4px rgba(0, 0, 0, 0.15) !important;
+        }
+        
+        .dark-mode .btn.enhanced-hover:hover {
+          box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3) !important;
+        }
+        
+        /* Card Hover Effects */
+        .card.enhanced-hover:hover {
+          transform: translateY(-2px) !important;
+          box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1) !important;
+        }
+        
+        .dark-mode .card.enhanced-hover:hover {
+          box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3) !important;
+        }
+        
+        /* Avatar Hover */
+        .avatar.enhanced-hover:hover {
+          transform: scale(1.1) !important;
+          box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15) !important;
+        }
+        
+        /* Tooltip Enhancements */
+        .tooltip {
+          font-size: 0.875rem !important;
+        }
+        
+        /* Focus States for Dark Mode */
+        .dark-mode .btn:focus,
+        .dark-mode .form-control:focus,
+        .dark-mode .form-select:focus {
+          box-shadow: 0 0 0 0.2rem rgba(99, 179, 237, 0.25) !important;
+        }
+        
+        /* Progress Bar Dark Mode */
+        .dark-mode .progress {
+          background-color: #4a5568 !important;
+        }
+        
+        /* Alert Dark Mode */
+        .dark-mode .alert {
+          border-color: #4a5568 !important;
+        }
+        
+        /* Badge Hover Effects */
+        .badge.enhanced-hover:hover {
+          transform: scale(1.05) !important;
+        }
+        
+        /* Smooth Scrolling */
+        * {
+          scroll-behavior: smooth;
+        }
+        
+        /* Custom Scrollbar for Dark Mode */
+        .dark-mode ::-webkit-scrollbar {
+          width: 8px;
+        }
+        
+        .dark-mode ::-webkit-scrollbar-track {
+          background: #2d3748;
+        }
+        
+        .dark-mode ::-webkit-scrollbar-thumb {
+          background: #4a5568;
+          border-radius: 4px;
+        }
+        
+        .dark-mode ::-webkit-scrollbar-thumb:hover {
+          background: #718096;
+        }
       `}</style>
     </div>
     </>
+  );
+}
+
+// Export with Dark Mode Provider
+export default function AdminDashboardWithProvider() {
+  return (
+    <DarkModeProvider>
+      <AdminDashboard />
+    </DarkModeProvider>
   );
 }
