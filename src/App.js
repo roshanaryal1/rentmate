@@ -1,379 +1,376 @@
-import React, { useState, Suspense } from 'react';
-import { BrowserRouter as Router, Routes, Route, Navigate, Link, useNavigate } from 'react-router-dom';
-import { AuthProvider, useAuth } from './contexts/AuthContext';
+// src/App.js
+import React from 'react';
+import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+import { AuthProvider } from './contexts/AuthContext';
+import { RoleRoute } from './components/RoleRoute';
+
+// Import Header Component
+import Header from './components/common/Header';
+
+// Import Page Components
+import Login from './components/auth/Login';
+import Signup from './components/auth/Signup';
+import ForgotPassword from './components/auth/ForgotPassword';
+
+// Dashboard Components
+import AdminDashboard from './components/Dashboard/AdminDashboard';
+import OwnerDashboard from './components/Dashboard/OwnerDashboard';
+import RenterDashboard from './components/Dashboard/RenterDashboard';
+
+// Equipment Components
+import AddEquipment from './components/Dashboard/AddEquipment';
+import EquipmentDetail from './components/Equipment/EquipmentDetail';
+import RentEquipment from './components/Equipment/RentEquipment';
+
+// Rental Components
+import RentalHistory from './components/Rental/RentalHistory';
+import PaymentPage from './components/Dashboard/PaymentPage';
+
+// Admin Tools
+import PopulateFirebase from './components/admin/PopulateFirebase';
+
+// Common Components
 import LoadingSpinner from './components/common/LoadingSpinner';
+import ErrorBoundary from './components/ErrorBoundary';
+
+// Auth Debug (only in development)
 import AuthDebug from './components/AuthDebug';
 
-// Lazy load components for better performance
-const Signup = React.lazy(() => import('./components/auth/Signup'));
-const Login = React.lazy(() => import('./components/auth/Login'));
-const ForgotPassword = React.lazy(() => import('./components/auth/ForgotPassword'));
-const RenterDashboard = React.lazy(() => import('./components/Dashboard/RenterDashboard'));
-const OwnerDashboard = React.lazy(() => import('./components/Dashboard/OwnerDashboard'));
-const AdminDashboard = React.lazy(() => import('./components/Dashboard/AdminDashboard'));
-const AddEquipment = React.lazy(() => import('./components/Dashboard/AddEquipment'));
-const PopulateFirebase = React.lazy(() => import('./components/admin/PopulateFirebase'));
-const RentEquipment = React.lazy(() => import('./components/Equipment/RentEquipment'));
-const RentalHistory = React.lazy(() => import('./components/Rental/RentalHistory'));
+// Import CSS
+import 'bootstrap/dist/css/bootstrap.min.css';
+import 'bootstrap-icons/font/bootstrap-icons.css';
+import './components/common/Header.css';
 
 function App() {
   return (
-    <Router>
+    <ErrorBoundary>
       <AuthProvider>
-        <AuthDebug />
-        <Suspense fallback={<LoadingSpinner message="Loading RentMate..." />}>
-          <AppContent />
-        </Suspense>
+        <Router>
+          <div className="App">
+            {/* Header - shown on all pages */}
+            <Header />
+            
+            {/* Auth Debug - only in development */}
+            {process.env.NODE_ENV === 'development' && <AuthDebug />}
+            
+            {/* Main Content */}
+            <main className="main-content">
+              <Routes>
+                {/* Public Routes */}
+                <Route path="/" element={<LandingPage />} />
+                <Route path="/login" element={<Login />} />
+                <Route path="/signup" element={<Signup />} />
+                <Route path="/forgot-password" element={<ForgotPassword />} />
+                <Route path="/equipment/:id" element={<EquipmentDetail />} />
+                
+                {/* Protected Routes - All Authenticated Users */}
+                <Route 
+                  path="/profile" 
+                  element={
+                    <RoleRoute allowedRoles={['admin', 'owner', 'renter']}>
+                      <ProfilePage />
+                    </RoleRoute>
+                  } 
+                />
+                <Route 
+                  path="/settings" 
+                  element={
+                    <RoleRoute allowedRoles={['admin', 'owner', 'renter']}>
+                      <SettingsPage />
+                    </RoleRoute>
+                  } 
+                />
+                <Route 
+                  path="/help" 
+                  element={
+                    <RoleRoute allowedRoles={['admin', 'owner', 'renter']}>
+                      <HelpPage />
+                    </RoleRoute>
+                  } 
+                />
+
+                {/* Admin Only Routes */}
+                <Route 
+                  path="/admin-dashboard" 
+                  element={
+                    <RoleRoute allowedRoles={['admin']}>
+                      <AdminDashboard />
+                    </RoleRoute>
+                  } 
+                />
+                <Route 
+                  path="/populate-firebase" 
+                  element={
+                    <RoleRoute allowedRoles={['admin']}>
+                      <PopulateFirebase />
+                    </RoleRoute>
+                  } 
+                />
+
+                {/* Owner Routes */}
+                <Route 
+                  path="/owner-dashboard" 
+                  element={
+                    <RoleRoute allowedRoles={['owner']}>
+                      <OwnerDashboard />
+                    </RoleRoute>
+                  } 
+                />
+                <Route 
+                  path="/add-equipment" 
+                  element={
+                    <RoleRoute allowedRoles={['owner']}>
+                      <AddEquipment />
+                    </RoleRoute>
+                  } 
+                />
+                <Route 
+                  path="/edit-equipment/:id" 
+                  element={
+                    <RoleRoute allowedRoles={['owner']}>
+                      <EditEquipmentPage />
+                    </RoleRoute>
+                  } 
+                />
+                <Route 
+                  path="/analytics" 
+                  element={
+                    <RoleRoute allowedRoles={['owner']}>
+                      <AnalyticsPage />
+                    </RoleRoute>
+                  } 
+                />
+
+                {/* Renter Routes */}
+                <Route 
+                  path="/renter-dashboard" 
+                  element={
+                    <RoleRoute allowedRoles={['renter']}>
+                      <RenterDashboard />
+                    </RoleRoute>
+                  } 
+                />
+                <Route 
+                  path="/rent/:equipmentId" 
+                  element={
+                    <RoleRoute allowedRoles={['renter']}>
+                      <RentEquipment />
+                    </RoleRoute>
+                  } 
+                />
+                <Route 
+                  path="/rental-history" 
+                  element={
+                    <RoleRoute allowedRoles={['renter']}>
+                      <RentalHistory />
+                    </RoleRoute>
+                  } 
+                />
+                <Route 
+                  path="/rental-details/:id" 
+                  element={
+                    <RoleRoute allowedRoles={['renter']}>
+                      <RentalDetailsPage />
+                    </RoleRoute>
+                  } 
+                />
+                <Route 
+                  path="/favorites" 
+                  element={
+                    <RoleRoute allowedRoles={['renter']}>
+                      <FavoritesPage />
+                    </RoleRoute>
+                  } 
+                />
+                <Route 
+                  path="/payment/:equipmentId" 
+                  element={
+                    <RoleRoute allowedRoles={['renter']}>
+                      <PaymentPage />
+                    </RoleRoute>
+                  } 
+                />
+
+                {/* Shared Routes (Owner + Renter) */}
+                <Route 
+                  path="/notifications" 
+                  element={
+                    <RoleRoute allowedRoles={['owner', 'renter']}>
+                      <NotificationsPage />
+                    </RoleRoute>
+                  } 
+                />
+
+                {/* Static Pages */}
+                <Route path="/about" element={<AboutPage />} />
+                <Route path="/how-it-works" element={<HowItWorksPage />} />
+                <Route path="/terms" element={<TermsPage />} />
+                <Route path="/privacy" element={<PrivacyPage />} />
+                <Route path="/contact" element={<ContactPage />} />
+
+                {/* Error Routes */}
+                <Route path="/not-authorized" element={<NotAuthorizedPage />} />
+                <Route path="/404" element={<NotFoundPage />} />
+                
+                {/* Catch all route */}
+                <Route path="*" element={<Navigate to="/404" replace />} />
+              </Routes>
+            </main>
+
+            {/* Footer (optional) */}
+            <Footer />
+          </div>
+        </Router>
       </AuthProvider>
-    </Router>
+    </ErrorBoundary>
   );
 }
 
-function AppContent() {
-  const { currentUser, userRole, loading, authChecked } = useAuth();
-
-  console.log('🎯 AppContent render:', { 
-    currentUser: currentUser?.email, 
-    userRole, 
-    loading, 
-    authChecked,
-    timestamp: new Date().toISOString()
-  });
-
-  // Show loading while checking authentication
-  if (!authChecked || loading) {
-    return <LoadingSpinner 
-      message={
-        !authChecked ? "Checking authentication..." : 
-        loading ? "Loading user data..." : 
-        "Loading..."
-      } 
-    />;
-  }
-
-  return (
-    <Routes>
-      {/* Root route - redirect based on auth status */}
-      <Route path="/" element={
-        currentUser ? (
-          <RoleBasedRedirect currentUser={currentUser} userRole={userRole} />
-        ) : (
-          <Navigate to="/login" />
-        )
-      } />
-      
-      {/* Authentication routes - redirect if already logged in */}
-      <Route path="/login" element={
-        currentUser ? (
-          <RoleBasedRedirect currentUser={currentUser} userRole={userRole} />
-        ) : (
-          <Login />
-        )
-      } />
-      
-      <Route path="/signup" element={
-        currentUser ? (
-          <RoleBasedRedirect currentUser={currentUser} userRole={userRole} />
-        ) : (
-          <Signup />
-        )
-      } />
-      
-      <Route path="/register" element={<Navigate to="/signup" />} />
-      <Route path="/forgot-password" element={<ForgotPassword />} />
-      
-      {/* Role-specific dashboard routes */}
-      <Route 
-        path="/renter-dashboard" 
-        element={
-          <ProtectedRoute role="renter" currentUser={currentUser} userRole={userRole}>
-            <DashboardLayout title="Renter Dashboard">
-              <RenterDashboard />
-            </DashboardLayout>
-          </ProtectedRoute>
-        } 
-      />
-      
-      <Route 
-        path="/owner-dashboard" 
-        element={
-          <ProtectedRoute role="owner" currentUser={currentUser} userRole={userRole}>
-            <DashboardLayout title="Equipment Owner Dashboard">
-              <OwnerDashboard />
-            </DashboardLayout>
-          </ProtectedRoute>
-        } 
-      />
-      
-      <Route 
-        path="/admin-dashboard" 
-        element={
-          <ProtectedRoute role="admin" currentUser={currentUser} userRole={userRole}>
-            <DashboardLayout title="Admin Dashboard">
-              <AdminDashboard />
-            </DashboardLayout>
-          </ProtectedRoute>
-        } 
-      />
-      
-      {/* Equipment rental route - Available to all authenticated users */}
-      <Route 
-        path="/rent/:equipmentId" 
-        element={
-          <ProtectedRoute role="renter" currentUser={currentUser} userRole={userRole}>
-            <DashboardLayout title="Rent Equipment">
-              <RentEquipment />
-            </DashboardLayout>
-          </ProtectedRoute>
-        } 
-      />
-      
-      {/* Owner-specific routes */}
-      <Route 
-        path="/add-equipment" 
-        element={
-          <ProtectedRoute role="owner" currentUser={currentUser} userRole={userRole}>
-            <DashboardLayout title="Add Equipment">
-              <AddEquipment />
-            </DashboardLayout>
-          </ProtectedRoute>
-        } 
-      />
-      
-      {/* Rental History route - Available to all authenticated users */}
-      <Route 
-        path="/rental-history" 
-        element={
-          <ProtectedRoute role="renter" currentUser={currentUser} userRole={userRole}>
-            <DashboardLayout title="Rental History">
-              <RentalHistory />
-            </DashboardLayout>
-          </ProtectedRoute>
-        } 
-      />
-      
-      {/* Populate Firebase route (temporary - for populating sample data) */}
-      <Route 
-        path="/populate-firebase" 
-        element={
-          <DashboardLayout title="Populate Firebase">
-            <PopulateFirebase />
-          </DashboardLayout>
-        } 
-      />
-      
-      {/* Legacy redirects */}
-      <Route path="/my-dashboard" element={<Navigate to="/" />} />
-      <Route path="/dashboard" element={<Navigate to="/" />} />
-      
-      {/* Catch-all route */}
-      <Route path="*" element={<Navigate to="/" />} />
-    </Routes>
-  );
-}
-
-// Helper component for role-based redirects
-function RoleBasedRedirect({ currentUser, userRole }) {
-  console.log('🚀 RoleBasedRedirect:', { 
-    currentUser: currentUser?.email, 
-    userRole,
-    timestamp: new Date().toISOString()
-  });
-  
-  if (!currentUser) {
-    console.log('❌ No current user, redirecting to login');
-    return <Navigate to="/login" replace />;
-  }
-
-  // Wait for userRole to be loaded
-  if (!userRole) {
-    console.log('⏳ Waiting for user role...');
-    return <LoadingSpinner message="Loading user data..." />;
-  }
-
-  let redirectPath;
-  switch (userRole) {
-    case 'admin':
-      redirectPath = '/admin-dashboard';
-      break;
-    case 'owner':
-      redirectPath = '/owner-dashboard';
-      break;
-    case 'renter':
-    default:
-      redirectPath = '/renter-dashboard';
-      break;
-  }
-
-  console.log(`🎯 Redirecting to: ${redirectPath}`);
-  return <Navigate to={redirectPath} replace />;
-}
-
-// Helper component for protected routes
-function ProtectedRoute({ role, currentUser, userRole, children }) {
-  console.log('🔐 ProtectedRoute check:', { 
-    requiredRole: role, 
-    currentUser: currentUser?.email, 
-    userRole,
-    hasAccess: currentUser && (userRole === role || userRole === 'admin'),
-    timestamp: new Date().toISOString()
-  });
-
-  if (!currentUser) {
-    console.log('❌ No user, redirecting to login');
-    return <Navigate to="/login" replace />;
-  }
-
-  // Wait for userRole to be loaded
-  if (!userRole) {
-    console.log('⏳ Waiting for user role in protected route...');
-    return <LoadingSpinner message="Loading user data..." />;
-  }
-
-  // Admin can access everything
-  if (userRole === 'admin') {
-    console.log('✅ Admin access granted');
-    return children;
-  }
-
-  // Check if user has the required role
-  if (userRole === role) {
-    console.log('✅ Role access granted');
-    return children;
-  }
-
-  // Redirect to appropriate dashboard if user doesn't have access
-  console.log('❌ Access denied, redirecting to appropriate dashboard');
-  return <RoleBasedRedirect currentUser={currentUser} userRole={userRole} />;
-}
-
-// Layout component for dashboards
-function DashboardLayout({ children, title }) {
-  const { currentUser, userRole, logout } = useAuth();
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState('');
-  const navigate = useNavigate();
-
-  const handleLogout = async () => {
-    setError('');
-    
-    try {
-      setLoading(true);
-      await logout();
-      navigate('/login');
-    } catch (error) {
-      setError('Failed to log out');
-      console.error(error);
-    }
-    
-    setLoading(false);
-  };
-
-  return (
-    <div className="min-h-screen bg-gray-100">
-      <nav className="bg-white shadow-sm">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between h-16">
-            <div className="flex">
-              <div className="flex-shrink-0 flex items-center">
-                <Link to="/" className="text-xl font-bold text-blue-600">RentMate</Link>
-              </div>
-              {/* Navigation Links */}
-              <div className="hidden md:ml-6 md:flex md:space-x-8">
-                {userRole === 'renter' && (
-                  <>
-                    <Link to="/renter-dashboard" className="text-gray-700 hover:text-blue-600 px-3 py-2 text-sm font-medium">
-                      Dashboard
-                    </Link>
-                    <Link to="/rental-history" className="text-gray-700 hover:text-blue-600 px-3 py-2 text-sm font-medium">
-                      My Rentals
-                    </Link>
-                  </>
-                )}
-                {userRole === 'owner' && (
-                  <>
-                    <Link to="/owner-dashboard" className="text-gray-700 hover:text-blue-600 px-3 py-2 text-sm font-medium">
-                      Dashboard
-                    </Link>
-                    <Link to="/add-equipment" className="text-gray-700 hover:text-blue-600 px-3 py-2 text-sm font-medium">
-                      Add Equipment
-                    </Link>
-                  </>
-                )}
-                {userRole === 'admin' && (
-                  <Link to="/admin-dashboard" className="text-gray-700 hover:text-blue-600 px-3 py-2 text-sm font-medium">
-                    Admin Panel
-                  </Link>
-                )}
-              </div>
-            </div>
-            <div className="flex items-center">
-              <div className="hidden md:ml-4 md:flex-shrink-0 md:flex md:items-center">
-                <div className="ml-3 relative">
-                  <div className="flex items-center space-x-4">
-                    <span className="text-sm font-medium text-gray-700">
-                      {currentUser?.displayName || currentUser?.email}
-                    </span>
-                    <span className={`text-xs px-2 py-1 rounded-full ${
-                      userRole === 'admin' ? 'bg-red-100 text-red-800' :
-                      userRole === 'owner' ? 'bg-blue-100 text-blue-800' :
-                      'bg-green-100 text-green-800'
-                    }`}>
-                      {userRole === 'renter' ? 'Renter' : 
-                       userRole === 'owner' ? 'Equipment Owner' : 
-                       userRole === 'admin' ? 'Admin' : 'Unknown'}
-                    </span>
-                    <button
-                      onClick={handleLogout}
-                      disabled={loading}
-                      className="px-3 py-1 border border-transparent text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 disabled:opacity-50"
-                    >
-                      {loading ? 'Logging out...' : 'Log Out'}
-                    </button>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
+// Placeholder Components (you can replace these with actual components)
+const LandingPage = () => (
+  <div className="container py-5">
+    <div className="row">
+      <div className="col-lg-8 mx-auto text-center">
+        <h1 className="display-4 fw-bold mb-4">
+          Rent Equipment, <span className="text-primary">Made Simple</span>
+        </h1>
+        <p className="lead mb-4">
+          Connect with equipment owners in your area and rent what you need, when you need it.
+        </p>
+        <div className="d-flex gap-3 justify-content-center">
+          <a href="/signup" className="btn btn-primary btn-lg">
+            Get Started
+          </a>
+          <a href="/how-it-works" className="btn btn-outline-primary btn-lg">
+            How It Works
+          </a>
         </div>
-      </nav>
-
-      <div className="py-10">
-        <header>
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <h1 className="text-3xl font-bold leading-tight text-gray-900">
-              {title}
-            </h1>
-          </div>
-        </header>
-        
-        <main>
-          <div className="max-w-7xl mx-auto sm:px-6 lg:px-8">
-            <div className="px-4 py-8 sm:px-0">
-              {error && (
-                <div className="mb-4 bg-red-50 border-l-4 border-red-400 p-4">
-                  <div className="flex">
-                    <div className="flex-shrink-0">
-                      <svg className="h-5 w-5 text-red-400" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
-                        <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
-                      </svg>
-                    </div>
-                    <div className="ml-3">
-                      <p className="text-sm text-red-800">{error}</p>
-                    </div>
-                  </div>
-                </div>
-              )}
-              
-              <div className="bg-white shadow rounded-lg p-6">
-                {children}
-              </div>
-            </div>
-          </div>
-        </main>
       </div>
     </div>
-  );
-}
+  </div>
+);
+
+const ProfilePage = () => (
+  <div className="container py-5">
+    <h2>My Profile</h2>
+    <p>User profile settings and information.</p>
+  </div>
+);
+
+const SettingsPage = () => (
+  <div className="container py-5">
+    <h2>Settings</h2>
+    <p>Account settings and preferences.</p>
+  </div>
+);
+
+const HelpPage = () => (
+  <div className="container py-5">
+    <h2>Help & Support</h2>
+    <p>Frequently asked questions and contact information.</p>
+  </div>
+);
+
+const EditEquipmentPage = () => (
+  <div className="container py-5">
+    <h2>Edit Equipment</h2>
+    <p>Edit your equipment listing.</p>
+  </div>
+);
+
+const AnalyticsPage = () => (
+  <div className="container py-5">
+    <h2>Analytics</h2>
+    <p>View your equipment performance and earnings.</p>
+  </div>
+);
+
+const RentalDetailsPage = () => (
+  <div className="container py-5">
+    <h2>Rental Details</h2>
+    <p>Detailed information about a specific rental.</p>
+  </div>
+);
+
+const FavoritesPage = () => (
+  <div className="container py-5">
+    <h2>My Favorites</h2>
+    <p>Equipment you've saved for later.</p>
+  </div>
+);
+
+const NotificationsPage = () => (
+  <div className="container py-5">
+    <h2>Notifications</h2>
+    <p>Your recent notifications and messages.</p>
+  </div>
+);
+
+const AboutPage = () => (
+  <div className="container py-5">
+    <h2>About RentMate</h2>
+    <p>Learn more about our platform and mission.</p>
+  </div>
+);
+
+const HowItWorksPage = () => (
+  <div className="container py-5">
+    <h2>How It Works</h2>
+    <p>Step-by-step guide to using RentMate.</p>
+  </div>
+);
+
+const TermsPage = () => (
+  <div className="container py-5">
+    <h2>Terms of Service</h2>
+    <p>Our terms and conditions.</p>
+  </div>
+);
+
+const PrivacyPage = () => (
+  <div className="container py-5">
+    <h2>Privacy Policy</h2>
+    <p>How we handle your data and privacy.</p>
+  </div>
+);
+
+const ContactPage = () => (
+  <div className="container py-5">
+    <h2>Contact Us</h2>
+    <p>Get in touch with our support team.</p>
+  </div>
+);
+
+const NotAuthorizedPage = () => (
+  <div className="container py-5 text-center">
+    <h2>Access Denied</h2>
+    <p>You don't have permission to view this page.</p>
+    <a href="/" className="btn btn-primary">Go Home</a>
+  </div>
+);
+
+const NotFoundPage = () => (
+  <div className="container py-5 text-center">
+    <h2>Page Not Found</h2>
+    <p>The page you're looking for doesn't exist.</p>
+    <a href="/" className="btn btn-primary">Go Home</a>
+  </div>
+);
+
+const Footer = () => (
+  <footer className="bg-dark text-light py-4 mt-auto">
+    <div className="container">
+      <div className="row">
+        <div className="col-md-6">
+          <h5>RentMate</h5>
+          <p>Equipment rental made simple.</p>
+        </div>
+        <div className="col-md-6 text-md-end">
+          <p>&copy; 2024 RentMate. All rights reserved.</p>
+        </div>
+      </div>
+    </div>
+  </footer>
+);
 
 export default App;
