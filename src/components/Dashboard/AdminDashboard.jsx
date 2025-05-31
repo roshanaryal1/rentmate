@@ -1,12 +1,11 @@
-// src/components/Dashboard/AdminDashboard.jsx - Remove unused Container import
+// src/components/Dashboard/AdminDashboard.jsx - Enhanced with new features
 
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router';
-// Remove unused Container import
-import { Row, Col, Card, Badge, Dropdown, Button, Form, InputGroup, Modal } from 'react-bootstrap';
+import { Row, Col, Card, Badge, Dropdown, Button, Form, InputGroup, Modal, Table, Alert, Spinner } from 'react-bootstrap';
 import { LineChart, Line, XAxis, YAxis, Tooltip, CartesianGrid, ResponsiveContainer } from 'recharts';
 import { 
-  Bell, Flag, Building, People, Tools, FileEarmark, HouseDoor, Gear, GraphUp, CheckCircle, Person, Search, BoxArrowRight, PencilSquare, Eye, Envelope, Calendar, Shield
+  Bell, Flag, Building, People, Tools, FileEarmark, HouseDoor, Gear, GraphUp, CheckCircle, Person, Search, BoxArrowRight, PencilSquare, Eye, Envelope, Calendar, Shield, XCircle, Check, X, Trash, Ban, Download, Upload, Save
 } from 'react-bootstrap-icons';
 import { startOfMonth, endOfMonth, subMonths } from 'date-fns';
 import { 
@@ -19,7 +18,11 @@ import {
   getDocs,
   doc,
   getDoc,
-  updateDoc
+  updateDoc,
+  deleteDoc,
+  addDoc,
+  serverTimestamp,
+  Timestamp
 } from 'firebase/firestore';
 import { db } from '../../firebase';
 import { useAuth } from '../../contexts/AuthContext';
@@ -51,7 +54,6 @@ function UserProfileModal({ user, isOpen, onClose }) {
     if (isOpen && user) {
       fetchUserDetails();
     }
-    // eslint-disable-next-line
   }, [isOpen, user]);
 
   const fetchUserDetails = async () => {
@@ -87,9 +89,7 @@ function UserProfileModal({ user, isOpen, onClose }) {
       <Modal.Body>
         {loading ? (
           <div className="text-center py-4">
-            <div className="spinner-border text-primary" role="status">
-              <span className="visually-hidden">Loading...</span>
-            </div>
+            <Spinner animation="border" variant="primary" />
           </div>
         ) : userDetails ? (
           <div>
@@ -114,6 +114,9 @@ function UserProfileModal({ user, isOpen, onClose }) {
                  userDetails.role === 'owner' ? 'Owner' : 
                  userDetails.role === 'admin' ? 'Admin' : 'Unknown'}
               </Badge>
+              {userDetails.banned && (
+                <Badge bg="danger" className="ms-2">BANNED</Badge>
+              )}
             </div>
             <Row>
               <Col md={6}>
@@ -170,7 +173,9 @@ function UserProfileModal({ user, isOpen, onClose }) {
               <h6 className="mb-2">Account Status</h6>
               <div className="d-flex justify-content-between">
                 <span>Status:</span>
-                <Badge bg="success">Active</Badge>
+                <Badge bg={userDetails.banned ? 'danger' : 'success'}>
+                  {userDetails.banned ? 'Banned' : 'Active'}
+                </Badge>
               </div>
             </div>
           </div>
@@ -213,8 +218,21 @@ function EditRoleModal({ user, isOpen, onClose, onRoleUpdate }) {
 
     try {
       await updateDoc(doc(db, 'users', user.id), {
-        role: selectedRole
+        role: selectedRole,
+        updatedAt: serverTimestamp()
       });
+
+      // Log admin action
+      await addDoc(collection(db, 'adminActions'), {
+        action: 'role_change',
+        targetUserId: user.id,
+        targetUserEmail: user.email,
+        oldRole: user.role,
+        newRole: selectedRole,
+        timestamp: serverTimestamp(),
+        adminId: user.adminId || 'system'
+      });
+
       onRoleUpdate(user.id, selectedRole);
       onClose();
     } catch (error) {
@@ -236,9 +254,7 @@ function EditRoleModal({ user, isOpen, onClose, onRoleUpdate }) {
       </Modal.Header>
       <Modal.Body>
         {error && (
-          <div className="alert alert-danger" role="alert">
-            {error}
-          </div>
+          <Alert variant="danger">{error}</Alert>
         )}
         <div className="mb-3">
           <p><strong>User:</strong> {user.displayName || user.email}</p>
@@ -277,11 +293,529 @@ function EditRoleModal({ user, isOpen, onClose, onRoleUpdate }) {
         >
           {loading ? (
             <>
-              <span className="spinner-border spinner-border-sm me-2" role="status"></span>
+              <Spinner as="span" animation="border" size="sm" className="me-2" />
               Updating...
             </>
           ) : (
             'Save Changes'
+          )}
+        </Button>
+      </Modal.Footer>
+    </Modal>
+  );
+}
+
+// ----------- BAN USER MODAL ----------
+function BanUserModal({ user, isOpen, onClose, onUserUpdate }) {
+  const [reason, setReason] = useState('');
+  const [duration, setDuration] = useState('permanent');
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+
+  useEffect(() => {
+    if (isOpen) {
+      setReason('');
+      setDuration('permanent');
+      setError('');
+    }
+  }, [isOpen]);
+
+  const handleBan = async () => {
+    if (!reason.trim()) {
+      setError('Please provide a reason for the ban.');
+      return;
+    }
+
+    setLoading(true);
+    setError('');
+
+    try {
+      const banData = {
+        banned: true,
+        banReason: reason,
+        banDuration: duration,
+        bannedAt: serverTimestamp(),
+        updatedAt: serverTimestamp()
+      };
+
+      if (duration !== 'permanent') {
+        const days = parseInt(duration);
+        const banExpiry = new Date();
+        banExpiry.setDate(banExpiry.getDate() + days);
+        banData.banExpiry = Timestamp.fromDate(banExpiry);
+      }
+
+      await updateDoc(doc(db, 'users', user.id), banData);
+
+      // Log admin action
+      await addDoc(collection(db, 'adminActions'), {
+        action: 'user_ban',
+        targetUserId: user.id,
+        targetUserEmail: user.email,
+        reason: reason,
+        duration: duration,
+        timestamp: serverTimestamp(),
+        adminId: user.adminId || 'system'
+      });
+
+      onUserUpdate(user.id, { ...user, banned: true, banReason: reason });
+      onClose();
+    } catch (error) {
+      setError('Failed to ban user. Please try again.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  if (!isOpen || !user) return null;
+
+  return (
+    <Modal show={isOpen} onHide={onClose} centered>
+      <Modal.Header closeButton>
+        <Modal.Title className="text-danger">
+          <Ban className="me-2" />
+          Ban User
+        </Modal.Title>
+      </Modal.Header>
+      <Modal.Body>
+        {error && (
+          <Alert variant="danger">{error}</Alert>
+        )}
+        <Alert variant="warning">
+          <strong>Warning:</strong> This action will prevent the user from accessing the platform.
+        </Alert>
+        <div className="mb-3">
+          <p><strong>User:</strong> {user.displayName || user.email}</p>
+        </div>
+        <Form.Group className="mb-3">
+          <Form.Label>Reason for Ban:</Form.Label>
+          <Form.Control
+            as="textarea"
+            rows={3}
+            value={reason}
+            onChange={(e) => setReason(e.target.value)}
+            placeholder="Explain why this user is being banned..."
+            disabled={loading}
+          />
+        </Form.Group>
+        <Form.Group>
+          <Form.Label>Ban Duration:</Form.Label>
+          <Form.Select
+            value={duration}
+            onChange={(e) => setDuration(e.target.value)}
+            disabled={loading}
+          >
+            <option value="7">7 days</option>
+            <option value="30">30 days</option>
+            <option value="90">90 days</option>
+            <option value="permanent">Permanent</option>
+          </Form.Select>
+        </Form.Group>
+      </Modal.Body>
+      <Modal.Footer>
+        <Button variant="secondary" onClick={onClose} disabled={loading}>
+          Cancel
+        </Button>
+        <Button variant="danger" onClick={handleBan} disabled={loading}>
+          {loading ? (
+            <>
+              <Spinner as="span" animation="border" size="sm" className="me-2" />
+              Banning...
+            </>
+          ) : (
+            'Ban User'
+          )}
+        </Button>
+      </Modal.Footer>
+    </Modal>
+  );
+}
+
+// ----------- EQUIPMENT APPROVAL MODAL ----------
+function EquipmentApprovalModal({ equipment, isOpen, onClose, onEquipmentUpdate }) {
+  const [action, setAction] = useState('approve');
+  const [reason, setReason] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+
+  useEffect(() => {
+    if (isOpen) {
+      setAction('approve');
+      setReason('');
+      setError('');
+    }
+  }, [isOpen]);
+
+  const handleSubmit = async () => {
+    if (action === 'reject' && !reason.trim()) {
+      setError('Please provide a reason for rejection.');
+      return;
+    }
+
+    setLoading(true);
+    setError('');
+
+    try {
+      const updateData = {
+        approvalStatus: action === 'approve' ? 'approved' : 'rejected',
+        approvedAt: action === 'approve' ? serverTimestamp() : null,
+        rejectedAt: action === 'reject' ? serverTimestamp() : null,
+        rejectionReason: action === 'reject' ? reason : null,
+        updatedAt: serverTimestamp()
+      };
+
+      await updateDoc(doc(db, 'equipment', equipment.id), updateData);
+
+      // Log admin action
+      await addDoc(collection(db, 'adminActions'), {
+        action: `equipment_${action}`,
+        targetEquipmentId: equipment.id,
+        targetEquipmentName: equipment.name,
+        reason: reason || null,
+        timestamp: serverTimestamp(),
+        adminId: equipment.adminId || 'system'
+      });
+
+      // Create notification for equipment owner
+      await addDoc(collection(db, 'notifications'), {
+        userId: equipment.ownerId,
+        title: `Equipment ${action === 'approve' ? 'Approved' : 'Rejected'}`,
+        message: `Your equipment "${equipment.name}" has been ${action}ed${action === 'reject' ? `: ${reason}` : ''}`,
+        type: action === 'approve' ? 'success' : 'warning',
+        timestamp: serverTimestamp(),
+        read: false
+      });
+
+      onEquipmentUpdate(equipment.id, { ...equipment, approvalStatus: updateData.approvalStatus });
+      onClose();
+    } catch (error) {
+      setError(`Failed to ${action} equipment. Please try again.`);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  if (!isOpen || !equipment) return null;
+
+  return (
+    <Modal show={isOpen} onHide={onClose} size="lg" centered>
+      <Modal.Header closeButton>
+        <Modal.Title>
+          <Tools className="me-2" />
+          Review Equipment
+        </Modal.Title>
+      </Modal.Header>
+      <Modal.Body>
+        {error && (
+          <Alert variant="danger">{error}</Alert>
+        )}
+        <Row>
+          <Col md={6}>
+            <img 
+              src={equipment.imageUrl || 'https://via.placeholder.com/300x200'} 
+              alt={equipment.name}
+              className="img-fluid rounded"
+              style={{ maxHeight: '200px', objectFit: 'cover' }}
+            />
+          </Col>
+          <Col md={6}>
+            <h5>{equipment.name}</h5>
+            <p><strong>Category:</strong> {equipment.category}</p>
+            <p><strong>Owner:</strong> {equipment.ownerName}</p>
+            <p><strong>Rate:</strong> ${equipment.ratePerDay}/day</p>
+            <p><strong>Location:</strong> {equipment.location}</p>
+            <p><strong>Description:</strong> {equipment.description}</p>
+          </Col>
+        </Row>
+        
+        <hr />
+        
+        <Form.Group className="mb-3">
+          <Form.Label>Action:</Form.Label>
+          <Form.Select
+            value={action}
+            onChange={(e) => setAction(e.target.value)}
+            disabled={loading}
+          >
+            <option value="approve">Approve Equipment</option>
+            <option value="reject">Reject Equipment</option>
+          </Form.Select>
+        </Form.Group>
+
+        {action === 'reject' && (
+          <Form.Group>
+            <Form.Label>Reason for Rejection:</Form.Label>
+            <Form.Control
+              as="textarea"
+              rows={3}
+              value={reason}
+              onChange={(e) => setReason(e.target.value)}
+              placeholder="Explain why this equipment is being rejected..."
+              disabled={loading}
+            />
+          </Form.Group>
+        )}
+      </Modal.Body>
+      <Modal.Footer>
+        <Button variant="secondary" onClick={onClose} disabled={loading}>
+          Cancel
+        </Button>
+        <Button 
+          variant={action === 'approve' ? 'success' : 'danger'} 
+          onClick={handleSubmit} 
+          disabled={loading}
+        >
+          {loading ? (
+            <>
+              <Spinner as="span" animation="border" size="sm" className="me-2" />
+              Processing...
+            </>
+          ) : (
+            action === 'approve' ? 'Approve' : 'Reject'
+          )}
+        </Button>
+      </Modal.Footer>
+    </Modal>
+  );
+}
+
+// ----------- SETTINGS MODAL ----------
+function SettingsModal({ isOpen, onClose }) {
+  const [settings, setSettings] = useState({
+    siteName: '',
+    siteDescription: '',
+    allowUserRegistration: true,
+    requireEmailVerification: true,
+    equipmentApprovalRequired: true,
+    maxEquipmentPerUser: 10,
+    defaultRentalDuration: 7,
+    platformFeePercentage: 5,
+    autoApproveVerifiedUsers: false,
+    maintenanceMode: false,
+    supportEmail: '',
+    maxFileUploadSize: 5
+  });
+  const [loading, setLoading] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState('');
+
+  useEffect(() => {
+    if (isOpen) {
+      fetchSettings();
+    }
+  }, [isOpen]);
+
+  const fetchSettings = async () => {
+    setLoading(true);
+    try {
+      const settingsDoc = await getDoc(doc(db, 'settings', 'platform'));
+      if (settingsDoc.exists()) {
+        setSettings({ ...settings, ...settingsDoc.data() });
+      }
+    } catch (error) {
+      setError('Failed to load settings');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleSave = async () => {
+    setSaving(true);
+    setError('');
+
+    try {
+      await updateDoc(doc(db, 'settings', 'platform'), {
+        ...settings,
+        updatedAt: serverTimestamp()
+      });
+
+      // Log admin action
+      await addDoc(collection(db, 'adminActions'), {
+        action: 'settings_update',
+        timestamp: serverTimestamp(),
+        adminId: 'system'
+      });
+
+      onClose();
+    } catch (error) {
+      setError('Failed to save settings. Please try again.');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  if (!isOpen) return null;
+
+  return (
+    <Modal show={isOpen} onHide={onClose} size="lg" centered>
+      <Modal.Header closeButton>
+        <Modal.Title>
+          <Gear className="me-2" />
+          Platform Settings
+        </Modal.Title>
+      </Modal.Header>
+      <Modal.Body style={{ maxHeight: '70vh', overflowY: 'auto' }}>
+        {error && (
+          <Alert variant="danger">{error}</Alert>
+        )}
+        
+        {loading ? (
+          <div className="text-center py-4">
+            <Spinner animation="border" variant="primary" />
+          </div>
+        ) : (
+          <Form>
+            <h6 className="text-primary mb-3">General Settings</h6>
+            <Row>
+              <Col md={6}>
+                <Form.Group className="mb-3">
+                  <Form.Label>Site Name</Form.Label>
+                  <Form.Control
+                    type="text"
+                    value={settings.siteName}
+                    onChange={(e) => setSettings({ ...settings, siteName: e.target.value })}
+                    placeholder="RentMate"
+                  />
+                </Form.Group>
+              </Col>
+              <Col md={6}>
+                <Form.Group className="mb-3">
+                  <Form.Label>Support Email</Form.Label>
+                  <Form.Control
+                    type="email"
+                    value={settings.supportEmail}
+                    onChange={(e) => setSettings({ ...settings, supportEmail: e.target.value })}
+                    placeholder="support@rentmate.com"
+                  />
+                </Form.Group>
+              </Col>
+            </Row>
+            
+            <Form.Group className="mb-3">
+              <Form.Label>Site Description</Form.Label>
+              <Form.Control
+                as="textarea"
+                rows={2}
+                value={settings.siteDescription}
+                onChange={(e) => setSettings({ ...settings, siteDescription: e.target.value })}
+                placeholder="Equipment rental platform"
+              />
+            </Form.Group>
+
+            <h6 className="text-primary mb-3 mt-4">User Management</h6>
+            <Row>
+              <Col md={6}>
+                <Form.Check
+                  type="switch"
+                  label="Allow User Registration"
+                  checked={settings.allowUserRegistration}
+                  onChange={(e) => setSettings({ ...settings, allowUserRegistration: e.target.checked })}
+                  className="mb-3"
+                />
+                <Form.Check
+                  type="switch"
+                  label="Require Email Verification"
+                  checked={settings.requireEmailVerification}
+                  onChange={(e) => setSettings({ ...settings, requireEmailVerification: e.target.checked })}
+                  className="mb-3"
+                />
+              </Col>
+              <Col md={6}>
+                <Form.Check
+                  type="switch"
+                  label="Auto-approve Verified Users"
+                  checked={settings.autoApproveVerifiedUsers}
+                  onChange={(e) => setSettings({ ...settings, autoApproveVerifiedUsers: e.target.checked })}
+                  className="mb-3"
+                />
+                <Form.Check
+                  type="switch"
+                  label="Maintenance Mode"
+                  checked={settings.maintenanceMode}
+                  onChange={(e) => setSettings({ ...settings, maintenanceMode: e.target.checked })}
+                  className="mb-3"
+                />
+              </Col>
+            </Row>
+
+            <h6 className="text-primary mb-3 mt-4">Equipment Settings</h6>
+            <Row>
+              <Col md={6}>
+                <Form.Group className="mb-3">
+                  <Form.Label>Max Equipment per User</Form.Label>
+                  <Form.Control
+                    type="number"
+                    min="1"
+                    max="100"
+                    value={settings.maxEquipmentPerUser}
+                    onChange={(e) => setSettings({ ...settings, maxEquipmentPerUser: parseInt(e.target.value) })}
+                  />
+                </Form.Group>
+                <Form.Check
+                  type="switch"
+                  label="Require Equipment Approval"
+                  checked={settings.equipmentApprovalRequired}
+                  onChange={(e) => setSettings({ ...settings, equipmentApprovalRequired: e.target.checked })}
+                  className="mb-3"
+                />
+              </Col>
+              <Col md={6}>
+                <Form.Group className="mb-3">
+                  <Form.Label>Max File Upload Size (MB)</Form.Label>
+                  <Form.Control
+                    type="number"
+                    min="1"
+                    max="50"
+                    value={settings.maxFileUploadSize}
+                    onChange={(e) => setSettings({ ...settings, maxFileUploadSize: parseInt(e.target.value) })}
+                  />
+                </Form.Group>
+                <Form.Group className="mb-3">
+                  <Form.Label>Default Rental Duration (days)</Form.Label>
+                  <Form.Control
+                    type="number"
+                    min="1"
+                    value={settings.defaultRentalDuration}
+                    onChange={(e) => setSettings({ ...settings, defaultRentalDuration: parseInt(e.target.value) })}
+                  />
+                </Form.Group>
+              </Col>
+            </Row>
+
+            <h6 className="text-primary mb-3 mt-4">Financial Settings</h6>
+            <Row>
+              <Col md={6}>
+                <Form.Group className="mb-3">
+                  <Form.Label>Platform Fee Percentage (%)</Form.Label>
+                  <Form.Control
+                    type="number"
+                    min="0"
+                    max="50"
+                    step="0.1"
+                    value={settings.platformFeePercentage}
+                    onChange={(e) => setSettings({ ...settings, platformFeePercentage: parseFloat(e.target.value) })}
+                  />
+                </Form.Group>
+              </Col>
+            </Row>
+          </Form>
+        )}
+      </Modal.Body>
+      <Modal.Footer>
+        <Button variant="secondary" onClick={onClose} disabled={saving}>
+          Cancel
+        </Button>
+        <Button variant="primary" onClick={handleSave} disabled={saving || loading}>
+          {saving ? (
+            <>
+              <Spinner as="span" animation="border" size="sm" className="me-2" />
+              Saving...
+            </>
+          ) : (
+            <>
+              <Save className="me-2" />
+              Save Settings
+            </>
           )}
         </Button>
       </Modal.Footer>
@@ -296,26 +830,35 @@ export default function AdminDashboard() {
     totalEquipment: 0,
     availableEquipment: 0,
     rentedEquipment: 0,
+    pendingApproval: 0,
     totalUsers: 0,
     activeRenters: 0,
     equipmentOwners: 0,
+    bannedUsers: 0,
     totalRentals: 0,
+    activeRentals: 0,
+    completedRentals: 0,
     loading: true
   });
   const [recentActivity, setRecentActivity] = useState([]);
   const [notifications, setNotifications] = useState([]);
   const [allEquipment, setAllEquipment] = useState([]);
   const [allUsers, setAllUsers] = useState([]);
+  const [allRentals, setAllRentals] = useState([]);
   const [chartData, setChartData] = useState([]);
   const [error, setError] = useState(null);
   const [searchQuery, setSearchQuery] = useState('');
   const { currentUser, logout } = useAuth();
   const navigate = useNavigate();
 
-  // User profile/edit role modal
+  // Modal states
   const [showUserProfile, setShowUserProfile] = useState(false);
   const [showEditRole, setShowEditRole] = useState(false);
+  const [showBanUser, setShowBanUser] = useState(false);
+  const [showEquipmentApproval, setShowEquipmentApproval] = useState(false);
+  const [showSettings, setShowSettings] = useState(false);
   const [selectedUser, setSelectedUser] = useState(null);
+  const [selectedEquipment, setSelectedEquipment] = useState(null);
 
   useEffect(() => {
     const unsubs = [];
@@ -328,8 +871,9 @@ export default function AdminDashboard() {
         setAllEquipment(equipment);
 
         const totalEquipment = equipment.length;
-        const availableEquipment = equipment.filter(item => item.available).length;
+        const availableEquipment = equipment.filter(item => item.available && item.approvalStatus === 'approved').length;
         const rentedEquipment = equipment.filter(item => !item.available).length;
+        const pendingApproval = equipment.filter(item => item.approvalStatus === 'pending').length;
 
         // Users
         const usersQuery = query(collection(db, 'users'));
@@ -338,24 +882,36 @@ export default function AdminDashboard() {
         setAllUsers(users);
 
         const totalUsers = users.length;
-        const activeRenters = users.filter(user => user.role === 'renter').length;
-        const equipmentOwners = users.filter(user => user.role === 'owner').length;
+        const activeRenters = users.filter(user => user.role === 'renter' && !user.banned).length;
+        const equipmentOwners = users.filter(user => user.role === 'owner' && !user.banned).length;
+        const bannedUsers = users.filter(user => user.banned).length;
 
         // Rentals
         let totalRentals = 0;
+        let activeRentals = 0;
+        let completedRentals = 0;
         try {
           const rentalsSnapshot = await getDocs(collection(db, 'rentals'));
-          totalRentals = rentalsSnapshot.size;
+          const rentals = rentalsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+          setAllRentals(rentals);
+          
+          totalRentals = rentals.length;
+          activeRentals = rentals.filter(rental => rental.status === 'active').length;
+          completedRentals = rentals.filter(rental => rental.status === 'completed').length;
         } catch (error) { }
 
         setMetrics({
           totalEquipment,
           availableEquipment,
           rentedEquipment,
+          pendingApproval,
           totalUsers,
           activeRenters,
           equipmentOwners,
+          bannedUsers,
           totalRentals,
+          activeRentals,
+          completedRentals,
           loading: false
         });
       } catch (err) {
@@ -364,11 +920,10 @@ export default function AdminDashboard() {
       }
     };
 
-    // Chart data for last 6 months (real from Firestore)
+    // Chart data for last 6 months
     const fetchChartData = async () => {
       const months = getLastNMonths(6);
       const promises = months.map(async (m) => {
-        // Equipment added this month
         const eqQuery = query(
           collection(db, "equipment"),
           where("createdAt", ">=", m.start),
@@ -376,7 +931,6 @@ export default function AdminDashboard() {
         );
         const eqSnap = await getDocs(eqQuery);
 
-        // Rentals completed this month
         const rentalQuery = query(
           collection(db, "rentals"),
           where("createdAt", ">=", m.start),
@@ -396,9 +950,8 @@ export default function AdminDashboard() {
     fetchData();
     fetchChartData();
 
-    // Listeners for activity & notifications
+    // Real-time listeners
     try {
-      // Recent activity
       const activityQuery = query(
         collection(db, 'activity'),
         orderBy('timestamp', 'desc'),
@@ -414,7 +967,6 @@ export default function AdminDashboard() {
       }, (error) => setRecentActivity([]));
       unsubs.push(activityUnsub);
 
-      // Notifications
       const notificationsQuery = query(
         collection(db, 'notifications'),
         where('recipients', 'array-contains', 'admin'),
@@ -434,7 +986,6 @@ export default function AdminDashboard() {
     } catch (err) {}
 
     return () => unsubs.forEach(unsub => unsub && unsub());
-    // eslint-disable-next-line
   }, []);
 
   const handleLogout = async () => {
@@ -466,6 +1017,17 @@ export default function AdminDashboard() {
     }
   };
 
+  const getRentalStatusBadge = (status) => {
+    switch(status) {
+      case 'pending': return <Badge bg="warning">Pending</Badge>;
+      case 'active': return <Badge bg="success">Active</Badge>;
+      case 'completed': return <Badge bg="primary">Completed</Badge>;
+      case 'cancelled': return <Badge bg="danger">Cancelled</Badge>;
+      case 'disputed': return <Badge bg="dark">Disputed</Badge>;
+      default: return <Badge bg="secondary">Unknown</Badge>;
+    }
+  };
+
   const toggleNotifications = () => setShowNotifications(!showNotifications);
 
   // Sidebar navigation items
@@ -488,37 +1050,81 @@ export default function AdminDashboard() {
             user.role?.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
+  const filteredRentals = allRentals.filter(
+    rental => rental.equipmentName?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+              rental.renterName?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+              rental.status?.toLowerCase().includes(searchQuery.toLowerCase())
+  );
+
   // Modal handlers
   const handleViewProfile = (user) => {
     setSelectedUser(user);
     setShowUserProfile(true);
   };
+  
   const handleEditRole = (user) => {
     setSelectedUser(user);
     setShowEditRole(true);
   };
+  
+  const handleBanUser = (user) => {
+    setSelectedUser(user);
+    setShowBanUser(true);
+  };
+
+  const handleApproveEquipment = (equipment) => {
+    setSelectedEquipment(equipment);
+    setShowEquipmentApproval(true);
+  };
+
   const handleRoleUpdate = (userId, newRole) => {
     setAllUsers(prevUsers => 
       prevUsers.map(user => 
         user.id === userId ? { ...user, role: newRole } : user
       )
     );
-    // update metrics
-    const updatedUsers = allUsers.map(user =>
-      user.id === userId ? { ...user, role: newRole } : user
+  };
+
+  const handleUserUpdate = (userId, updatedUser) => {
+    setAllUsers(prevUsers => 
+      prevUsers.map(user => 
+        user.id === userId ? updatedUser : user
+      )
     );
-    const activeRenters = updatedUsers.filter(user => user.role === 'renter').length;
-    const equipmentOwners = updatedUsers.filter(user => user.role === 'owner').length;
-    setMetrics(prev => ({
-      ...prev,
-      activeRenters,
-      equipmentOwners
-    }));
+  };
+
+  const handleEquipmentUpdate = (equipmentId, updatedEquipment) => {
+    setAllEquipment(prevEquipment => 
+      prevEquipment.map(equipment => 
+        equipment.id === equipmentId ? updatedEquipment : equipment
+      )
+    );
+  };
+
+  const handleRemoveEquipment = async (equipmentId) => {
+    if (window.confirm('Are you sure you want to remove this equipment? This action cannot be undone.')) {
+      try {
+        await deleteDoc(doc(db, 'equipment', equipmentId));
+        setAllEquipment(prevEquipment => 
+          prevEquipment.filter(equipment => equipment.id !== equipmentId)
+        );
+        
+        // Log admin action
+        await addDoc(collection(db, 'adminActions'), {
+          action: 'equipment_removal',
+          targetEquipmentId: equipmentId,
+          timestamp: serverTimestamp(),
+          adminId: currentUser?.uid || 'system'
+        });
+      } catch (error) {
+        setError('Failed to remove equipment');
+      }
+    }
   };
 
   return (
     <>
-      {/* Modals for user actions */}
+      {/* All Modals */}
       <UserProfileModal
         user={selectedUser}
         isOpen={showUserProfile}
@@ -538,6 +1144,31 @@ export default function AdminDashboard() {
         onRoleUpdate={handleRoleUpdate}
       />
 
+      <BanUserModal
+        user={selectedUser}
+        isOpen={showBanUser}
+        onClose={() => {
+          setShowBanUser(false);
+          setSelectedUser(null);
+        }}
+        onUserUpdate={handleUserUpdate}
+      />
+
+      <EquipmentApprovalModal
+        equipment={selectedEquipment}
+        isOpen={showEquipmentApproval}
+        onClose={() => {
+          setShowEquipmentApproval(false);
+          setSelectedEquipment(null);
+        }}
+        onEquipmentUpdate={handleEquipmentUpdate}
+      />
+
+      <SettingsModal
+        isOpen={showSettings}
+        onClose={() => setShowSettings(false)}
+      />
+
       <div className="dashboard-container d-flex">
       {/* Sidebar */}
       <div className="sidebar bg-dark text-white">
@@ -554,6 +1185,9 @@ export default function AdminDashboard() {
               >
                 <span className="icon me-3">{item.icon}</span>
                 {item.label}
+                {item.label === 'Equipment' && metrics.pendingApproval > 0 && (
+                  <Badge bg="warning" className="ms-auto">{metrics.pendingApproval}</Badge>
+                )}
               </button>
             </li>
           ))}
@@ -566,7 +1200,7 @@ export default function AdminDashboard() {
         <header className="dashboard-header bg-white d-flex justify-content-between align-items-center p-3 shadow-sm">
           <h4>{activeTab}</h4>
           <div className="d-flex align-items-center">
-            {(activeTab === 'Equipment' || activeTab === 'Users') && (
+            {(activeTab === 'Equipment' || activeTab === 'Users' || activeTab === 'Rentals') && (
               <InputGroup className="me-3" style={{ maxWidth: 220 }}>
                 <Form.Control
                   placeholder={`Search ${activeTab.toLowerCase()}...`}
@@ -647,7 +1281,7 @@ export default function AdminDashboard() {
                 <Dropdown.Item onClick={() => navigate('/profile')}>
                   <Person className="me-2" /> Profile
                 </Dropdown.Item>
-                <Dropdown.Item onClick={() => navigate('/settings')}>
+                <Dropdown.Item onClick={() => setShowSettings(true)}>
                   <Gear className="me-2" /> Settings
                 </Dropdown.Item>
                 <Dropdown.Divider />
@@ -662,13 +1296,15 @@ export default function AdminDashboard() {
         {/* Main Dashboard Content */}
         <div className="dashboard-body p-4">
           {error && (
-            <div className="alert alert-danger">{error}</div>
+            <Alert variant="danger" dismissible onClose={() => setError(null)}>
+              {error}
+            </Alert>
           )}
 
           {/* --------- DASHBOARD TAB --------- */}
           {activeTab === 'Dashboard' && (
             <>
-              {/* Stats Cards */}
+              {/* Enhanced Stats Cards */}
               <Row className="mb-4">
                 <Col md={6} lg={3} className="mb-3">
                   <Card className="stats-card h-100">
@@ -680,21 +1316,9 @@ export default function AdminDashboard() {
                         <div>
                           <h2 className="mb-1">{metrics.loading ? '...' : metrics.totalEquipment}</h2>
                           <p className="text-muted mb-0 small">Total Equipment</p>
-                        </div>
-                      </div>
-                    </Card.Body>
-                  </Card>
-                </Col>
-                <Col md={6} lg={3} className="mb-3">
-                  <Card className="stats-card h-100">
-                    <Card.Body>
-                      <div className="d-flex align-items-center">
-                        <div className="p-3 bg-success bg-opacity-10 rounded-3 me-3">
-                          <CheckCircle className="text-success fs-4" />
-                        </div>
-                        <div>
-                          <h2 className="mb-1">{metrics.loading ? '...' : metrics.availableEquipment}</h2>
-                          <p className="text-muted mb-0 small">Available</p>
+                          {metrics.pendingApproval > 0 && (
+                            <Badge bg="warning" className="mt-1">{metrics.pendingApproval} Pending</Badge>
+                          )}
                         </div>
                       </div>
                     </Card.Body>
@@ -710,6 +1334,9 @@ export default function AdminDashboard() {
                         <div>
                           <h2 className="mb-1">{metrics.loading ? '...' : metrics.totalUsers}</h2>
                           <p className="text-muted mb-0 small">Total Users</p>
+                          {metrics.bannedUsers > 0 && (
+                            <Badge bg="danger" className="mt-1">{metrics.bannedUsers} Banned</Badge>
+                          )}
                         </div>
                       </div>
                     </Card.Body>
@@ -725,6 +1352,22 @@ export default function AdminDashboard() {
                         <div>
                           <h2 className="mb-1">{metrics.loading ? '...' : metrics.totalRentals}</h2>
                           <p className="text-muted mb-0 small">Total Rentals</p>
+                          <Badge bg="success" className="mt-1 me-1">{metrics.activeRentals} Active</Badge>
+                        </div>
+                      </div>
+                    </Card.Body>
+                  </Card>
+                </Col>
+                <Col md={6} lg={3} className="mb-3">
+                  <Card className="stats-card h-100">
+                    <Card.Body>
+                      <div className="d-flex align-items-center">
+                        <div className="p-3 bg-success bg-opacity-10 rounded-3 me-3">
+                          <CheckCircle className="text-success fs-4" />
+                        </div>
+                        <div>
+                          <h2 className="mb-1">{metrics.loading ? '...' : metrics.availableEquipment}</h2>
+                          <p className="text-muted mb-0 small">Available Equipment</p>
                         </div>
                       </div>
                     </Card.Body>
@@ -850,14 +1493,13 @@ export default function AdminDashboard() {
                 <div className="d-flex gap-2">
                   <Badge bg="success">{metrics.availableEquipment} Available</Badge>
                   <Badge bg="danger">{metrics.rentedEquipment} Rented</Badge>
+                  <Badge bg="warning">{metrics.pendingApproval} Pending Approval</Badge>
                 </div>
               </div>
               
               {metrics.loading ? (
                 <div className="text-center py-5">
-                  <div className="spinner-border text-primary" role="status">
-                    <span className="visually-hidden">Loading...</span>
-                  </div>
+                  <Spinner animation="border" variant="primary" />
                 </div>
               ) : (
                 <Row>
@@ -881,9 +1523,15 @@ export default function AdminDashboard() {
                               <Card.Title className="h6">{equipment.name}</Card.Title>
                               <div className="mb-2">
                                 <Badge bg="primary" className="me-2">{equipment.category}</Badge>
-                                <Badge bg={equipment.available ? "success" : "danger"}>
+                                <Badge bg={equipment.available ? "success" : "danger"} className="me-2">
                                   {equipment.available ? "Available" : "Rented"}
                                 </Badge>
+                                {equipment.approvalStatus === 'pending' && (
+                                  <Badge bg="warning">Pending Approval</Badge>
+                                )}
+                                {equipment.approvalStatus === 'rejected' && (
+                                  <Badge bg="danger">Rejected</Badge>
+                                )}
                               </div>
                               <Card.Text className="small text-muted">
                                 Owner: {equipment.ownerName}
@@ -893,10 +1541,31 @@ export default function AdminDashboard() {
                               </Card.Text>
                             </div>
                             <div className="mt-auto">
-                              <div className="d-flex justify-content-between align-items-center">
+                              <div className="d-flex justify-content-between align-items-center mb-2">
                                 <span className="fw-bold text-success">${equipment.ratePerDay}/day</span>
+                              </div>
+                              <div className="d-flex gap-1">
                                 <Button variant="outline-primary" size="sm">
-                                  View Details
+                                  <Eye className="me-1" size={12} />
+                                  View
+                                </Button>
+                                {equipment.approvalStatus === 'pending' && (
+                                  <Button 
+                                    variant="outline-warning" 
+                                    size="sm"
+                                    onClick={() => handleApproveEquipment(equipment)}
+                                  >
+                                    <Check className="me-1" size={12} />
+                                    Review
+                                  </Button>
+                                )}
+                                <Button 
+                                  variant="outline-danger" 
+                                  size="sm"
+                                  onClick={() => handleRemoveEquipment(equipment.id)}
+                                >
+                                  <Trash className="me-1" size={12} />
+                                  Remove
                                 </Button>
                               </div>
                             </div>
@@ -929,24 +1598,26 @@ export default function AdminDashboard() {
                   <Badge bg="primary">{metrics.activeRenters} Renters</Badge>
                   <Badge bg="success">{metrics.equipmentOwners} Owners</Badge>
                   <Badge bg="warning">{metrics.totalUsers - metrics.activeRenters - metrics.equipmentOwners} Admins</Badge>
+                  {metrics.bannedUsers > 0 && (
+                    <Badge bg="danger">{metrics.bannedUsers} Banned</Badge>
+                  )}
                 </div>
               </div>
               
               {metrics.loading ? (
                 <div className="text-center py-5">
-                  <div className="spinner-border text-primary" role="status">
-                    <span className="visually-hidden">Loading...</span>
-                  </div>
+                  <Spinner animation="border" variant="primary" />
                 </div>
               ) : (
                 <Card>
                   <div className="table-responsive">
-                    <table className="table table-hover mb-0">
+                    <Table hover className="mb-0">
                       <thead className="table-light">
                         <tr>
                           <th>User</th>
                           <th>Email</th>
                           <th>Role</th>
+                          <th>Status</th>
                           <th>Joined</th>
                           <th>Actions</th>
                         </tr>
@@ -987,33 +1658,48 @@ export default function AdminDashboard() {
                                 </Badge>
                               </td>
                               <td>
+                                {user.banned ? (
+                                  <Badge bg="danger">Banned</Badge>
+                                ) : (
+                                  <Badge bg="success">Active</Badge>
+                                )}
+                              </td>
+                              <td>
                                 {user.createdAt ? 
                                   new Date(user.createdAt.toDate()).toLocaleDateString() : 
                                   'Unknown'
                                 }
                               </td>
                               <td>
-                                <Button variant="outline-primary" size="sm" className="me-2" onClick={() => handleViewProfile(user)}>
-                                  <Eye className="me-1" size={14} />
-                                  View Profile
-                                </Button>
-                                <Button variant="outline-secondary" size="sm" onClick={() => handleEditRole(user)}>
-                                  <PencilSquare className="me-1" size={14} />
-                                  Edit Role
-                                </Button>
+                                <div className="d-flex gap-1">
+                                  <Button variant="outline-primary" size="sm" onClick={() => handleViewProfile(user)}>
+                                    <Eye className="me-1" size={12} />
+                                    View
+                                  </Button>
+                                  <Button variant="outline-secondary" size="sm" onClick={() => handleEditRole(user)}>
+                                    <PencilSquare className="me-1" size={12} />
+                                    Edit Role
+                                  </Button>
+                                  {!user.banned && (
+                                    <Button variant="outline-danger" size="sm" onClick={() => handleBanUser(user)}>
+                                      <Ban className="me-1" size={12} />
+                                      Ban
+                                    </Button>
+                                  )}
+                                </div>
                               </td>
                             </tr>
                           ))
                         ) : (
                           <tr>
-                            <td colSpan="5" className="text-center py-4">
+                            <td colSpan="6" className="text-center py-4">
                               <People className="display-4 text-muted" />
                               <div className="mt-2">No users found</div>
                             </td>
                           </tr>
                         )}
                       </tbody>
-                    </table>
+                    </Table>
                   </div>
                 </Card>
               )}
@@ -1023,14 +1709,119 @@ export default function AdminDashboard() {
           {/* --------- RENTALS TAB --------- */}
           {activeTab === 'Rentals' && (
             <>
-              <h5>Rental Management</h5>
-              <p>Rental management section coming soon! Here you'll be able to:</p>
-              <ul>
-                <li>View all active rentals</li>
-                <li>Monitor rental status</li>
-                <li>Handle disputes</li>
-                <li>Generate rental reports</li>
-              </ul>
+              <div className="d-flex justify-content-between align-items-center mb-4">
+                <h5>All Rentals ({allRentals.length})</h5>
+                <div className="d-flex gap-2">
+                  <Badge bg="warning">{allRentals.filter(r => r.status === 'pending').length} Pending</Badge>
+                  <Badge bg="success">{metrics.activeRentals} Active</Badge>
+                  <Badge bg="primary">{metrics.completedRentals} Completed</Badge>
+                  <Badge bg="danger">{allRentals.filter(r => r.status === 'cancelled').length} Cancelled</Badge>
+                </div>
+              </div>
+              
+              {metrics.loading ? (
+                <div className="text-center py-5">
+                  <Spinner animation="border" variant="primary" />
+                </div>
+              ) : (
+                <Card>
+                  <div className="table-responsive">
+                    <Table hover className="mb-0">
+                      <thead className="table-light">
+                        <tr>
+                          <th>Rental ID</th>
+                          <th>Equipment</th>
+                          <th>Renter</th>
+                          <th>Owner</th>
+                          <th>Duration</th>
+                          <th>Total Cost</th>
+                          <th>Status</th>
+                          <th>Created</th>
+                          <th>Actions</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {filteredRentals.length > 0 ? (
+                          filteredRentals.map(rental => (
+                            <tr key={rental.id}>
+                              <td className="text-muted small">#{rental.id.slice(-8)}</td>
+                              <td>
+                                <div className="d-flex align-items-center">
+                                  <img 
+                                    src={rental.equipmentImage || 'https://via.placeholder.com/40'} 
+                                    alt={rental.equipmentName}
+                                    className="rounded me-2"
+                                    width="40"
+                                    height="40"
+                                    onError={(e) => {
+                                      e.target.onerror = null;
+                                      e.target.src = 'https://via.placeholder.com/40';
+                                    }}
+                                  />
+                                  <div>
+                                    <div className="fw-semibold">{rental.equipmentName}</div>
+                                    <small className="text-muted">{rental.equipmentCategory}</small>
+                                  </div>
+                                </div>
+                              </td>
+                              <td>
+                                <div className="fw-semibold">{rental.renterName}</div>
+                                <small className="text-muted">{rental.renterEmail}</small>
+                              </td>
+                              <td>
+                                <div className="fw-semibold">{rental.ownerName}</div>
+                                <small className="text-muted">{rental.ownerEmail}</small>
+                              </td>
+                              <td>
+                                {rental.startDate && rental.endDate ? (
+                                  <div>
+                                    <div>{new Date(rental.startDate.toDate()).toLocaleDateString()}</div>
+                                    <small className="text-muted">to {new Date(rental.endDate.toDate()).toLocaleDateString()}</small>
+                                  </div>
+                                ) : (
+                                  <span className="text-muted">Unknown</span>
+                                )}
+                              </td>
+                              <td className="fw-bold text-success">${rental.totalCost || '0'}</td>
+                              <td>{getRentalStatusBadge(rental.status)}</td>
+                              <td>
+                                {rental.createdAt ? 
+                                  new Date(rental.createdAt.toDate()).toLocaleDateString() : 
+                                  'Unknown'
+                                }
+                              </td>
+                              <td>
+                                <div className="d-flex gap-1">
+                                  <Button variant="outline-primary" size="sm">
+                                    <Eye className="me-1" size={12} />
+                                    View
+                                  </Button>
+                                  {rental.status === 'disputed' && (
+                                    <Button variant="outline-warning" size="sm">
+                                      <Flag className="me-1" size={12} />
+                                      Resolve
+                                    </Button>
+                                  )}
+                                </div>
+                              </td>
+                            </tr>
+                          ))
+                        ) : (
+                          <tr>
+                            <td colSpan="9" className="text-center py-4">
+                              <FileEarmark className="display-4 text-muted" />
+                              <div className="mt-2">No rentals found</div>
+                              {searchQuery && (
+                                <p className="text-muted">Try adjusting your search terms.</p>
+                              )}
+                            </td>
+                          </tr>
+                        )}
+                      </tbody>
+                    </Table>
+                  </div>
+                </Card>
+              )}
             </>
           )}
 
@@ -1086,25 +1877,59 @@ export default function AdminDashboard() {
           {/* --------- SETTINGS TAB --------- */}
           {activeTab === 'Settings' && (
             <>
-              <h5>Admin Settings</h5>
+              <div className="d-flex justify-content-between align-items-center mb-4">
+                <h5>Admin Settings</h5>
+                <Button variant="primary" onClick={() => setShowSettings(true)}>
+                  <Gear className="me-2" />
+                  Configure Platform
+                </Button>
+              </div>
               <Row>
                 <Col md={8}>
                   <Card>
                     <Card.Header>
-                      <h6 className="mb-0">Platform Configuration</h6>
+                      <h6 className="mb-0">Quick Actions</h6>
                     </Card.Header>
                     <Card.Body>
-                      <p>Admin settings panel coming soon! This will include:</p>
-                      <ul>
-                        <li>Platform-wide settings</li>
-                        <li>User management policies</li>
-                        <li>Equipment approval settings</li>
-                        <li>Notification preferences</li>
-                        <li>Security configurations</li>
-                      </ul>
-                      <Button variant="primary" disabled>
-                        Save Settings
-                      </Button>
+                      <div className="d-grid gap-2">
+                        <Button variant="outline-primary" className="d-flex align-items-center justify-content-start">
+                          <Download className="me-2" />
+                          Export User Data
+                        </Button>
+                        <Button variant="outline-primary" className="d-flex align-items-center justify-content-start">
+                          <Download className="me-2" />
+                          Export Equipment Data
+                        </Button>
+                        <Button variant="outline-primary" className="d-flex align-items-center justify-content-start">
+                          <Download className="me-2" />
+                          Export Rental Reports
+                        </Button>
+                        <Button variant="outline-warning" className="d-flex align-items-center justify-content-start">
+                          <Upload className="me-2" />
+                          Bulk Import Equipment
+                        </Button>
+                      </div>
+                    </Card.Body>
+                  </Card>
+                </Col>
+                <Col md={4}>
+                  <Card>
+                    <Card.Header>
+                      <h6 className="mb-0">System Status</h6>
+                    </Card.Header>
+                    <Card.Body>
+                      <div className="d-flex justify-content-between align-items-center mb-2">
+                        <span>Database Status:</span>
+                        <Badge bg="success">Online</Badge>
+                      </div>
+                      <div className="d-flex justify-content-between align-items-center mb-2">
+                        <span>Storage Usage:</span>
+                        <Badge bg="primary">45% Used</Badge>
+                      </div>
+                      <div className="d-flex justify-content-between align-items-center">
+                        <span>Active Sessions:</span>
+                        <Badge bg="info">{metrics.totalUsers} Users</Badge>
+                      </div>
                     </Card.Body>
                   </Card>
                 </Col>
