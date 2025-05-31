@@ -1,11 +1,11 @@
-// src/components/Dashboard/AdminDashboard.jsx - Enhanced with new features
+// src/components/Dashboard/AdminDashboard.jsx - Enhanced with Dispute Center, Review Moderation, and Export Features
 
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router';
-import { Row, Col, Card, Badge, Dropdown, Button, Form, InputGroup, Modal, Table, Alert, Spinner } from 'react-bootstrap';
+import { Row, Col, Card, Badge, Dropdown, Button, Form, InputGroup, Modal, Table, Alert, Spinner, ProgressBar } from 'react-bootstrap';
 import { LineChart, Line, XAxis, YAxis, Tooltip, CartesianGrid, ResponsiveContainer } from 'recharts';
 import { 
-  Bell, Flag, Building, People, Tools, FileEarmark, HouseDoor, Gear, GraphUp, CheckCircle, Person, Search, BoxArrowRight, PencilSquare, Eye, Envelope, Calendar, Shield, XCircle, Check, X, Trash, Ban, Download, Upload, Save
+  Bell, Flag, Building, People, Tools, FileEarmark, HouseDoor, Gear, GraphUp, CheckCircle, Person, Search, BoxArrowRight, PencilSquare, Eye, Envelope, Calendar, Shield, XCircle, Check, X, Trash, Ban, Download, Upload, Save, ChatText, StarFill, ExclamationTriangle, FileText, Archive
 } from 'react-bootstrap-icons';
 import { startOfMonth, endOfMonth, subMonths } from 'date-fns';
 import { 
@@ -45,7 +45,697 @@ function getLastNMonths(n = 6) {
   return arr;
 }
 
-// ----------- USER PROFILE MODAL ----------
+// ----------- AUDIT LOGGING FUNCTION ----------
+const logAdminAction = async (action, details, adminId) => {
+  try {
+    await addDoc(collection(db, 'adminActions'), {
+      action,
+      ...details,
+      timestamp: serverTimestamp(),
+      adminId: adminId || 'system',
+      ip: 'xxx.xxx.xxx.xxx', // In production, capture real IP
+      userAgent: navigator.userAgent
+    });
+  } catch (error) {
+    console.error('Failed to log admin action:', error);
+  }
+};
+
+// ----------- DISPUTE RESOLUTION MODAL ----------
+function DisputeResolutionModal({ dispute, isOpen, onClose, onDisputeUpdate }) {
+  const [resolution, setResolution] = useState('');
+  const [action, setAction] = useState('resolve_favor_renter');
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+  const { currentUser } = useAuth();
+
+  useEffect(() => {
+    if (isOpen) {
+      setResolution('');
+      setAction('resolve_favor_renter');
+      setError('');
+    }
+  }, [isOpen]);
+
+  const handleResolve = async () => {
+    if (!resolution.trim()) {
+      setError('Please provide a resolution explanation.');
+      return;
+    }
+
+    setLoading(true);
+    setError('');
+
+    try {
+      const updateData = {
+        status: 'resolved',
+        resolution: resolution,
+        resolutionAction: action,
+        resolvedBy: currentUser?.uid,
+        resolvedAt: serverTimestamp(),
+        updatedAt: serverTimestamp()
+      };
+
+      await updateDoc(doc(db, 'disputes', dispute.id), updateData);
+
+      // Log admin action
+      await logAdminAction('dispute_resolution', {
+        targetDisputeId: dispute.id,
+        targetRentalId: dispute.rentalId,
+        resolutionAction: action,
+        resolution: resolution
+      }, currentUser?.uid);
+
+      // Create notifications for involved parties
+      const notifications = [
+        {
+          userId: dispute.renterId,
+          title: 'Dispute Resolved',
+          message: `Your dispute for rental #${dispute.rentalId?.slice(-8)} has been resolved: ${resolution}`,
+          type: 'info',
+          timestamp: serverTimestamp(),
+          read: false
+        },
+        {
+          userId: dispute.ownerId,
+          title: 'Dispute Resolved',
+          message: `The dispute for your equipment rental has been resolved: ${resolution}`,
+          type: 'info',
+          timestamp: serverTimestamp(),
+          read: false
+        }
+      ];
+
+      for (const notification of notifications) {
+        await addDoc(collection(db, 'notifications'), notification);
+      }
+
+      onDisputeUpdate(dispute.id, { ...dispute, ...updateData });
+      onClose();
+    } catch (error) {
+      setError('Failed to resolve dispute. Please try again.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  if (!isOpen || !dispute) return null;
+
+  return (
+    <Modal show={isOpen} onHide={onClose} size="lg" centered>
+      <Modal.Header closeButton>
+        <Modal.Title>
+          <Flag className="me-2 text-warning" />
+          Resolve Dispute
+        </Modal.Title>
+      </Modal.Header>
+      <Modal.Body>
+        {error && (
+          <Alert variant="danger">{error}</Alert>
+        )}
+        
+        <div className="mb-4">
+          <h6>Dispute Details</h6>
+          <Card className="bg-light">
+            <Card.Body>
+              <Row>
+                <Col md={6}>
+                  <p><strong>Rental ID:</strong> #{dispute.rentalId?.slice(-8)}</p>
+                  <p><strong>Equipment:</strong> {dispute.equipmentName}</p>
+                  <p><strong>Type:</strong> <Badge bg="warning">{dispute.type}</Badge></p>
+                </Col>
+                <Col md={6}>
+                  <p><strong>Filed by:</strong> {dispute.reporterName}</p>
+                  <p><strong>Filed on:</strong> {dispute.createdAt ? new Date(dispute.createdAt.toDate()).toLocaleDateString() : 'Unknown'}</p>
+                  <p><strong>Priority:</strong> <Badge bg={dispute.priority === 'high' ? 'danger' : dispute.priority === 'medium' ? 'warning' : 'info'}>{dispute.priority}</Badge></p>
+                </Col>
+              </Row>
+              <div className="mt-2">
+                <strong>Description:</strong>
+                <p className="mt-1">{dispute.description}</p>
+              </div>
+              {dispute.evidence && (
+                <div className="mt-2">
+                  <strong>Evidence:</strong>
+                  <div className="mt-1">
+                    {dispute.evidence.map((item, index) => (
+                      <a key={index} href={item.url} target="_blank" rel="noopener noreferrer" className="me-2">
+                        📎 {item.name}
+                      </a>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </Card.Body>
+          </Card>
+        </div>
+
+        <Form.Group className="mb-3">
+          <Form.Label>Resolution Action:</Form.Label>
+          <Form.Select
+            value={action}
+            onChange={(e) => setAction(e.target.value)}
+            disabled={loading}
+          >
+            <option value="resolve_favor_renter">Resolve in favor of renter</option>
+            <option value="resolve_favor_owner">Resolve in favor of owner</option>
+            <option value="resolve_compromise">Compromise resolution</option>
+            <option value="dismiss_dispute">Dismiss dispute</option>
+            <option value="escalate_external">Escalate to external mediation</option>
+          </Form.Select>
+        </Form.Group>
+
+        <Form.Group>
+          <Form.Label>Resolution Explanation:</Form.Label>
+          <Form.Control
+            as="textarea"
+            rows={4}
+            value={resolution}
+            onChange={(e) => setResolution(e.target.value)}
+            placeholder="Explain the resolution and any actions taken..."
+            disabled={loading}
+          />
+        </Form.Group>
+      </Modal.Body>
+      <Modal.Footer>
+        <Button variant="secondary" onClick={onClose} disabled={loading}>
+          Cancel
+        </Button>
+        <Button variant="success" onClick={handleResolve} disabled={loading}>
+          {loading ? (
+            <>
+              <Spinner as="span" animation="border" size="sm" className="me-2" />
+              Resolving...
+            </>
+          ) : (
+            'Resolve Dispute'
+          )}
+        </Button>
+      </Modal.Footer>
+    </Modal>
+  );
+}
+
+// ----------- REVIEW MODERATION MODAL ----------
+function ReviewModerationModal({ review, isOpen, onClose, onReviewUpdate }) {
+  const [action, setAction] = useState('approve');
+  const [reason, setReason] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+  const { currentUser } = useAuth();
+
+  useEffect(() => {
+    if (isOpen) {
+      setAction('approve');
+      setReason('');
+      setError('');
+    }
+  }, [isOpen]);
+
+  const handleSubmit = async () => {
+    if ((action === 'reject' || action === 'remove') && !reason.trim()) {
+      setError('Please provide a reason for this action.');
+      return;
+    }
+
+    setLoading(true);
+    setError('');
+
+    try {
+      const updateData = {
+        moderationStatus: action === 'approve' ? 'approved' : action === 'reject' ? 'rejected' : 'removed',
+        moderatedBy: currentUser?.uid,
+        moderatedAt: serverTimestamp(),
+        moderationReason: action !== 'approve' ? reason : null,
+        updatedAt: serverTimestamp()
+      };
+
+      await updateDoc(doc(db, 'reviews', review.id), updateData);
+
+      // Log admin action
+      await logAdminAction('review_moderation', {
+        targetReviewId: review.id,
+        targetEquipmentId: review.equipmentId,
+        action: action,
+        reason: reason || null
+      }, currentUser?.uid);
+
+      // Notify review author if rejected/removed
+      if (action !== 'approve') {
+        await addDoc(collection(db, 'notifications'), {
+          userId: review.userId,
+          title: `Review ${action === 'reject' ? 'Rejected' : 'Removed'}`,
+          message: `Your review has been ${action}ed: ${reason}`,
+          type: 'warning',
+          timestamp: serverTimestamp(),
+          read: false
+        });
+      }
+
+      onReviewUpdate(review.id, { ...review, ...updateData });
+      onClose();
+    } catch (error) {
+      setError(`Failed to ${action} review. Please try again.`);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  if (!isOpen || !review) return null;
+
+  return (
+    <Modal show={isOpen} onHide={onClose} size="lg" centered>
+      <Modal.Header closeButton>
+        <Modal.Title>
+          <StarFill className="me-2 text-warning" />
+          Moderate Review
+        </Modal.Title>
+      </Modal.Header>
+      <Modal.Body>
+        {error && (
+          <Alert variant="danger">{error}</Alert>
+        )}
+        
+        <div className="mb-4">
+          <h6>Review Details</h6>
+          <Card className="bg-light">
+            <Card.Body>
+              <div className="d-flex justify-content-between align-items-start mb-2">
+                <div>
+                  <div className="d-flex align-items-center mb-1">
+                    {[...Array(5)].map((_, i) => (
+                      <StarFill
+                        key={i}
+                        className={`me-1 ${i < review.rating ? 'text-warning' : 'text-muted'}`}
+                        size={16}
+                      />
+                    ))}
+                    <span className="ms-2 fw-bold">{review.rating}/5</span>
+                  </div>
+                  <p className="mb-0"><strong>By:</strong> {review.userName}</p>
+                  <p className="mb-0"><strong>Equipment:</strong> {review.equipmentName}</p>
+                  <p className="mb-0"><strong>Posted:</strong> {review.createdAt ? new Date(review.createdAt.toDate()).toLocaleDateString() : 'Unknown'}</p>
+                </div>
+                {review.flaggedCount && (
+                  <Badge bg="danger">🚩 {review.flaggedCount} reports</Badge>
+                )}
+              </div>
+              <div className="mt-3">
+                <strong>Review Content:</strong>
+                <p className="mt-1 border p-2 rounded bg-white">{review.comment}</p>
+              </div>
+              {review.images && review.images.length > 0 && (
+                <div className="mt-2">
+                  <strong>Images:</strong>
+                  <div className="d-flex gap-2 mt-1">
+                    {review.images.map((img, index) => (
+                      <img
+                        key={index}
+                        src={img}
+                        alt={`Review ${index + 1}`}
+                        className="rounded"
+                        style={{ width: 60, height: 60, objectFit: 'cover' }}
+                      />
+                    ))}
+                  </div>
+                </div>
+              )}
+              {review.flagReasons && review.flagReasons.length > 0 && (
+                <div className="mt-2">
+                  <strong>Reported for:</strong>
+                  <div className="mt-1">
+                    {review.flagReasons.map((reason, index) => (
+                      <Badge key={index} bg="warning" className="me-1">{reason}</Badge>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </Card.Body>
+          </Card>
+        </div>
+
+        <Form.Group className="mb-3">
+          <Form.Label>Moderation Action:</Form.Label>
+          <Form.Select
+            value={action}
+            onChange={(e) => setAction(e.target.value)}
+            disabled={loading}
+          >
+            <option value="approve">Approve Review</option>
+            <option value="reject">Reject Review</option>
+            <option value="remove">Remove Review</option>
+          </Form.Select>
+        </Form.Group>
+
+        {(action === 'reject' || action === 'remove') && (
+          <Form.Group>
+            <Form.Label>Reason:</Form.Label>
+            <Form.Control
+              as="textarea"
+              rows={3}
+              value={reason}
+              onChange={(e) => setReason(e.target.value)}
+              placeholder="Explain why this review is being rejected/removed..."
+              disabled={loading}
+            />
+          </Form.Group>
+        )}
+      </Modal.Body>
+      <Modal.Footer>
+        <Button variant="secondary" onClick={onClose} disabled={loading}>
+          Cancel
+        </Button>
+        <Button 
+          variant={action === 'approve' ? 'success' : 'danger'} 
+          onClick={handleSubmit} 
+          disabled={loading}
+        >
+          {loading ? (
+            <>
+              <Spinner as="span" animation="border" size="sm" className="me-2" />
+              Processing...
+            </>
+          ) : (
+            action === 'approve' ? 'Approve' : action === 'reject' ? 'Reject' : 'Remove'
+          )}
+        </Button>
+      </Modal.Footer>
+    </Modal>
+  );
+}
+
+// ----------- EXPORT/IMPORT MODAL ----------
+function ExportImportModal({ isOpen, onClose }) {
+  const [activeTab, setActiveTab] = useState('export');
+  const [exportType, setExportType] = useState('users');
+  const [dateRange, setDateRange] = useState('all');
+  const [customStartDate, setCustomStartDate] = useState('');
+  const [customEndDate, setCustomEndDate] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [progress, setProgress] = useState(0);
+  const [importFile, setImportFile] = useState(null);
+  const [importType, setImportType] = useState('equipment');
+  const { currentUser } = useAuth();
+
+  const handleExport = async () => {
+    setLoading(true);
+    setProgress(0);
+
+    try {
+      // Simulate progress
+      for (let i = 0; i <= 100; i += 10) {
+        setProgress(i);
+        await new Promise(resolve => setTimeout(resolve, 100));
+      }
+
+      // Get data based on type and date range
+      let queryRef = collection(db, exportType);
+      
+      if (dateRange === 'custom' && customStartDate && customEndDate) {
+        const startDate = new Date(customStartDate);
+        const endDate = new Date(customEndDate);
+        queryRef = query(queryRef, 
+          where('createdAt', '>=', startDate),
+          where('createdAt', '<=', endDate)
+        );
+      } else if (dateRange === 'last30days') {
+        const thirtyDaysAgo = new Date();
+        thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+        queryRef = query(queryRef, where('createdAt', '>=', thirtyDaysAgo));
+      }
+
+      const snapshot = await getDocs(queryRef);
+      const data = snapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data(),
+        createdAt: doc.data().createdAt?.toDate?.()?.toISOString() || null,
+        updatedAt: doc.data().updatedAt?.toDate?.()?.toISOString() || null
+      }));
+
+      // Convert to CSV
+      if (data.length > 0) {
+        const headers = Object.keys(data[0]);
+        const csvContent = [
+          headers.join(','),
+          ...data.map(row => headers.map(header => {
+            const value = row[header];
+            if (value === null || value === undefined) return '';
+            if (typeof value === 'string' && value.includes(',')) return `"${value}"`;
+            return value;
+          }).join(','))
+        ].join('\n');
+
+        // Download file
+        const blob = new Blob([csvContent], { type: 'text/csv' });
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `${exportType}_export_${new Date().toISOString().split('T')[0]}.csv`;
+        a.click();
+        window.URL.revokeObjectURL(url);
+
+        // Log admin action
+        await logAdminAction('data_export', {
+          exportType,
+          recordCount: data.length,
+          dateRange
+        }, currentUser?.uid);
+      }
+
+    } catch (error) {
+      console.error('Export failed:', error);
+    } finally {
+      setLoading(false);
+      setProgress(0);
+    }
+  };
+
+  const handleImport = async () => {
+    if (!importFile) return;
+
+    setLoading(true);
+    setProgress(0);
+
+    try {
+      const text = await importFile.text();
+      const lines = text.split('\n');
+      const headers = lines[0].split(',');
+      
+      let imported = 0;
+      for (let i = 1; i < lines.length; i++) {
+        if (lines[i].trim()) {
+          const values = lines[i].split(',');
+          const data = {};
+          headers.forEach((header, index) => {
+            data[header.trim()] = values[index]?.trim() || '';
+          });
+          
+          // Add to Firestore (example for equipment)
+          if (importType === 'equipment') {
+            await addDoc(collection(db, 'equipment'), {
+              ...data,
+              createdAt: serverTimestamp(),
+              updatedAt: serverTimestamp(),
+              approvalStatus: 'pending',
+              imported: true
+            });
+          }
+          
+          imported++;
+          setProgress((i / lines.length) * 100);
+        }
+      }
+
+      // Log admin action
+      await logAdminAction('data_import', {
+        importType,
+        recordCount: imported,
+        fileName: importFile.name
+      }, currentUser?.uid);
+
+      alert(`Successfully imported ${imported} records`);
+      
+    } catch (error) {
+      console.error('Import failed:', error);
+      alert('Import failed. Please check file format.');
+    } finally {
+      setLoading(false);
+      setProgress(0);
+      setImportFile(null);
+    }
+  };
+
+  if (!isOpen) return null;
+
+  return (
+    <Modal show={isOpen} onHide={onClose} size="lg" centered>
+      <Modal.Header closeButton>
+        <Modal.Title>
+          <Archive className="me-2" />
+          Data Export & Import
+        </Modal.Title>
+      </Modal.Header>
+      <Modal.Body>
+        <div className="d-flex mb-3">
+          <Button
+            variant={activeTab === 'export' ? 'primary' : 'outline-primary'}
+            className="me-2"
+            onClick={() => setActiveTab('export')}
+          >
+            <Download className="me-1" size={16} />
+            Export Data
+          </Button>
+          <Button
+            variant={activeTab === 'import' ? 'primary' : 'outline-primary'}
+            onClick={() => setActiveTab('import')}
+          >
+            <Upload className="me-1" size={16} />
+            Import Data
+          </Button>
+        </div>
+
+        {activeTab === 'export' && (
+          <div>
+            <Form.Group className="mb-3">
+              <Form.Label>Data Type:</Form.Label>
+              <Form.Select value={exportType} onChange={(e) => setExportType(e.target.value)}>
+                <option value="users">Users</option>
+                <option value="equipment">Equipment</option>
+                <option value="rentals">Rentals</option>
+                <option value="reviews">Reviews</option>
+                <option value="disputes">Disputes</option>
+                <option value="adminActions">Admin Actions</option>
+              </Form.Select>
+            </Form.Group>
+
+            <Form.Group className="mb-3">
+              <Form.Label>Date Range:</Form.Label>
+              <Form.Select value={dateRange} onChange={(e) => setDateRange(e.target.value)}>
+                <option value="all">All Time</option>
+                <option value="last30days">Last 30 Days</option>
+                <option value="last90days">Last 90 Days</option>
+                <option value="custom">Custom Range</option>
+              </Form.Select>
+            </Form.Group>
+
+            {dateRange === 'custom' && (
+              <Row className="mb-3">
+                <Col md={6}>
+                  <Form.Group>
+                    <Form.Label>Start Date:</Form.Label>
+                    <Form.Control
+                      type="date"
+                      value={customStartDate}
+                      onChange={(e) => setCustomStartDate(e.target.value)}
+                    />
+                  </Form.Group>
+                </Col>
+                <Col md={6}>
+                  <Form.Group>
+                    <Form.Label>End Date:</Form.Label>
+                    <Form.Control
+                      type="date"
+                      value={customEndDate}
+                      onChange={(e) => setCustomEndDate(e.target.value)}
+                    />
+                  </Form.Group>
+                </Col>
+              </Row>
+            )}
+
+            {loading && (
+              <div className="mb-3">
+                <div className="d-flex justify-content-between align-items-center mb-1">
+                  <small>Exporting...</small>
+                  <small>{progress.toFixed(0)}%</small>
+                </div>
+                <ProgressBar now={progress} />
+              </div>
+            )}
+          </div>
+        )}
+
+        {activeTab === 'import' && (
+          <div>
+            <Form.Group className="mb-3">
+              <Form.Label>Import Type:</Form.Label>
+              <Form.Select value={importType} onChange={(e) => setImportType(e.target.value)}>
+                <option value="equipment">Equipment</option>
+                <option value="users">Users (Bulk Registration)</option>
+              </Form.Select>
+            </Form.Group>
+
+            <Form.Group className="mb-3">
+              <Form.Label>CSV File:</Form.Label>
+              <Form.Control
+                type="file"
+                accept=".csv"
+                onChange={(e) => setImportFile(e.target.files[0])}
+              />
+              <Form.Text className="text-muted">
+                Upload a CSV file with the appropriate headers for {importType}.
+              </Form.Text>
+            </Form.Group>
+
+            {loading && (
+              <div className="mb-3">
+                <div className="d-flex justify-content-between align-items-center mb-1">
+                  <small>Importing...</small>
+                  <small>{progress.toFixed(0)}%</small>
+                </div>
+                <ProgressBar now={progress} />
+              </div>
+            )}
+
+            <Alert variant="info">
+              <strong>CSV Format Requirements:</strong>
+              <ul className="mb-0 mt-2">
+                <li>Equipment: name, category, description, ratePerDay, location, ownerId</li>
+                <li>Users: email, displayName, role (renter/owner/admin)</li>
+              </ul>
+            </Alert>
+          </div>
+        )}
+      </Modal.Body>
+      <Modal.Footer>
+        <Button variant="secondary" onClick={onClose} disabled={loading}>
+          Cancel
+        </Button>
+        {activeTab === 'export' ? (
+          <Button variant="primary" onClick={handleExport} disabled={loading}>
+            {loading ? (
+              <>
+                <Spinner as="span" animation="border" size="sm" className="me-2" />
+                Exporting...
+              </>
+            ) : (
+              <>
+                <Download className="me-2" />
+                Export {exportType}
+              </>
+            )}
+          </Button>
+        ) : (
+          <Button variant="primary" onClick={handleImport} disabled={loading || !importFile}>
+            {loading ? (
+              <>
+                <Spinner as="span" animation="border" size="sm" className="me-2" />
+                Importing...
+              </>
+            ) : (
+              <>
+                <Upload className="me-2" />
+                Import Data
+              </>
+            )}
+          </Button>
+        )}
+      </Modal.Footer>
+    </Modal>
+  );
+}
+
+// ----------- EXISTING MODALS (keeping the ones you already have) ----------
 function UserProfileModal({ user, isOpen, onClose }) {
   const [userDetails, setUserDetails] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -194,11 +884,11 @@ function UserProfileModal({ user, isOpen, onClose }) {
   );
 }
 
-// ----------- EDIT ROLE MODAL ----------
 function EditRoleModal({ user, isOpen, onClose, onRoleUpdate }) {
   const [selectedRole, setSelectedRole] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const { currentUser } = useAuth();
 
   useEffect(() => {
     if (isOpen && user) {
@@ -223,15 +913,12 @@ function EditRoleModal({ user, isOpen, onClose, onRoleUpdate }) {
       });
 
       // Log admin action
-      await addDoc(collection(db, 'adminActions'), {
-        action: 'role_change',
+      await logAdminAction('role_change', {
         targetUserId: user.id,
         targetUserEmail: user.email,
         oldRole: user.role,
-        newRole: selectedRole,
-        timestamp: serverTimestamp(),
-        adminId: user.adminId || 'system'
-      });
+        newRole: selectedRole
+      }, currentUser?.uid);
 
       onRoleUpdate(user.id, selectedRole);
       onClose();
@@ -305,12 +992,12 @@ function EditRoleModal({ user, isOpen, onClose, onRoleUpdate }) {
   );
 }
 
-// ----------- BAN USER MODAL ----------
 function BanUserModal({ user, isOpen, onClose, onUserUpdate }) {
   const [reason, setReason] = useState('');
   const [duration, setDuration] = useState('permanent');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const { currentUser } = useAuth();
 
   useEffect(() => {
     if (isOpen) {
@@ -348,15 +1035,12 @@ function BanUserModal({ user, isOpen, onClose, onUserUpdate }) {
       await updateDoc(doc(db, 'users', user.id), banData);
 
       // Log admin action
-      await addDoc(collection(db, 'adminActions'), {
-        action: 'user_ban',
+      await logAdminAction('user_ban', {
         targetUserId: user.id,
         targetUserEmail: user.email,
         reason: reason,
-        duration: duration,
-        timestamp: serverTimestamp(),
-        adminId: user.adminId || 'system'
-      });
+        duration: duration
+      }, currentUser?.uid);
 
       onUserUpdate(user.id, { ...user, banned: true, banReason: reason });
       onClose();
@@ -431,12 +1115,12 @@ function BanUserModal({ user, isOpen, onClose, onUserUpdate }) {
   );
 }
 
-// ----------- EQUIPMENT APPROVAL MODAL ----------
 function EquipmentApprovalModal({ equipment, isOpen, onClose, onEquipmentUpdate }) {
   const [action, setAction] = useState('approve');
   const [reason, setReason] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const { currentUser } = useAuth();
 
   useEffect(() => {
     if (isOpen) {
@@ -467,14 +1151,11 @@ function EquipmentApprovalModal({ equipment, isOpen, onClose, onEquipmentUpdate 
       await updateDoc(doc(db, 'equipment', equipment.id), updateData);
 
       // Log admin action
-      await addDoc(collection(db, 'adminActions'), {
-        action: `equipment_${action}`,
+      await logAdminAction(`equipment_${action}`, {
         targetEquipmentId: equipment.id,
         targetEquipmentName: equipment.name,
-        reason: reason || null,
-        timestamp: serverTimestamp(),
-        adminId: equipment.adminId || 'system'
-      });
+        reason: reason || null
+      }, currentUser?.uid);
 
       // Create notification for equipment owner
       await addDoc(collection(db, 'notifications'), {
@@ -579,7 +1260,6 @@ function EquipmentApprovalModal({ equipment, isOpen, onClose, onEquipmentUpdate 
   );
 }
 
-// ----------- SETTINGS MODAL ----------
 function SettingsModal({ isOpen, onClose }) {
   const [settings, setSettings] = useState({
     siteName: '',
@@ -598,6 +1278,7 @@ function SettingsModal({ isOpen, onClose }) {
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
+  const { currentUser } = useAuth();
 
   useEffect(() => {
     if (isOpen) {
@@ -630,11 +1311,7 @@ function SettingsModal({ isOpen, onClose }) {
       });
 
       // Log admin action
-      await addDoc(collection(db, 'adminActions'), {
-        action: 'settings_update',
-        timestamp: serverTimestamp(),
-        adminId: 'system'
-      });
+      await logAdminAction('settings_update', {}, currentUser?.uid);
 
       onClose();
     } catch (error) {
@@ -838,6 +1515,9 @@ export default function AdminDashboard() {
     totalRentals: 0,
     activeRentals: 0,
     completedRentals: 0,
+    totalDisputes: 0,
+    activeDisputes: 0,
+    flaggedReviews: 0,
     loading: true
   });
   const [recentActivity, setRecentActivity] = useState([]);
@@ -845,6 +1525,8 @@ export default function AdminDashboard() {
   const [allEquipment, setAllEquipment] = useState([]);
   const [allUsers, setAllUsers] = useState([]);
   const [allRentals, setAllRentals] = useState([]);
+  const [allDisputes, setAllDisputes] = useState([]);
+  const [allReviews, setAllReviews] = useState([]);
   const [chartData, setChartData] = useState([]);
   const [error, setError] = useState(null);
   const [searchQuery, setSearchQuery] = useState('');
@@ -857,8 +1539,13 @@ export default function AdminDashboard() {
   const [showBanUser, setShowBanUser] = useState(false);
   const [showEquipmentApproval, setShowEquipmentApproval] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
+  const [showDisputeResolution, setShowDisputeResolution] = useState(false);
+  const [showReviewModeration, setShowReviewModeration] = useState(false);
+  const [showExportImport, setShowExportImport] = useState(false);
   const [selectedUser, setSelectedUser] = useState(null);
   const [selectedEquipment, setSelectedEquipment] = useState(null);
+  const [selectedDispute, setSelectedDispute] = useState(null);
+  const [selectedReview, setSelectedReview] = useState(null);
 
   useEffect(() => {
     const unsubs = [];
@@ -900,6 +1587,32 @@ export default function AdminDashboard() {
           completedRentals = rentals.filter(rental => rental.status === 'completed').length;
         } catch (error) { }
 
+        // Disputes
+        let totalDisputes = 0;
+        let activeDisputes = 0;
+        try {
+          const disputesSnapshot = await getDocs(collection(db, 'disputes'));
+          const disputes = disputesSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+          setAllDisputes(disputes);
+          
+          totalDisputes = disputes.length;
+          activeDisputes = disputes.filter(dispute => dispute.status === 'open' || dispute.status === 'investigating').length;
+        } catch (error) { }
+
+        // Reviews
+        let flaggedReviews = 0;
+        try {
+          const reviewsSnapshot = await getDocs(collection(db, 'reviews'));
+          const reviews = reviewsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+          setAllReviews(reviews);
+          
+          flaggedReviews = reviews.filter(review => 
+            review.flagged === true || 
+            (review.flaggedCount && review.flaggedCount > 0) ||
+            review.moderationStatus === 'pending'
+          ).length;
+        } catch (error) { }
+
         setMetrics({
           totalEquipment,
           availableEquipment,
@@ -912,6 +1625,9 @@ export default function AdminDashboard() {
           totalRentals,
           activeRentals,
           completedRentals,
+          totalDisputes,
+          activeDisputes,
+          flaggedReviews,
           loading: false
         });
       } catch (err) {
@@ -1028,14 +1744,26 @@ export default function AdminDashboard() {
     }
   };
 
+  const getDisputeStatusBadge = (status) => {
+    switch(status) {
+      case 'open': return <Badge bg="danger">Open</Badge>;
+      case 'investigating': return <Badge bg="warning">Investigating</Badge>;
+      case 'resolved': return <Badge bg="success">Resolved</Badge>;
+      case 'closed': return <Badge bg="secondary">Closed</Badge>;
+      default: return <Badge bg="secondary">Unknown</Badge>;
+    }
+  };
+
   const toggleNotifications = () => setShowNotifications(!showNotifications);
 
-  // Sidebar navigation items
+  // Sidebar navigation items - Updated with new tabs
   const navItems = [
     { label: 'Dashboard', icon: <HouseDoor /> },
     { label: 'Equipment', icon: <Tools /> },
     { label: 'Users', icon: <People /> },
     { label: 'Rentals', icon: <FileEarmark /> },
+    { label: 'Dispute Center', icon: <Flag /> },
+    { label: 'Review Moderation', icon: <StarFill /> },
     { label: 'Analytics', icon: <GraphUp /> },
     { label: 'Settings', icon: <Gear /> }
   ];
@@ -1054,6 +1782,18 @@ export default function AdminDashboard() {
     rental => rental.equipmentName?.toLowerCase().includes(searchQuery.toLowerCase()) ||
               rental.renterName?.toLowerCase().includes(searchQuery.toLowerCase()) ||
               rental.status?.toLowerCase().includes(searchQuery.toLowerCase())
+  );
+
+  const filteredDisputes = allDisputes.filter(
+    dispute => dispute.equipmentName?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+               dispute.reporterName?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+               dispute.type?.toLowerCase().includes(searchQuery.toLowerCase())
+  );
+
+  const filteredReviews = allReviews.filter(
+    review => review.equipmentName?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+              review.userName?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+              review.comment?.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
   // Modal handlers
@@ -1075,6 +1815,16 @@ export default function AdminDashboard() {
   const handleApproveEquipment = (equipment) => {
     setSelectedEquipment(equipment);
     setShowEquipmentApproval(true);
+  };
+
+  const handleResolveDispute = (dispute) => {
+    setSelectedDispute(dispute);
+    setShowDisputeResolution(true);
+  };
+
+  const handleModerateReview = (review) => {
+    setSelectedReview(review);
+    setShowReviewModeration(true);
   };
 
   const handleRoleUpdate = (userId, newRole) => {
@@ -1101,6 +1851,22 @@ export default function AdminDashboard() {
     );
   };
 
+  const handleDisputeUpdate = (disputeId, updatedDispute) => {
+    setAllDisputes(prevDisputes => 
+      prevDisputes.map(dispute => 
+        dispute.id === disputeId ? updatedDispute : dispute
+      )
+    );
+  };
+
+  const handleReviewUpdate = (reviewId, updatedReview) => {
+    setAllReviews(prevReviews => 
+      prevReviews.map(review => 
+        review.id === reviewId ? updatedReview : review
+      )
+    );
+  };
+
   const handleRemoveEquipment = async (equipmentId) => {
     if (window.confirm('Are you sure you want to remove this equipment? This action cannot be undone.')) {
       try {
@@ -1110,12 +1876,9 @@ export default function AdminDashboard() {
         );
         
         // Log admin action
-        await addDoc(collection(db, 'adminActions'), {
-          action: 'equipment_removal',
-          targetEquipmentId: equipmentId,
-          timestamp: serverTimestamp(),
-          adminId: currentUser?.uid || 'system'
-        });
+        await logAdminAction('equipment_removal', {
+          targetEquipmentId: equipmentId
+        }, currentUser?.uid);
       } catch (error) {
         setError('Failed to remove equipment');
       }
@@ -1164,9 +1927,34 @@ export default function AdminDashboard() {
         onEquipmentUpdate={handleEquipmentUpdate}
       />
 
+      <DisputeResolutionModal
+        dispute={selectedDispute}
+        isOpen={showDisputeResolution}
+        onClose={() => {
+          setShowDisputeResolution(false);
+          setSelectedDispute(null);
+        }}
+        onDisputeUpdate={handleDisputeUpdate}
+      />
+
+      <ReviewModerationModal
+        review={selectedReview}
+        isOpen={showReviewModeration}
+        onClose={() => {
+          setShowReviewModeration(false);
+          setSelectedReview(null);
+        }}
+        onReviewUpdate={handleReviewUpdate}
+      />
+
       <SettingsModal
         isOpen={showSettings}
         onClose={() => setShowSettings(false)}
+      />
+
+      <ExportImportModal
+        isOpen={showExportImport}
+        onClose={() => setShowExportImport(false)}
       />
 
       <div className="dashboard-container d-flex">
@@ -1188,6 +1976,12 @@ export default function AdminDashboard() {
                 {item.label === 'Equipment' && metrics.pendingApproval > 0 && (
                   <Badge bg="warning" className="ms-auto">{metrics.pendingApproval}</Badge>
                 )}
+                {item.label === 'Dispute Center' && metrics.activeDisputes > 0 && (
+                  <Badge bg="danger" className="ms-auto">{metrics.activeDisputes}</Badge>
+                )}
+                {item.label === 'Review Moderation' && metrics.flaggedReviews > 0 && (
+                  <Badge bg="warning" className="ms-auto">{metrics.flaggedReviews}</Badge>
+                )}
               </button>
             </li>
           ))}
@@ -1200,7 +1994,7 @@ export default function AdminDashboard() {
         <header className="dashboard-header bg-white d-flex justify-content-between align-items-center p-3 shadow-sm">
           <h4>{activeTab}</h4>
           <div className="d-flex align-items-center">
-            {(activeTab === 'Equipment' || activeTab === 'Users' || activeTab === 'Rentals') && (
+            {(activeTab === 'Equipment' || activeTab === 'Users' || activeTab === 'Rentals' || activeTab === 'Dispute Center' || activeTab === 'Review Moderation') && (
               <InputGroup className="me-3" style={{ maxWidth: 220 }}>
                 <Form.Control
                   placeholder={`Search ${activeTab.toLowerCase()}...`}
@@ -1368,6 +2162,46 @@ export default function AdminDashboard() {
                         <div>
                           <h2 className="mb-1">{metrics.loading ? '...' : metrics.availableEquipment}</h2>
                           <p className="text-muted mb-0 small">Available Equipment</p>
+                        </div>
+                      </div>
+                    </Card.Body>
+                  </Card>
+                </Col>
+              </Row>
+
+              {/* New Stats for Disputes and Reviews */}
+              <Row className="mb-4">
+                <Col md={6} lg={3} className="mb-3">
+                  <Card className="stats-card h-100">
+                    <Card.Body>
+                      <div className="d-flex align-items-center">
+                        <div className="p-3 bg-danger bg-opacity-10 rounded-3 me-3">
+                          <Flag className="text-danger fs-4" />
+                        </div>
+                        <div>
+                          <h2 className="mb-1">{metrics.loading ? '...' : metrics.totalDisputes}</h2>
+                          <p className="text-muted mb-0 small">Total Disputes</p>
+                          {metrics.activeDisputes > 0 && (
+                            <Badge bg="danger" className="mt-1">{metrics.activeDisputes} Active</Badge>
+                          )}
+                        </div>
+                      </div>
+                    </Card.Body>
+                  </Card>
+                </Col>
+                <Col md={6} lg={3} className="mb-3">
+                  <Card className="stats-card h-100">
+                    <Card.Body>
+                      <div className="d-flex align-items-center">
+                        <div className="p-3 bg-warning bg-opacity-10 rounded-3 me-3">
+                          <StarFill className="text-warning fs-4" />
+                        </div>
+                        <div>
+                          <h2 className="mb-1">{metrics.loading ? '...' : metrics.flaggedReviews}</h2>
+                          <p className="text-muted mb-0 small">Flagged Reviews</p>
+                          {metrics.flaggedReviews > 0 && (
+                            <Badge bg="warning" className="mt-1">Needs Moderation</Badge>
+                          )}
                         </div>
                       </div>
                     </Card.Body>
@@ -1825,6 +2659,297 @@ export default function AdminDashboard() {
             </>
           )}
 
+          {/* --------- DISPUTE CENTER TAB --------- */}
+          {activeTab === 'Dispute Center' && (
+            <>
+              <div className="d-flex justify-content-between align-items-center mb-4">
+                <h5>Dispute Center ({allDisputes.length})</h5>
+                <div className="d-flex gap-2">
+                  <Badge bg="danger">{allDisputes.filter(d => d.status === 'open').length} Open</Badge>
+                  <Badge bg="warning">{allDisputes.filter(d => d.status === 'investigating').length} Investigating</Badge>
+                  <Badge bg="success">{allDisputes.filter(d => d.status === 'resolved').length} Resolved</Badge>
+                  <Badge bg="secondary">{allDisputes.filter(d => d.status === 'closed').length} Closed</Badge>
+                </div>
+              </div>
+              
+              {metrics.loading ? (
+                <div className="text-center py-5">
+                  <Spinner animation="border" variant="primary" />
+                </div>
+              ) : (
+                <Card>
+                  <div className="table-responsive">
+                    <Table hover className="mb-0">
+                      <thead className="table-light">
+                        <tr>
+                          <th>Dispute ID</th>
+                          <th>Type</th>
+                          <th>Equipment</th>
+                          <th>Reported By</th>
+                          <th>Priority</th>
+                          <th>Status</th>
+                          <th>Created</th>
+                          <th>Actions</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {filteredDisputes.length > 0 ? (
+                          filteredDisputes.map(dispute => (
+                            <tr key={dispute.id}>
+                              <td className="text-muted small">#{dispute.id.slice(-8)}</td>
+                              <td>
+                                <Badge bg={
+                                  dispute.type === 'damage' ? 'danger' :
+                                  dispute.type === 'payment' ? 'warning' :
+                                  dispute.type === 'quality' ? 'info' : 'secondary'
+                                }>
+                                  {dispute.type}
+                                </Badge>
+                              </td>
+                              <td>
+                                <div className="d-flex align-items-center">
+                                  <img 
+                                    src={dispute.equipmentImage || 'https://via.placeholder.com/40'} 
+                                    alt={dispute.equipmentName}
+                                    className="rounded me-2"
+                                    width="40"
+                                    height="40"
+                                    onError={(e) => {
+                                      e.target.onerror = null;
+                                      e.target.src = 'https://via.placeholder.com/40';
+                                    }}
+                                  />
+                                  <div>
+                                    <div className="fw-semibold">{dispute.equipmentName}</div>
+                                    <small className="text-muted">Rental #{dispute.rentalId?.slice(-8)}</small>
+                                  </div>
+                                </div>
+                              </td>
+                              <td>
+                                <div className="fw-semibold">{dispute.reporterName}</div>
+                                <small className="text-muted">{dispute.reporterEmail}</small>
+                              </td>
+                              <td>
+                                <Badge bg={
+                                  dispute.priority === 'high' ? 'danger' :
+                                  dispute.priority === 'medium' ? 'warning' : 'info'
+                                }>
+                                  {dispute.priority}
+                                </Badge>
+                              </td>
+                              <td>{getDisputeStatusBadge(dispute.status)}</td>
+                              <td>
+                                {dispute.createdAt ? 
+                                  new Date(dispute.createdAt.toDate()).toLocaleDateString() : 
+                                  'Unknown'
+                                }
+                              </td>
+                              <td>
+                                <div className="d-flex gap-1">
+                                  <Button variant="outline-primary" size="sm">
+                                    <Eye className="me-1" size={12} />
+                                    View
+                                  </Button>
+                                  {(dispute.status === 'open' || dispute.status === 'investigating') && (
+                                    <Button 
+                                      variant="outline-success" 
+                                      size="sm"
+                                      onClick={() => handleResolveDispute(dispute)}
+                                    >
+                                      <Check className="me-1" size={12} />
+                                      Resolve
+                                    </Button>
+                                  )}
+                                  <Button variant="outline-warning" size="sm">
+                                    <ChatText className="me-1" size={12} />
+                                    Messages
+                                  </Button>
+                                </div>
+                              </td>
+                            </tr>
+                          ))
+                        ) : (
+                          <tr>
+                            <td colSpan="8" className="text-center py-4">
+                              <Flag className="display-4 text-muted" />
+                              <div className="mt-2">No disputes found</div>
+                              {searchQuery ? (
+                                <p className="text-muted">Try adjusting your search terms.</p>
+                              ) : (
+                                <p className="text-muted">Great! No active disputes on the platform.</p>
+                              )}
+                            </td>
+                          </tr>
+                        )}
+                      </tbody>
+                    </Table>
+                  </div>
+                </Card>
+              )}
+            </>
+          )}
+
+          {/* --------- REVIEW MODERATION TAB --------- */}
+          {activeTab === 'Review Moderation' && (
+            <>
+              <div className="d-flex justify-content-between align-items-center mb-4">
+                <h5>Review Moderation ({allReviews.length})</h5>
+                <div className="d-flex gap-2">
+                  <Badge bg="warning">{allReviews.filter(r => r.moderationStatus === 'pending' || r.flagged).length} Flagged</Badge>
+                  <Badge bg="success">{allReviews.filter(r => r.moderationStatus === 'approved').length} Approved</Badge>
+                  <Badge bg="danger">{allReviews.filter(r => r.moderationStatus === 'rejected' || r.moderationStatus === 'removed').length} Rejected/Removed</Badge>
+                </div>
+              </div>
+              
+              {metrics.loading ? (
+                <div className="text-center py-5">
+                  <Spinner animation="border" variant="primary" />
+                </div>
+              ) : (
+                <Card>
+                  <div className="table-responsive">
+                    <Table hover className="mb-0">
+                      <thead className="table-light">
+                        <tr>
+                          <th>Review</th>
+                          <th>Equipment</th>
+                          <th>Reviewer</th>
+                          <th>Rating</th>
+                          <th>Flags</th>
+                          <th>Status</th>
+                          <th>Created</th>
+                          <th>Actions</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {filteredReviews.length > 0 ? (
+                          filteredReviews.map(review => (
+                            <tr key={review.id} className={
+                              (review.flagged || review.flaggedCount > 0 || review.moderationStatus === 'pending') ? 'table-warning' : ''
+                            }>
+                              <td>
+                                <div className="d-flex align-items-center">
+                                  <div>
+                                    <div className="fw-semibold">Review #{review.id.slice(-6)}</div>
+                                    <small className="text-muted text-truncate d-block" style={{ maxWidth: '200px' }}>
+                                      {review.comment}
+                                    </small>
+                                  </div>
+                                </div>
+                              </td>
+                              <td>
+                                <div className="d-flex align-items-center">
+                                  <img 
+                                    src={review.equipmentImage || 'https://via.placeholder.com/40'} 
+                                    alt={review.equipmentName}
+                                    className="rounded me-2"
+                                    width="40"
+                                    height="40"
+                                    onError={(e) => {
+                                      e.target.onerror = null;
+                                      e.target.src = 'https://via.placeholder.com/40';
+                                    }}
+                                  />
+                                  <div>
+                                    <div className="fw-semibold">{review.equipmentName}</div>
+                                    <small className="text-muted">{review.equipmentCategory}</small>
+                                  </div>
+                                </div>
+                              </td>
+                              <td>
+                                <div className="fw-semibold">{review.userName}</div>
+                                <small className="text-muted">{review.userEmail}</small>
+                              </td>
+                              <td>
+                                <div className="d-flex align-items-center">
+                                  {[...Array(5)].map((_, i) => (
+                                    <StarFill
+                                      key={i}
+                                      className={`me-1 ${i < review.rating ? 'text-warning' : 'text-muted'}`}
+                                      size={14}
+                                    />
+                                  ))}
+                                  <span className="ms-1 small">{review.rating}/5</span>
+                                </div>
+                              </td>
+                              <td>
+                                {review.flaggedCount > 0 ? (
+                                  <Badge bg="danger">🚩 {review.flaggedCount}</Badge>
+                                ) : review.flagged ? (
+                                  <Badge bg="warning">🚩 Flagged</Badge>
+                                ) : (
+                                  <Badge bg="success">Clean</Badge>
+                                )}
+                                {review.flagReasons && review.flagReasons.length > 0 && (
+                                  <div className="mt-1">
+                                    {review.flagReasons.slice(0, 2).map((reason, index) => (
+                                      <Badge key={index} bg="secondary" className="me-1 small">{reason}</Badge>
+                                    ))}
+                                  </div>
+                                )}
+                              </td>
+                              <td>
+                                <Badge bg={
+                                  review.moderationStatus === 'approved' ? 'success' :
+                                  review.moderationStatus === 'rejected' ? 'danger' :
+                                  review.moderationStatus === 'removed' ? 'dark' : 'warning'
+                                }>
+                                  {review.moderationStatus || 'Pending'}
+                                </Badge>
+                              </td>
+                              <td>
+                                {review.createdAt ? 
+                                  new Date(review.createdAt.toDate()).toLocaleDateString() : 
+                                  'Unknown'
+                                }
+                              </td>
+                              <td>
+                                <div className="d-flex gap-1">
+                                  <Button variant="outline-primary" size="sm">
+                                    <Eye className="me-1" size={12} />
+                                    View
+                                  </Button>
+                                  {(review.flagged || review.flaggedCount > 0 || review.moderationStatus === 'pending') && (
+                                    <Button 
+                                      variant="outline-warning" 
+                                      size="sm"
+                                      onClick={() => handleModerateReview(review)}
+                                    >
+                                      <ExclamationTriangle className="me-1" size={12} />
+                                      Moderate
+                                    </Button>
+                                  )}
+                                  {review.moderationStatus === 'approved' && (
+                                    <Button variant="outline-danger" size="sm">
+                                      <X className="me-1" size={12} />
+                                      Remove
+                                    </Button>
+                                  )}
+                                </div>
+                              </td>
+                            </tr>
+                          ))
+                        ) : (
+                          <tr>
+                            <td colSpan="8" className="text-center py-4">
+                              <StarFill className="display-4 text-muted" />
+                              <div className="mt-2">No reviews found</div>
+                              {searchQuery ? (
+                                <p className="text-muted">Try adjusting your search terms.</p>
+                              ) : (
+                                <p className="text-muted">No reviews need moderation at this time.</p>
+                              )}
+                            </td>
+                          </tr>
+                        )}
+                      </tbody>
+                    </Table>
+                  </div>
+                </Card>
+              )}
+            </>
+          )}
+
           {/* --------- ANALYTICS TAB --------- */}
           {activeTab === 'Analytics' && (
             <>
@@ -1879,10 +3004,16 @@ export default function AdminDashboard() {
             <>
               <div className="d-flex justify-content-between align-items-center mb-4">
                 <h5>Admin Settings</h5>
-                <Button variant="primary" onClick={() => setShowSettings(true)}>
-                  <Gear className="me-2" />
-                  Configure Platform
-                </Button>
+                <div className="d-flex gap-2">
+                  <Button variant="primary" onClick={() => setShowSettings(true)}>
+                    <Gear className="me-2" />
+                    Configure Platform
+                  </Button>
+                  <Button variant="outline-primary" onClick={() => setShowExportImport(true)}>
+                    <Archive className="me-2" />
+                    Export/Import
+                  </Button>
+                </div>
               </div>
               <Row>
                 <Col md={8}>
@@ -1892,21 +3023,45 @@ export default function AdminDashboard() {
                     </Card.Header>
                     <Card.Body>
                       <div className="d-grid gap-2">
-                        <Button variant="outline-primary" className="d-flex align-items-center justify-content-start">
+                        <Button 
+                          variant="outline-primary" 
+                          className="d-flex align-items-center justify-content-start"
+                          onClick={() => setShowExportImport(true)}
+                        >
                           <Download className="me-2" />
                           Export User Data
                         </Button>
-                        <Button variant="outline-primary" className="d-flex align-items-center justify-content-start">
+                        <Button 
+                          variant="outline-primary" 
+                          className="d-flex align-items-center justify-content-start"
+                          onClick={() => setShowExportImport(true)}
+                        >
                           <Download className="me-2" />
                           Export Equipment Data
                         </Button>
-                        <Button variant="outline-primary" className="d-flex align-items-center justify-content-start">
+                        <Button 
+                          variant="outline-primary" 
+                          className="d-flex align-items-center justify-content-start"
+                          onClick={() => setShowExportImport(true)}
+                        >
                           <Download className="me-2" />
                           Export Rental Reports
                         </Button>
-                        <Button variant="outline-warning" className="d-flex align-items-center justify-content-start">
+                        <Button 
+                          variant="outline-warning" 
+                          className="d-flex align-items-center justify-content-start"
+                          onClick={() => setShowExportImport(true)}
+                        >
                           <Upload className="me-2" />
                           Bulk Import Equipment
+                        </Button>
+                        <Button 
+                          variant="outline-info" 
+                          className="d-flex align-items-center justify-content-start"
+                          onClick={() => setShowExportImport(true)}
+                        >
+                          <FileText className="me-2" />
+                          Export Admin Actions Log
                         </Button>
                       </div>
                     </Card.Body>
@@ -1926,9 +3081,21 @@ export default function AdminDashboard() {
                         <span>Storage Usage:</span>
                         <Badge bg="primary">45% Used</Badge>
                       </div>
-                      <div className="d-flex justify-content-between align-items-center">
+                      <div className="d-flex justify-content-between align-items-center mb-2">
                         <span>Active Sessions:</span>
                         <Badge bg="info">{metrics.totalUsers} Users</Badge>
+                      </div>
+                      <div className="d-flex justify-content-between align-items-center mb-2">
+                        <span>Pending Disputes:</span>
+                        <Badge bg={metrics.activeDisputes > 0 ? "danger" : "success"}>
+                          {metrics.activeDisputes}
+                        </Badge>
+                      </div>
+                      <div className="d-flex justify-content-between align-items-center">
+                        <span>Flagged Reviews:</span>
+                        <Badge bg={metrics.flaggedReviews > 0 ? "warning" : "success"}>
+                          {metrics.flaggedReviews}
+                        </Badge>
                       </div>
                     </Card.Body>
                   </Card>
@@ -1950,6 +3117,7 @@ export default function AdminDashboard() {
         .stats-card:hover { transform: translateY(-2px); transition: transform 0.2s; }
         .activity-list li { padding: 0.5rem 0; border-bottom: 1px solid #f1f3f4; }
         .activity-list li:last-child { border-bottom: none; }
+        .table-warning { background-color: rgba(255, 193, 7, 0.1) !important; }
       `}</style>
     </div>
     </>
