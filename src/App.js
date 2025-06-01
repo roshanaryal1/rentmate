@@ -366,7 +366,7 @@ const Footer = () => (
           <p>Equipment rental made simple.</p>
         </div>
         <div className="col-md-6 text-md-end">
-          <p>&copy; 2024 RentMate. All rights reserved.</p>
+          <p>&copy; 2025 RentMate. All rights reserved.</p>
         </div>
       </div>
     </div>
