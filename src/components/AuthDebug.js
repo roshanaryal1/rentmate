@@ -5,6 +5,10 @@ import { useAuth } from '../contexts/AuthContext';
 function AuthDebug() {
   const { currentUser, userRole, loading, authChecked } = useAuth();
 
+  // Always hide the debug panel
+  return null;
+
+  // Original code below (will never execute)
   if (process.env.NODE_ENV !== 'development') {
     return null; // Don't show in production
   }
@@ -42,7 +46,7 @@ function AuthDebug() {
       <div style={{ margin: '4px 0' }}>
         <strong>Verified:</strong> {currentUser ? (currentUser.emailVerified ? 'Yes' : 'No') : 'N/A'}
       </div>
-      <button 
+      <button
         onClick={() => console.log('Full auth state:', { currentUser, userRole, loading, authChecked })}
         style={{
           marginTop: '8px',
