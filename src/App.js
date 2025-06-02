@@ -1,4 +1,4 @@
-// src/App.js
+// src/App.js - Updated with public renter dashboard
 import React from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider } from './contexts/AuthContext';
@@ -56,13 +56,34 @@ function App() {
             {/* Main Content */}
             <main className="main-content">
               <Routes>
-                {/* Public Routes */}
-                <Route path="/" element={<LandingPage />} />
+                {/* Public Routes - No authentication required */}
+                <Route path="/" element={<RenterDashboard />} />
+                <Route path="/browse" element={<RenterDashboard />} />
+                <Route path="/equipment/:id" element={<EquipmentDetail />} />
                 <Route path="/login" element={<Login />} />
                 <Route path="/signup" element={<Signup />} />
                 <Route path="/forgot-password" element={<ForgotPassword />} />
-                <Route path="/equipment/:id" element={<EquipmentDetail />} />
                 
+                {/* Equipment rental - requires authentication */}
+                <Route 
+                  path="/rent/:equipmentId" 
+                  element={
+                    <RoleRoute allowedRoles={['admin', 'owner', 'renter']}>
+                      <RentEquipment />
+                    </RoleRoute>
+                  } 
+                />
+                
+                {/* Payment - requires authentication */}
+                <Route 
+                  path="/payment/:equipmentId" 
+                  element={
+                    <RoleRoute allowedRoles={['admin', 'owner', 'renter']}>
+                      <PaymentPage />
+                    </RoleRoute>
+                  } 
+                />
+
                 {/* Protected Routes - All Authenticated Users */}
                 <Route 
                   path="/profile" 
@@ -141,20 +162,12 @@ function App() {
                   } 
                 />
 
-                {/* Renter Routes */}
+                {/* Renter Protected Routes - Only for authenticated renters */}
                 <Route 
                   path="/renter-dashboard" 
                   element={
                     <RoleRoute allowedRoles={['renter']}>
                       <RenterDashboard />
-                    </RoleRoute>
-                  } 
-                />
-                <Route 
-                  path="/rent/:equipmentId" 
-                  element={
-                    <RoleRoute allowedRoles={['renter']}>
-                      <RentEquipment />
                     </RoleRoute>
                   } 
                 />
@@ -179,14 +192,6 @@ function App() {
                   element={
                     <RoleRoute allowedRoles={['renter']}>
                       <FavoritesPage />
-                    </RoleRoute>
-                  } 
-                />
-                <Route 
-                  path="/payment/:equipmentId" 
-                  element={
-                    <RoleRoute allowedRoles={['renter']}>
-                      <PaymentPage />
                     </RoleRoute>
                   } 
                 />
@@ -227,29 +232,6 @@ function App() {
 }
 
 // Placeholder Components (you can replace these with actual components)
-const LandingPage = () => (
-  <div className="container py-5">
-    <div className="row">
-      <div className="col-lg-8 mx-auto text-center">
-        <h1 className="display-4 fw-bold mb-4">
-          Rent Equipment, <span className="text-primary">Made Simple</span>
-        </h1>
-        <p className="lead mb-4">
-          Connect with equipment owners in your area and rent what you need, when you need it.
-        </p>
-        <div className="d-flex gap-3 justify-content-center">
-          <a href="/signup" className="btn btn-primary btn-lg">
-            Get Started
-          </a>
-          <a href="/how-it-works" className="btn btn-outline-primary btn-lg">
-            How It Works
-          </a>
-        </div>
-      </div>
-    </div>
-  </div>
-);
-
 const ProfilePage = () => (
   <div className="container py-5">
     <h2>My Profile</h2>
