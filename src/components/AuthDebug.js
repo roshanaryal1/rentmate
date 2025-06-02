@@ -1,8 +1,9 @@
 // src/components/AuthDebug.js
 import React from 'react';
-import { useAuth } from '../contexts/AuthContext';
 
+// Empty component - renders nothing
 function AuthDebug() {
+<<<<<<< HEAD
   const { currentUser, userRole, loading, authChecked } = useAuth();
 
   // Always hide the debug panel
@@ -61,6 +62,9 @@ function AuthDebug() {
       </button>
     </div>
   );
+=======
+  return null;
+>>>>>>> 6c6fcb2 ( changed on auth debug)
 }
 
 export default AuthDebug;
