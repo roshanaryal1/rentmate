@@ -1,14 +1,16 @@
 import React, { useState, useEffect } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
-import { collection, getDocs, query, where, orderBy } from 'firebase/firestore';
+import { collection, getDocs, query, where, orderBy, addDoc, deleteDoc, doc } from 'firebase/firestore';
 import { db } from '../../firebase';
 import EquipmentDetailModal from '../Equipment/EquipmentDetailModal';
 
 function RenterDashboard() {
   const { currentUser } = useAuth();
+  const navigate = useNavigate();
   const [equipmentList, setEquipmentList] = useState([]);
   const [rentalHistory, setRentalHistory] = useState([]);
+  const [favorites, setFavorites] = useState([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('all');
@@ -23,13 +25,138 @@ function RenterDashboard() {
     availableEquipment: 0
   });
 
+  // Check if user has access to personal tabs
+  const hasPersonalAccess = currentUser !== null;
+
+  // Redirect to browse tab if user is not authenticated and tries to access personal tabs
+  useEffect(() => {
+    if (!hasPersonalAccess && activeTab === 'rentals') {
+      setActiveTab('browse');
+    }
+  }, [hasPersonalAccess, activeTab]);
+
+  // Fetch user favorites from Firebase
+  const fetchFavorites = async () => {
+    if (!currentUser) {
+      setFavorites([]);
+      return;
+    }
+
+    try {
+      const favoritesQuery = query(
+        collection(db, 'favorites'),
+        where('userId', '==', currentUser.uid)
+      );
+      
+      const favoritesSnapshot = await getDocs(favoritesQuery);
+      const userFavorites = favoritesSnapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      }));
+      
+      setFavorites(userFavorites);
+      console.log(`✅ Loaded ${userFavorites.length} user favorites`);
+    } catch (error) {
+      console.error('❌ Error fetching favorites:', error);
+      setFavorites([]);
+    }
+  };
+
+  // Add item to favorites
+  const addToFavorites = async (equipmentId, equipmentData) => {
+    if (!currentUser) {
+      console.log('User not authenticated');
+      return;
+    }
+
+    try {
+      // Check if already favorited
+      const isAlreadyFavorite = favorites.some(fav => fav.equipmentId === equipmentId);
+      if (isAlreadyFavorite) {
+        console.log('Item already in favorites');
+        return;
+      }
+
+      const favoriteDoc = await addDoc(collection(db, 'favorites'), {
+        userId: currentUser.uid,
+        equipmentId: equipmentId,
+        equipmentName: equipmentData.name,
+        equipmentImage: equipmentData.imageUrl,
+        equipmentPrice: equipmentData.ratePerDay,
+        equipmentCategory: equipmentData.category,
+        equipmentLocation: equipmentData.location,
+        dateAdded: new Date(),
+      });
+
+      // Update local state
+      const newFavorite = {
+        id: favoriteDoc.id,
+        userId: currentUser.uid,
+        equipmentId: equipmentId,
+        equipmentName: equipmentData.name,
+        equipmentImage: equipmentData.imageUrl,
+        equipmentPrice: equipmentData.ratePerDay,
+        equipmentCategory: equipmentData.category,
+        equipmentLocation: equipmentData.location,
+        dateAdded: new Date(),
+      };
+
+      setFavorites(prev => [...prev, newFavorite]);
+      console.log('✅ Added to favorites:', equipmentData.name);
+      
+      // Show success feedback (you can enhance this with a toast notification)
+      alert('Added to favorites!');
+    } catch (error) {
+      console.error('❌ Error adding to favorites:', error);
+      alert('Failed to add to favorites. Please try again.');
+    }
+  };
+
+  // Remove item from favorites
+  const removeFromFavorites = async (equipmentId) => {
+    if (!currentUser) return;
+
+    try {
+      const favoriteToRemove = favorites.find(fav => fav.equipmentId === equipmentId);
+      if (!favoriteToRemove) return;
+
+      await deleteDoc(doc(db, 'favorites', favoriteToRemove.id));
+      
+      // Update local state
+      setFavorites(prev => prev.filter(fav => fav.equipmentId !== equipmentId));
+      console.log('✅ Removed from favorites');
+      
+      // Show success feedback
+      alert('Removed from favorites!');
+    } catch (error) {
+      console.error('❌ Error removing from favorites:', error);
+      alert('Failed to remove from favorites. Please try again.');
+    }
+  };
+
+  // Toggle favorite status
+  const toggleFavorite = async (equipmentId, equipmentData) => {
+    const isFavorited = favorites.some(fav => fav.equipmentId === equipmentId);
+    
+    if (isFavorited) {
+      await removeFromFavorites(equipmentId);
+    } else {
+      await addToFavorites(equipmentId, equipmentData);
+    }
+  };
+
+  // Check if item is favorited
+  const isFavorited = (equipmentId) => {
+    return favorites.some(fav => fav.equipmentId === equipmentId);
+  };
+
   // Fetch all data from Firebase
   useEffect(() => {
     const fetchAllData = async () => {
       try {
         setLoading(true);
         
-        // 1. Fetch ALL equipment from Firebase with detailed logging
+        // 1. Fetch ALL equipment from Firebase (always accessible)
         console.log('🔍 Starting to fetch equipment from Firebase...');
         
         const equipmentSnapshot = await getDocs(collection(db, 'equipment'));
@@ -51,41 +178,23 @@ function RenterDashboard() {
         });
 
         console.log(`📦 Total equipment fetched: ${allEquipment.length}`);
-        console.log('🔍 Sample equipment data:', allEquipment.slice(0, 3));
-
-        // Show ALL equipment first (for debugging)
-        console.log('🚀 Setting ALL equipment to state (no filtering)...');
         setEquipmentList(allEquipment);
         
-        // Log filtering results
-        const approvedEquipment = allEquipment.filter(item => 
-          item.status === 'approved' || item.approvalStatus === 'approved'
-        );
-        console.log(`✅ Approved equipment: ${approvedEquipment.length}`);
+        // Update available equipment count for stats
+        const availableCount = allEquipment.filter(item => item.available).length;
         
-        const availableEquipment = allEquipment.filter(item => item.available);
-        console.log(`🟢 Available equipment: ${availableEquipment.length}`);
-        
-        const bothApprovedAndAvailable = allEquipment.filter(item => 
-          (item.status === 'approved' || item.approvalStatus === 'approved') && item.available
-        );
-        console.log(`✨ Both approved AND available: ${bothApprovedAndAvailable.length}`);
-        
-        // For now, show ALL equipment to debug
-        // setEquipmentList(availableEquipment);
-        console.log(`✅ Loaded ${allEquipment.length} total equipment items`);
-
-        // 2. Fetch rental history for current user
+        // 2. Fetch rental history and favorites only if user is authenticated
         let userRentals = [];
         let calculatedStats = {
           totalRentals: 0,
           activeRentals: 0,
           totalSpent: 0,
-          availableEquipment: allEquipment.filter(item => item.available).length
+          availableEquipment: availableCount
         };
 
         if (currentUser) {
           try {
+            // Fetch rentals
             const rentalsQuery = query(
               collection(db, 'rentals'),
               where('renterId', '==', currentUser.uid)
@@ -97,17 +206,20 @@ function RenterDashboard() {
               ...doc.data()
             }));
 
-            // Calculate real stats
+            // Calculate real stats for authenticated users
             calculatedStats = {
               totalRentals: userRentals.length,
               activeRentals: userRentals.filter(r => r.status === 'active' || r.status === 'approved').length,
               totalSpent: userRentals.reduce((sum, r) => sum + (r.totalPrice || r.totalCost || 0), 0),
-              availableEquipment: allEquipment.filter(item => item.available).length
+              availableEquipment: availableCount
             };
 
             console.log(`✅ Loaded ${userRentals.length} user rentals`);
+            
+            // Fetch favorites
+            await fetchFavorites();
           } catch (error) {
-            console.log('ℹ️ Error fetching rentals or no rentals found:', error);
+            console.log('ℹ️ Error fetching rentals or favorites:', error);
           }
         }
 
@@ -116,10 +228,6 @@ function RenterDashboard() {
 
       } catch (error) {
         console.error('❌ Error fetching dashboard data:', error);
-        console.error('❌ Error details:', error.message);
-        console.error('❌ Error code:', error.code);
-        
-        // Set empty state on error so user knows something went wrong
         setEquipmentList([]);
         setStats({
           totalRentals: 0,
@@ -151,22 +259,7 @@ function RenterDashboard() {
       (priceRange === 'medium' && item.ratePerDay > 50 && item.ratePerDay <= 150) ||
       (priceRange === 'high' && item.ratePerDay > 150);
     
-    const passesFilter = matchesSearch && matchesCategory && matchesPrice;
-    
-    // Debug logging for first few items
-    if (equipmentList.indexOf(item) < 5) {
-      console.log(`🔍 Filter debug for "${item.name}":`, {
-        matchesSearch,
-        matchesCategory, 
-        matchesPrice,
-        passesFilter,
-        searchTerm,
-        selectedCategory,
-        priceRange
-      });
-    }
-    
-    return passesFilter;
+    return matchesSearch && matchesCategory && matchesPrice;
   });
 
   console.log(`📊 Filtering results: ${filteredEquipment.length} of ${equipmentList.length} items shown`);
@@ -203,6 +296,31 @@ function RenterDashboard() {
     setPriceRange('all');
   };
 
+  // Handle actions that require authentication
+  const handleAuthRequiredAction = (action, equipmentId = null) => {
+    if (!currentUser) {
+      // Store intended action for after login
+      localStorage.setItem('pendingAction', JSON.stringify({ action, equipmentId }));
+      navigate('/login');
+      return;
+    }
+    
+    // User is authenticated, proceed with action
+    switch (action) {
+      case 'rent':
+        navigate(`/rent/${equipmentId}`);
+        break;
+      case 'favorites':
+        navigate('/favorites');
+        break;
+      case 'rental-history':
+        navigate('/rental-history');
+        break;
+      default:
+        break;
+    }
+  };
+
   return (
     <div className="min-vh-100" style={{ backgroundColor: '#f8fafc' }}>
       <div className="container-fluid py-4">
@@ -220,19 +338,56 @@ function RenterDashboard() {
             <div className="d-flex justify-content-between align-items-center">
               <div>
                 <h1 className="h3 fw-bold text-dark mb-1">
-                  Welcome back, {currentUser?.displayName || currentUser?.email?.split('@')[0]}! 👋
+                  {currentUser ? (
+                    <>Welcome back, {currentUser?.displayName || currentUser?.email?.split('@')[0]}! 👋</>
+                  ) : (
+                    <>Discover Amazing Equipment 🔧</>
+                  )}
                 </h1>
-                <p className="text-muted mb-0">Discover and rent equipment from trusted owners in your area</p>
+                <p className="text-muted mb-0">
+                  {currentUser ? (
+                    'Discover and rent equipment from trusted owners in your area'
+                  ) : (
+                    'Browse thousands of tools and equipment available for rent near you'
+                  )}
+                </p>
               </div>
               <div className="d-flex gap-2">
-                <Link to="/rental-history" className="btn btn-outline-primary">
-                  <i className="bi bi-clock-history me-2"></i>
-                  Rental History
-                </Link>
-                <Link to="/favorites" className="btn btn-outline-success">
-                  <i className="bi bi-heart me-2"></i>
-                  Favorites
-                </Link>
+                {currentUser ? (
+                  <>
+                    <button 
+                      onClick={() => handleAuthRequiredAction('rental-history')}
+                      className="btn btn-outline-primary"
+                    >
+                      <i className="bi bi-clock-history me-2"></i>
+                      Rental History
+                    </button>
+                    <button 
+                      onClick={() => handleAuthRequiredAction('favorites')}
+                      className="btn btn-outline-success position-relative"
+                    >
+                      <i className="bi bi-heart me-2"></i>
+                      Favorites
+                      {favorites.length > 0 && (
+                        <span className="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger">
+                          {favorites.length}
+                          <span className="visually-hidden">favorites count</span>
+                        </span>
+                      )}
+                    </button>
+                  </>
+                ) : (
+                  <>
+                    <Link to="/login" className="btn btn-outline-primary">
+                      <i className="bi bi-box-arrow-in-right me-2"></i>
+                      Log In
+                    </Link>
+                    <Link to="/signup" className="btn btn-primary">
+                      <i className="bi bi-person-plus me-2"></i>
+                      Sign Up
+                    </Link>
+                  </>
+                )}
               </div>
             </div>
           </div>
@@ -256,53 +411,107 @@ function RenterDashboard() {
             </div>
           </div>
 
-          <div className="col-lg-3 col-md-6 mb-3">
-            <div className="card border-0 shadow-sm h-100" style={{ background: 'linear-gradient(135deg, #f093fb 0%, #f5576c 100%)' }}>
-              <div className="card-body text-white">
-                <div className="d-flex align-items-center justify-content-between">
-                  <div>
-                    <h3 className="fw-bold mb-1">{stats.activeRentals}</h3>
-                    <p className="mb-0 opacity-75">Active Rentals</p>
-                  </div>
-                  <div className="bg-white bg-opacity-20 p-3 rounded-3">
-                    <i className="bi bi-check-circle fs-4"></i>
+          {currentUser ? (
+            <>
+              <div className="col-lg-3 col-md-6 mb-3">
+                <div className="card border-0 shadow-sm h-100" style={{ background: 'linear-gradient(135deg, #f093fb 0%, #f5576c 100%)' }}>
+                  <div className="card-body text-white">
+                    <div className="d-flex align-items-center justify-content-between">
+                      <div>
+                        <h3 className="fw-bold mb-1">{stats.activeRentals}</h3>
+                        <p className="mb-0 opacity-75">Active Rentals</p>
+                      </div>
+                      <div className="bg-white bg-opacity-20 p-3 rounded-3">
+                        <i className="bi bi-check-circle fs-4"></i>
+                      </div>
+                    </div>
                   </div>
                 </div>
               </div>
-            </div>
-          </div>
 
-          <div className="col-lg-3 col-md-6 mb-3">
-            <div className="card border-0 shadow-sm h-100" style={{ background: 'linear-gradient(135deg, #4facfe 0%, #00f2fe 100%)' }}>
-              <div className="card-body text-white">
-                <div className="d-flex align-items-center justify-content-between">
-                  <div>
-                    <h3 className="fw-bold mb-1">{stats.totalRentals}</h3>
-                    <p className="mb-0 opacity-75">Total Rentals</p>
-                  </div>
-                  <div className="bg-white bg-opacity-20 p-3 rounded-3">
-                    <i className="bi bi-archive fs-4"></i>
+              <div className="col-lg-3 col-md-6 mb-3">
+                <div className="card border-0 shadow-sm h-100" style={{ background: 'linear-gradient(135deg, #4facfe 0%, #00f2fe 100%)' }}>
+                  <div className="card-body text-white">
+                    <div className="d-flex align-items-center justify-content-between">
+                      <div>
+                        <h3 className="fw-bold mb-1">{stats.totalRentals}</h3>
+                        <p className="mb-0 opacity-75">Total Rentals</p>
+                      </div>
+                      <div className="bg-white bg-opacity-20 p-3 rounded-3">
+                        <i className="bi bi-archive fs-4"></i>
+                      </div>
+                    </div>
                   </div>
                 </div>
               </div>
-            </div>
-          </div>
 
-          <div className="col-lg-3 col-md-6 mb-3">
-            <div className="card border-0 shadow-sm h-100" style={{ background: 'linear-gradient(135deg, #fa709a 0%, #fee140 100%)' }}>
-              <div className="card-body text-white">
-                <div className="d-flex align-items-center justify-content-between">
-                  <div>
-                    <h3 className="fw-bold mb-1">${stats.totalSpent}</h3>
-                    <p className="mb-0 opacity-75">Total Spent</p>
-                  </div>
-                  <div className="bg-white bg-opacity-20 p-3 rounded-3">
-                    <i className="bi bi-currency-dollar fs-4"></i>
+              <div className="col-lg-3 col-md-6 mb-3">
+                <div className="card border-0 shadow-sm h-100" style={{ background: 'linear-gradient(135deg, #fa709a 0%, #fee140 100%)' }}>
+                  <div className="card-body text-white">
+                    <div className="d-flex align-items-center justify-content-between">
+                      <div>
+                        <h3 className="fw-bold mb-1">${stats.totalSpent}</h3>
+                        <p className="mb-0 opacity-75">Total Spent</p>
+                      </div>
+                      <div className="bg-white bg-opacity-20 p-3 rounded-3">
+                        <i className="bi bi-currency-dollar fs-4"></i>
+                      </div>
+                    </div>
                   </div>
                 </div>
               </div>
-            </div>
-          </div>
+            </>
+          ) : (
+            <>
+              <div className="col-lg-3 col-md-6 mb-3">
+                <div className="card border-0 shadow-sm h-100" style={{ background: 'linear-gradient(135deg, #f093fb 0%, #f5576c 100%)' }}>
+                  <div className="card-body text-white">
+                    <div className="d-flex align-items-center justify-content-between">
+                      <div>
+                        <h3 className="fw-bold mb-1">Easy</h3>
+                        <p className="mb-0 opacity-75">Browse & Rent</p>
+                      </div>
+                      <div className="bg-white bg-opacity-20 p-3 rounded-3">
+                        <i className="bi bi-search fs-4"></i>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div className="col-lg-3 col-md-6 mb-3">
+                <div className="card border-0 shadow-sm h-100" style={{ background: 'linear-gradient(135deg, #4facfe 0%, #00f2fe 100%)' }}>
+                  <div className="card-body text-white">
+                    <div className="d-flex align-items-center justify-content-between">
+                      <div>
+                        <h3 className="fw-bold mb-1">Trusted</h3>
+                        <p className="mb-0 opacity-75">Verified Owners</p>
+                      </div>
+                      <div className="bg-white bg-opacity-20 p-3 rounded-3">
+                        <i className="bi bi-shield-check fs-4"></i>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div className="col-lg-3 col-md-6 mb-3">
+                <div className="card border-0 shadow-sm h-100" style={{ background: 'linear-gradient(135deg, #fa709a 0%, #fee140 100%)' }}>
+                  <div className="card-body text-white">
+                    <div className="d-flex align-items-center justify-content-between">
+                      <div>
+                        <h3 className="fw-bold mb-1">Affordable</h3>
+                        <p className="mb-0 opacity-75">Great Prices</p>
+                      </div>
+                      <div className="bg-white bg-opacity-20 p-3 rounded-3">
+                        <i className="bi bi-currency-dollar fs-4"></i>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </>
+          )}
         </div>
 
         {/* Tab Navigation */}
@@ -318,16 +527,18 @@ function RenterDashboard() {
                     <i className="bi bi-search me-2"></i>
                     Browse Equipment ({filteredEquipment.length})
                   </button>
-                  <button 
-                    className={`nav-link py-3 border-0 fw-semibold ${activeTab === 'rentals' ? 'active' : ''}`}
-                    onClick={() => setActiveTab('rentals')}
-                  >
-                    <i className="bi bi-calendar me-2"></i>
-                    My Rentals ({stats.totalRentals})
-                    {stats.activeRentals > 0 && (
-                      <span className="badge bg-success ms-2">{stats.activeRentals}</span>
-                    )}
-                  </button>
+                  {hasPersonalAccess && (
+                    <button 
+                      className={`nav-link py-3 border-0 fw-semibold ${activeTab === 'rentals' ? 'active' : ''}`}
+                      onClick={() => setActiveTab('rentals')}
+                    >
+                      <i className="bi bi-calendar me-2"></i>
+                      My Rentals ({stats.totalRentals})
+                      {stats.activeRentals > 0 && (
+                        <span className="badge bg-success ms-2">{stats.activeRentals}</span>
+                      )}
+                    </button>
+                  )}
                 </nav>
               </div>
             </div>
@@ -437,6 +648,10 @@ function RenterDashboard() {
                         item={item} 
                         currentUserId={currentUser?.uid} 
                         onViewDetails={handleViewDetails}
+                        onAuthRequiredAction={handleAuthRequiredAction}
+                        isAuthenticated={!!currentUser}
+                        isFavorited={isFavorited(item.id)}
+                        onToggleFavorite={toggleFavorite}
                       />
                     </div>
                   ))}
@@ -457,10 +672,17 @@ function RenterDashboard() {
                         Have Equipment to Share?
                       </h6>
                       <p className="mb-2">Start earning by listing your equipment:</p>
-                      <Link to="/add-equipment" className="btn btn-primary btn-sm">
-                        <i className="bi bi-plus-circle me-1"></i>
-                        List Equipment
-                      </Link>
+                      {currentUser ? (
+                        <Link to="/add-equipment" className="btn btn-primary btn-sm">
+                          <i className="bi bi-plus-circle me-1"></i>
+                          List Equipment
+                        </Link>
+                      ) : (
+                        <Link to="/signup" className="btn btn-primary btn-sm">
+                          <i className="bi bi-person-plus me-1"></i>
+                          Sign Up to List Equipment
+                        </Link>
+                      )}
                     </div>
                   </div>
                 </div>
@@ -483,8 +705,8 @@ function RenterDashboard() {
           </div>
         )}
 
-        {/* My Rentals Tab */}
-        {activeTab === 'rentals' && (
+        {/* My Rentals Tab - Only for authenticated users */}
+        {activeTab === 'rentals' && hasPersonalAccess && (
           <div>
             {rentalHistory.length > 0 ? (
               <div className="row">
@@ -576,14 +798,69 @@ function RenterDashboard() {
             )}
           </div>
         )}
+
+        {/* Call to Action for non-authenticated users */}
+        {!currentUser && (
+          <div className="row mt-5">
+            <div className="col">
+              <div className="card border-0 shadow-sm bg-primary text-white">
+                <div className="card-body text-center py-5">
+                  <h3 className="fw-bold mb-3">Ready to Start Renting?</h3>
+                  <p className="mb-4 opacity-75">
+                    Join thousands of users who are already saving money by renting instead of buying!
+                  </p>
+                  <div className="d-flex gap-3 justify-content-center">
+                    <Link to="/signup" className="btn btn-light btn-lg">
+                      <i className="bi bi-person-plus me-2"></i>
+                      Sign Up Free
+                    </Link>
+                    <Link to="/login" className="btn btn-outline-light btn-lg">
+                      <i className="bi bi-box-arrow-in-right me-2"></i>
+                      Log In
+                    </Link>
+                  </div>
+                  <p className="mt-3 mb-0 small opacity-75">
+                    Already have equipment? <Link to="/signup" className="text-white fw-bold">List it for rent</Link>
+                  </p>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
 }
 
-// Enhanced Equipment Card Component
-function EquipmentCard({ item, currentUserId, onViewDetails }) {
+// Enhanced Equipment Card Component with functional favorites
+function EquipmentCard({ 
+  item, 
+  currentUserId, 
+  onViewDetails, 
+  onAuthRequiredAction, 
+  isAuthenticated, 
+  isFavorited,
+  onToggleFavorite 
+}) {
   const isOwnEquipment = item.ownerId === currentUserId;
+  
+  const handleRentClick = () => {
+    if (!isAuthenticated) {
+      onAuthRequiredAction('rent', item.id);
+    } else {
+      onAuthRequiredAction('rent', item.id);
+    }
+  };
+
+  const handleFavoriteClick = (e) => {
+    e.stopPropagation(); // Prevent triggering other click events
+    
+    if (!isAuthenticated) {
+      onAuthRequiredAction('favorites');
+    } else {
+      onToggleFavorite(item.id, item);
+    }
+  };
   
   return (
     <div className="card border-0 shadow-sm h-100 equipment-card">
@@ -626,8 +903,20 @@ function EquipmentCard({ item, currentUserId, onViewDetails }) {
           >
             <i className="bi bi-eye"></i>
           </button>
-          <button className="btn btn-light btn-sm rounded-circle" title="Add to favorites">
-            <i className="bi bi-heart"></i>
+          <button 
+            className={`btn btn-sm rounded-circle ${
+              isFavorited ? 'btn-danger' : 'btn-light'
+            }`}
+            title={
+              !isAuthenticated 
+                ? "Login to add to favorites" 
+                : isFavorited 
+                  ? "Remove from favorites" 
+                  : "Add to favorites"
+            }
+            onClick={handleFavoriteClick}
+          >
+            <i className={`bi ${isFavorited ? 'bi-heart-fill' : 'bi-heart'}`}></i>
           </button>
         </div>
       </div>
@@ -649,6 +938,8 @@ function EquipmentCard({ item, currentUserId, onViewDetails }) {
           }}>
             {item.description}
           </p>
+          
+          
           
           <div className="d-flex justify-content-between align-items-center mb-3">
             <div>
@@ -677,13 +968,13 @@ function EquipmentCard({ item, currentUserId, onViewDetails }) {
         {/* Action Button */}
         <div className="d-grid">
           {item.available && !isOwnEquipment ? (
-            <Link
-              to={`/rent/${item.id}`}
+            <button
+              onClick={handleRentClick}
               className="btn btn-primary"
             >
               <i className="bi bi-calendar-plus me-2"></i>
-              Rent Now
-            </Link>
+              {isAuthenticated ? 'Rent Now' : 'Login to Rent'}
+            </button>
           ) : isOwnEquipment ? (
             <Link
               to={`/edit-equipment/${item.id}`}

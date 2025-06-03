@@ -58,7 +58,17 @@ const Header = () => {
     }
   };
 
-  // Navbar items
+  // Handle actions that require authentication
+  const handleAuthRequiredAction = (path) => {
+    if (!currentUser) {
+      localStorage.setItem('pendingNavigation', path);
+      navigate('/login');
+      return;
+    }
+    navigate(path);
+  };
+
+  // Navbar items based on authentication status
   const getNavItems = () => {
     if (!currentUser) {
       return [
@@ -67,15 +77,18 @@ const Header = () => {
         { label: 'About', path: '/about', icon: 'bi-info-circle' },
       ];
     }
+
     const common = [{ label: 'Browse', path: '/', icon: 'bi-search' }];
+    
     if (userRole === 'admin') {
       return [
         ...common,
-        { label: 'Dashboard', path: '/admin-dashboard', icon: 'bi-speedometer2' },
+        { label: 'Admin Dashboard', path: '/admin-dashboard', icon: 'bi-speedometer2' },
         { label: 'Users', path: '/admin-users', icon: 'bi-people' },
         { label: 'Reports', path: '/admin-reports', icon: 'bi-graph-up' },
       ];
     }
+    
     if (userRole === 'owner') {
       return [
         ...common,
@@ -85,6 +98,7 @@ const Header = () => {
         { label: 'Rentals', path: '/owner-rentals', icon: 'bi-calendar-check' },
       ];
     }
+    
     // Default: renter
     return [
       ...common,
@@ -95,7 +109,12 @@ const Header = () => {
   };
 
   // Highlight nav
-  const isActivePath = (path) => location.pathname === path;
+  const isActivePath = (path) => {
+    if (path === '/' && (location.pathname === '/' || location.pathname === '/browse')) {
+      return true;
+    }
+    return location.pathname === path;
+  };
 
   const getRoleBadge = () => {
     const badges = {
