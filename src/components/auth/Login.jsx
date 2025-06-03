@@ -14,6 +14,45 @@ export default function Login() {
   // Memoized role-based redirection function
   const redirectUserByRole = useCallback((role) => {
     console.log('🎯 Redirecting user with role:', role);
+    
+    // Check for pending actions first
+    const pendingAction = localStorage.getItem('pendingAction');
+    const pendingNavigation = localStorage.getItem('pendingNavigation');
+    
+    if (pendingAction) {
+      try {
+        const action = JSON.parse(pendingAction);
+        localStorage.removeItem('pendingAction');
+        
+        switch (action.action) {
+          case 'rent':
+            if (action.equipmentId) {
+              navigate(`/rent/${action.equipmentId}`, { replace: true });
+              return;
+            }
+            break;
+          case 'favorites':
+            navigate('/favorites', { replace: true });
+            return;
+          case 'rental-history':
+            navigate('/rental-history', { replace: true });
+            return;
+          default:
+            break;
+        }
+      } catch (error) {
+        console.error('Error parsing pending action:', error);
+        localStorage.removeItem('pendingAction');
+      }
+    }
+    
+    if (pendingNavigation) {
+      localStorage.removeItem('pendingNavigation');
+      navigate(pendingNavigation, { replace: true });
+      return;
+    }
+    
+    // Default role-based redirection
     switch (role) {
       case 'admin':
         navigate('/admin-dashboard', { replace: true });
@@ -23,7 +62,7 @@ export default function Login() {
         break;
       case 'renter':
       default:
-        navigate('/renter-dashboard', { replace: true });
+        navigate('/', { replace: true }); // Redirect to public dashboard for renters
         break;
     }
   }, [navigate]);
@@ -179,6 +218,32 @@ export default function Login() {
                     Sign up
                   </Link>
                 </p>
+
+                {/* Show what user will get access to after login */}
+                <div className="mt-4 p-3 bg-light rounded">
+                  <h6 className="fw-semibold mb-2">
+                    <i className="bi bi-unlock-fill text-primary me-2"></i>
+                    After signing in, you'll be able to:
+                  </h6>
+                  <ul className="list-unstyled small mb-0">
+                    <li className="mb-1">
+                      <i className="bi bi-check-circle-fill text-success me-2"></i>
+                      Rent equipment from verified owners
+                    </li>
+                    <li className="mb-1">
+                      <i className="bi bi-check-circle-fill text-success me-2"></i>
+                      Track your rental history
+                    </li>
+                    <li className="mb-1">
+                      <i className="bi bi-check-circle-fill text-success me-2"></i>
+                      Save favorites and get notifications
+                    </li>
+                    <li className="mb-0">
+                      <i className="bi bi-check-circle-fill text-success me-2"></i>
+                      List your own equipment for rent
+                    </li>
+                  </ul>
+                </div>
 
                 {process.env.NODE_ENV === 'development' && (
                   <div className="mt-3 p-2 bg-info bg-opacity-10 rounded text-small">
