@@ -86,16 +86,16 @@ const Footer = () => {
               Your trusted platform for equipment rental. Connect with local equipment owners and find everything you need for your projects.
             </p>
             <div className="social-links">
-              <a href="#" aria-label="Facebook" className="social-link">
+              <a href="https://facebook.com/rentmate" target="_blank" rel="noopener noreferrer" aria-label="Facebook" className="social-link">
                 <i className="bi bi-facebook"></i>
               </a>
-              <a href="#" aria-label="Twitter" className="social-link">
+              <a href="https://twitter.com/rentmate" target="_blank" rel="noopener noreferrer" aria-label="Twitter" className="social-link">
                 <i className="bi bi-twitter"></i>
               </a>
-              <a href="#" aria-label="Instagram" className="social-link">
+              <a href="https://instagram.com/rentmate" target="_blank" rel="noopener noreferrer" aria-label="Instagram" className="social-link">
                 <i className="bi bi-instagram"></i>
               </a>
-              <a href="#" aria-label="LinkedIn" className="social-link">
+              <a href="https://linkedin.com/company/rentmate" target="_blank" rel="noopener noreferrer" aria-label="LinkedIn" className="social-link">
                 <i className="bi bi-linkedin"></i>
               </a>
             </div>
