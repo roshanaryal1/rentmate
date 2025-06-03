@@ -1,11 +1,12 @@
-// src/App.js - Updated with public renter dashboard
+import { Link } from 'react-router-dom';
 import React from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider } from './contexts/AuthContext';
 import { RoleRoute } from './components/RoleRoute';
 
-// Import Header Component
+// Import Header and Footer Components
 import Header from './components/common/Header';
+import Footer from './components/common/Footer';
 
 // Import Page Components
 import Login from './components/auth/Login';
@@ -30,7 +31,6 @@ import PaymentPage from './components/Dashboard/PaymentPage';
 import PopulateFirebase from './components/admin/PopulateFirebase';
 
 // Common Components
-import LoadingSpinner from './components/common/LoadingSpinner';
 import ErrorBoundary from './components/ErrorBoundary';
 
 // Auth Debug (only in development)
@@ -40,13 +40,14 @@ import AuthDebug from './components/AuthDebug';
 import 'bootstrap/dist/css/bootstrap.min.css';
 import 'bootstrap-icons/font/bootstrap-icons.css';
 import './components/common/Header.css';
+import './components/common/Footer.css';
 
 function App() {
   return (
     <ErrorBoundary>
       <AuthProvider>
         <Router>
-          <div className="App">
+          <div className="App d-flex flex-column min-vh-100">
             {/* Header - shown on all pages */}
             <Header />
             
@@ -54,7 +55,7 @@ function App() {
             {process.env.NODE_ENV === 'development' && <AuthDebug />}
             
             {/* Main Content */}
-            <main className="main-content">
+            <main className="main-content flex-grow-1">
               <Routes>
                 {/* Public Routes - No authentication required */}
                 <Route path="/" element={<RenterDashboard />} />
@@ -120,6 +121,22 @@ function App() {
                   } 
                 />
                 <Route 
+                  path="/admin-users" 
+                  element={
+                    <RoleRoute allowedRoles={['admin']}>
+                      <AdminUsersPage />
+                    </RoleRoute>
+                  } 
+                />
+                <Route 
+                  path="/admin-reports" 
+                  element={
+                    <RoleRoute allowedRoles={['admin']}>
+                      <AdminReportsPage />
+                    </RoleRoute>
+                  } 
+                />
+                <Route 
                   path="/populate-firebase" 
                   element={
                     <RoleRoute allowedRoles={['admin']}>
@@ -142,6 +159,22 @@ function App() {
                   element={
                     <RoleRoute allowedRoles={['owner']}>
                       <AddEquipment />
+                    </RoleRoute>
+                  } 
+                />
+                <Route 
+                  path="/my-equipment" 
+                  element={
+                    <RoleRoute allowedRoles={['owner']}>
+                      <MyEquipmentPage />
+                    </RoleRoute>
+                  } 
+                />
+                <Route 
+                  path="/owner-rentals" 
+                  element={
+                    <RoleRoute allowedRoles={['owner']}>
+                      <OwnerRentalsPage />
                     </RoleRoute>
                   } 
                 />
@@ -206,12 +239,24 @@ function App() {
                   } 
                 />
 
-                {/* Static Pages */}
+                {/* Static/Public Pages */}
                 <Route path="/about" element={<AboutPage />} />
                 <Route path="/how-it-works" element={<HowItWorksPage />} />
-                <Route path="/terms" element={<TermsPage />} />
-                <Route path="/privacy" element={<PrivacyPage />} />
+                <Route path="/categories" element={<CategoriesPage />} />
                 <Route path="/contact" element={<ContactPage />} />
+                <Route path="/faq" element={<FAQPage />} />
+                <Route path="/safety" element={<SafetyPage />} />
+                <Route path="/community-guidelines" element={<CommunityGuidelinesPage />} />
+                
+                {/* Legal Pages */}
+                <Route path="/terms-of-service" element={<TermsPage />} />
+                <Route path="/privacy-policy" element={<PrivacyPage />} />
+                <Route path="/cookie-policy" element={<CookiePolicyPage />} />
+                <Route path="/accessibility" element={<AccessibilityPage />} />
+
+                {/* Legacy routes for backward compatibility */}
+                <Route path="/terms" element={<Navigate to="/terms-of-service" replace />} />
+                <Route path="/privacy" element={<Navigate to="/privacy-policy" replace />} />
 
                 {/* Error Routes */}
                 <Route path="/not-authorized" element={<NotAuthorizedPage />} />
@@ -222,7 +267,7 @@ function App() {
               </Routes>
             </main>
 
-            {/* Footer (optional) */}
+            {/* Footer - shown on all pages */}
             <Footer />
           </div>
         </Router>
@@ -253,6 +298,36 @@ const HelpPage = () => (
   </div>
 );
 
+// Admin Components
+const AdminUsersPage = () => (
+  <div className="container py-5">
+    <h2>User Management</h2>
+    <p>Manage platform users and their roles.</p>
+  </div>
+);
+
+const AdminReportsPage = () => (
+  <div className="container py-5">
+    <h2>Reports & Analytics</h2>
+    <p>Platform-wide analytics and reporting.</p>
+  </div>
+);
+
+// Owner Components
+const MyEquipmentPage = () => (
+  <div className="container py-5">
+    <h2>My Equipment</h2>
+    <p>Manage your equipment listings.</p>
+  </div>
+);
+
+const OwnerRentalsPage = () => (
+  <div className="container py-5">
+    <h2>Rental Management</h2>
+    <p>Track and manage your equipment rentals.</p>
+  </div>
+);
+
 const EditEquipmentPage = () => (
   <div className="container py-5">
     <h2>Edit Equipment</h2>
@@ -267,6 +342,7 @@ const AnalyticsPage = () => (
   </div>
 );
 
+// Renter Components
 const RentalDetailsPage = () => (
   <div className="container py-5">
     <h2>Rental Details</h2>
@@ -281,6 +357,7 @@ const FavoritesPage = () => (
   </div>
 );
 
+// Shared Components
 const NotificationsPage = () => (
   <div className="container py-5">
     <h2>Notifications</h2>
@@ -288,6 +365,7 @@ const NotificationsPage = () => (
   </div>
 );
 
+// Public Pages
 const AboutPage = () => (
   <div className="container py-5">
     <h2>About RentMate</h2>
@@ -302,6 +380,42 @@ const HowItWorksPage = () => (
   </div>
 );
 
+const CategoriesPage = () => (
+  <div className="container py-5">
+    <h2>Equipment Categories</h2>
+    <p>Browse equipment by category.</p>
+  </div>
+);
+
+const ContactPage = () => (
+  <div className="container py-5">
+    <h2>Contact Us</h2>
+    <p>Get in touch with our support team.</p>
+  </div>
+);
+
+const FAQPage = () => (
+  <div className="container py-5">
+    <h2>Frequently Asked Questions</h2>
+    <p>Find answers to common questions.</p>
+  </div>
+);
+
+const SafetyPage = () => (
+  <div className="container py-5">
+    <h2>Safety Guidelines</h2>
+    <p>Important safety information for equipment rental.</p>
+  </div>
+);
+
+const CommunityGuidelinesPage = () => (
+  <div className="container py-5">
+    <h2>Community Guidelines</h2>
+    <p>Rules and guidelines for our community.</p>
+  </div>
+);
+
+// Legal Pages
 const TermsPage = () => (
   <div className="container py-5">
     <h2>Terms of Service</h2>
@@ -316,18 +430,26 @@ const PrivacyPage = () => (
   </div>
 );
 
-const ContactPage = () => (
+const CookiePolicyPage = () => (
   <div className="container py-5">
-    <h2>Contact Us</h2>
-    <p>Get in touch with our support team.</p>
+    <h2>Cookie Policy</h2>
+    <p>Information about how we use cookies.</p>
   </div>
 );
 
+const AccessibilityPage = () => (
+  <div className="container py-5">
+    <h2>Accessibility</h2>
+    <p>Our commitment to accessibility and inclusive design.</p>
+  </div>
+);
+
+// Error Pages
 const NotAuthorizedPage = () => (
   <div className="container py-5 text-center">
     <h2>Access Denied</h2>
     <p>You don't have permission to view this page.</p>
-    <a href="/" className="btn btn-primary">Go Home</a>
+    <Link to="/" className="btn btn-primary">Go Home</Link>
   </div>
 );
 
@@ -335,24 +457,8 @@ const NotFoundPage = () => (
   <div className="container py-5 text-center">
     <h2>Page Not Found</h2>
     <p>The page you're looking for doesn't exist.</p>
-    <a href="/" className="btn btn-primary">Go Home</a>
+    <Link to="/" className="btn btn-primary">Go Home</Link>
   </div>
-);
-
-const Footer = () => (
-  <footer className="bg-dark text-light py-4 mt-auto">
-    <div className="container">
-      <div className="row">
-        <div className="col-md-6">
-          <h5>RentMate</h5>
-          <p>Equipment rental made simple.</p>
-        </div>
-        <div className="col-md-6 text-md-end">
-          <p>&copy; 2025 RentMate. All rights reserved.</p>
-        </div>
-      </div>
-    </div>
-  </footer>
 );
 
 export default App;
