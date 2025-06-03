@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
-import { collection, getDocs, query, where, orderBy } from 'firebase/firestore';
+import { collection, getDocs, query, where, orderBy, addDoc, deleteDoc, doc } from 'firebase/firestore';
 import { db } from '../../firebase';
 import EquipmentDetailModal from '../Equipment/EquipmentDetailModal';
 
@@ -10,6 +10,7 @@ function RenterDashboard() {
   const navigate = useNavigate();
   const [equipmentList, setEquipmentList] = useState([]);
   const [rentalHistory, setRentalHistory] = useState([]);
+  const [favorites, setFavorites] = useState([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('all');
@@ -33,6 +34,121 @@ function RenterDashboard() {
       setActiveTab('browse');
     }
   }, [hasPersonalAccess, activeTab]);
+
+  // Fetch user favorites from Firebase
+  const fetchFavorites = async () => {
+    if (!currentUser) {
+      setFavorites([]);
+      return;
+    }
+
+    try {
+      const favoritesQuery = query(
+        collection(db, 'favorites'),
+        where('userId', '==', currentUser.uid)
+      );
+      
+      const favoritesSnapshot = await getDocs(favoritesQuery);
+      const userFavorites = favoritesSnapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      }));
+      
+      setFavorites(userFavorites);
+      console.log(`✅ Loaded ${userFavorites.length} user favorites`);
+    } catch (error) {
+      console.error('❌ Error fetching favorites:', error);
+      setFavorites([]);
+    }
+  };
+
+  // Add item to favorites
+  const addToFavorites = async (equipmentId, equipmentData) => {
+    if (!currentUser) {
+      console.log('User not authenticated');
+      return;
+    }
+
+    try {
+      // Check if already favorited
+      const isAlreadyFavorite = favorites.some(fav => fav.equipmentId === equipmentId);
+      if (isAlreadyFavorite) {
+        console.log('Item already in favorites');
+        return;
+      }
+
+      const favoriteDoc = await addDoc(collection(db, 'favorites'), {
+        userId: currentUser.uid,
+        equipmentId: equipmentId,
+        equipmentName: equipmentData.name,
+        equipmentImage: equipmentData.imageUrl,
+        equipmentPrice: equipmentData.ratePerDay,
+        equipmentCategory: equipmentData.category,
+        equipmentLocation: equipmentData.location,
+        dateAdded: new Date(),
+      });
+
+      // Update local state
+      const newFavorite = {
+        id: favoriteDoc.id,
+        userId: currentUser.uid,
+        equipmentId: equipmentId,
+        equipmentName: equipmentData.name,
+        equipmentImage: equipmentData.imageUrl,
+        equipmentPrice: equipmentData.ratePerDay,
+        equipmentCategory: equipmentData.category,
+        equipmentLocation: equipmentData.location,
+        dateAdded: new Date(),
+      };
+
+      setFavorites(prev => [...prev, newFavorite]);
+      console.log('✅ Added to favorites:', equipmentData.name);
+      
+      // Show success feedback (you can enhance this with a toast notification)
+      alert('Added to favorites!');
+    } catch (error) {
+      console.error('❌ Error adding to favorites:', error);
+      alert('Failed to add to favorites. Please try again.');
+    }
+  };
+
+  // Remove item from favorites
+  const removeFromFavorites = async (equipmentId) => {
+    if (!currentUser) return;
+
+    try {
+      const favoriteToRemove = favorites.find(fav => fav.equipmentId === equipmentId);
+      if (!favoriteToRemove) return;
+
+      await deleteDoc(doc(db, 'favorites', favoriteToRemove.id));
+      
+      // Update local state
+      setFavorites(prev => prev.filter(fav => fav.equipmentId !== equipmentId));
+      console.log('✅ Removed from favorites');
+      
+      // Show success feedback
+      alert('Removed from favorites!');
+    } catch (error) {
+      console.error('❌ Error removing from favorites:', error);
+      alert('Failed to remove from favorites. Please try again.');
+    }
+  };
+
+  // Toggle favorite status
+  const toggleFavorite = async (equipmentId, equipmentData) => {
+    const isFavorited = favorites.some(fav => fav.equipmentId === equipmentId);
+    
+    if (isFavorited) {
+      await removeFromFavorites(equipmentId);
+    } else {
+      await addToFavorites(equipmentId, equipmentData);
+    }
+  };
+
+  // Check if item is favorited
+  const isFavorited = (equipmentId) => {
+    return favorites.some(fav => fav.equipmentId === equipmentId);
+  };
 
   // Fetch all data from Firebase
   useEffect(() => {
@@ -67,7 +183,7 @@ function RenterDashboard() {
         // Update available equipment count for stats
         const availableCount = allEquipment.filter(item => item.available).length;
         
-        // 2. Fetch rental history only if user is authenticated
+        // 2. Fetch rental history and favorites only if user is authenticated
         let userRentals = [];
         let calculatedStats = {
           totalRentals: 0,
@@ -78,6 +194,7 @@ function RenterDashboard() {
 
         if (currentUser) {
           try {
+            // Fetch rentals
             const rentalsQuery = query(
               collection(db, 'rentals'),
               where('renterId', '==', currentUser.uid)
@@ -98,8 +215,11 @@ function RenterDashboard() {
             };
 
             console.log(`✅ Loaded ${userRentals.length} user rentals`);
+            
+            // Fetch favorites
+            await fetchFavorites();
           } catch (error) {
-            console.log('ℹ️ Error fetching rentals or no rentals found:', error);
+            console.log('ℹ️ Error fetching rentals or favorites:', error);
           }
         }
 
@@ -244,10 +364,16 @@ function RenterDashboard() {
                     </button>
                     <button 
                       onClick={() => handleAuthRequiredAction('favorites')}
-                      className="btn btn-outline-success"
+                      className="btn btn-outline-success position-relative"
                     >
                       <i className="bi bi-heart me-2"></i>
                       Favorites
+                      {favorites.length > 0 && (
+                        <span className="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger">
+                          {favorites.length}
+                          <span className="visually-hidden">favorites count</span>
+                        </span>
+                      )}
                     </button>
                   </>
                 ) : (
@@ -524,6 +650,8 @@ function RenterDashboard() {
                         onViewDetails={handleViewDetails}
                         onAuthRequiredAction={handleAuthRequiredAction}
                         isAuthenticated={!!currentUser}
+                        isFavorited={isFavorited(item.id)}
+                        onToggleFavorite={toggleFavorite}
                       />
                     </div>
                   ))}
@@ -704,8 +832,16 @@ function RenterDashboard() {
   );
 }
 
-// Enhanced Equipment Card Component with authentication handling
-function EquipmentCard({ item, currentUserId, onViewDetails, onAuthRequiredAction, isAuthenticated }) {
+// Enhanced Equipment Card Component with functional favorites
+function EquipmentCard({ 
+  item, 
+  currentUserId, 
+  onViewDetails, 
+  onAuthRequiredAction, 
+  isAuthenticated, 
+  isFavorited,
+  onToggleFavorite 
+}) {
   const isOwnEquipment = item.ownerId === currentUserId;
   
   const handleRentClick = () => {
@@ -713,6 +849,16 @@ function EquipmentCard({ item, currentUserId, onViewDetails, onAuthRequiredActio
       onAuthRequiredAction('rent', item.id);
     } else {
       onAuthRequiredAction('rent', item.id);
+    }
+  };
+
+  const handleFavoriteClick = (e) => {
+    e.stopPropagation(); // Prevent triggering other click events
+    
+    if (!isAuthenticated) {
+      onAuthRequiredAction('favorites');
+    } else {
+      onToggleFavorite(item.id, item);
     }
   };
   
@@ -758,11 +904,19 @@ function EquipmentCard({ item, currentUserId, onViewDetails, onAuthRequiredActio
             <i className="bi bi-eye"></i>
           </button>
           <button 
-            className="btn btn-light btn-sm rounded-circle" 
-            title={isAuthenticated ? "Add to favorites" : "Login to add to favorites"}
-            onClick={() => !isAuthenticated ? onAuthRequiredAction('favorites') : console.log('Add to favorites')}
+            className={`btn btn-sm rounded-circle ${
+              isFavorited ? 'btn-danger' : 'btn-light'
+            }`}
+            title={
+              !isAuthenticated 
+                ? "Login to add to favorites" 
+                : isFavorited 
+                  ? "Remove from favorites" 
+                  : "Add to favorites"
+            }
+            onClick={handleFavoriteClick}
           >
-            <i className="bi bi-heart"></i>
+            <i className={`bi ${isFavorited ? 'bi-heart-fill' : 'bi-heart'}`}></i>
           </button>
         </div>
       </div>
@@ -784,6 +938,8 @@ function EquipmentCard({ item, currentUserId, onViewDetails, onAuthRequiredActio
           }}>
             {item.description}
           </p>
+          
+          
           
           <div className="d-flex justify-content-between align-items-center mb-3">
             <div>
