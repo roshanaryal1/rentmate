@@ -4,39 +4,39 @@ import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-d
 import { AuthProvider } from './contexts/AuthContext';
 import { RoleRoute } from './components/RoleRoute';
 
-// Import Header and Footer Components
 import Header from './components/common/Header';
 import Footer from './components/common/Footer';
 
-// Import Page Components
+// Auth Pages
 import Login from './components/auth/Login';
 import Signup from './components/auth/Signup';
 import ForgotPassword from './components/auth/ForgotPassword';
 
-// Dashboard Components
+// Dashboard
 import AdminDashboard from './components/Dashboard/AdminDashboard';
 import OwnerDashboard from './components/Dashboard/OwnerDashboard';
 import RenterDashboard from './components/Dashboard/RenterDashboard';
 
-// Equipment Components
+// Equipment
 import AddEquipment from './components/Dashboard/AddEquipment';
 import EquipmentDetail from './components/Equipment/EquipmentDetail';
 import RentEquipment from './components/Equipment/RentEquipment';
 
-// Rental Components
+// Rental
 import RentalHistory from './components/Rental/RentalHistory';
 import PaymentPage from './components/Dashboard/PaymentPage';
 
 // Admin Tools
 import PopulateFirebase from './components/admin/PopulateFirebase';
 
-// Common Components
+// Common
 import ErrorBoundary from './components/ErrorBoundary';
-
-// Auth Debug (only in development)
 import AuthDebug from './components/AuthDebug';
 
-// Import CSS
+// QR Code Tools Page
+import QRCodePage from './pages/QRCodePage';
+
+// CSS
 import 'bootstrap/dist/css/bootstrap.min.css';
 import 'bootstrap-icons/font/bootstrap-icons.css';
 import './components/common/Header.css';
@@ -48,24 +48,24 @@ function App() {
       <AuthProvider>
         <Router>
           <div className="App d-flex flex-column min-vh-100">
-            {/* Header - shown on all pages */}
             <Header />
-            
-            {/* Auth Debug - only in development */}
+
             {process.env.NODE_ENV === 'development' && <AuthDebug />}
-            
-            {/* Main Content */}
+
             <main className="main-content flex-grow-1">
               <Routes>
-                {/* Public Routes - No authentication required */}
+                {/* Public Routes */}
                 <Route path="/" element={<RenterDashboard />} />
                 <Route path="/browse" element={<RenterDashboard />} />
                 <Route path="/equipment/:id" element={<EquipmentDetail />} />
                 <Route path="/login" element={<Login />} />
                 <Route path="/signup" element={<Signup />} />
                 <Route path="/forgot-password" element={<ForgotPassword />} />
-                
-                {/* Equipment rental - requires authentication */}
+
+                {/* QR Code Tools Route */}
+                <Route path="/qr-tools" element={<QRCodePage />} />
+
+                {/* Equipment rental */}
                 <Route 
                   path="/rent/:equipmentId" 
                   element={
@@ -74,8 +74,7 @@ function App() {
                     </RoleRoute>
                   } 
                 />
-                
-                {/* Payment - requires authentication */}
+                {/* Payment */}
                 <Route 
                   path="/payment/:equipmentId" 
                   element={
@@ -111,7 +110,7 @@ function App() {
                   } 
                 />
 
-                {/* Admin Only Routes */}
+                {/* Admin Only */}
                 <Route 
                   path="/admin-dashboard" 
                   element={
@@ -145,7 +144,7 @@ function App() {
                   } 
                 />
 
-                {/* Owner Routes */}
+                {/* Owner Only */}
                 <Route 
                   path="/owner-dashboard" 
                   element={
@@ -195,7 +194,7 @@ function App() {
                   } 
                 />
 
-                {/* Renter Protected Routes - Only for authenticated renters */}
+                {/* Renter Only */}
                 <Route 
                   path="/renter-dashboard" 
                   element={
@@ -229,7 +228,7 @@ function App() {
                   } 
                 />
 
-                {/* Shared Routes (Owner + Renter) */}
+                {/* Shared (Owner + Renter) */}
                 <Route 
                   path="/notifications" 
                   element={
@@ -239,7 +238,7 @@ function App() {
                   } 
                 />
 
-                {/* Static/Public Pages */}
+                {/* Static/Public */}
                 <Route path="/about" element={<AboutPage />} />
                 <Route path="/how-it-works" element={<HowItWorksPage />} />
                 <Route path="/categories" element={<CategoriesPage />} />
@@ -247,27 +246,23 @@ function App() {
                 <Route path="/faq" element={<FAQPage />} />
                 <Route path="/safety" element={<SafetyPage />} />
                 <Route path="/community-guidelines" element={<CommunityGuidelinesPage />} />
-                
-                {/* Legal Pages */}
+
+                {/* Legal */}
                 <Route path="/terms-of-service" element={<TermsPage />} />
                 <Route path="/privacy-policy" element={<PrivacyPage />} />
                 <Route path="/cookie-policy" element={<CookiePolicyPage />} />
                 <Route path="/accessibility" element={<AccessibilityPage />} />
 
-                {/* Legacy routes for backward compatibility */}
+                {/* Legacy redirect */}
                 <Route path="/terms" element={<Navigate to="/terms-of-service" replace />} />
                 <Route path="/privacy" element={<Navigate to="/privacy-policy" replace />} />
 
-                {/* Error Routes */}
+                {/* Error */}
                 <Route path="/not-authorized" element={<NotAuthorizedPage />} />
                 <Route path="/404" element={<NotFoundPage />} />
-                
-                {/* Catch all route */}
                 <Route path="*" element={<Navigate to="/404" replace />} />
               </Routes>
             </main>
-
-            {/* Footer - shown on all pages */}
             <Footer />
           </div>
         </Router>
@@ -276,7 +271,7 @@ function App() {
   );
 }
 
-// Placeholder Components (you can replace these with actual components)
+// Placeholder pages
 const ProfilePage = () => (
   <div className="container py-5">
     <h2>My Profile</h2>
@@ -298,7 +293,7 @@ const HelpPage = () => (
   </div>
 );
 
-// Admin Components
+// Admin
 const AdminUsersPage = () => (
   <div className="container py-5">
     <h2>User Management</h2>
@@ -313,7 +308,7 @@ const AdminReportsPage = () => (
   </div>
 );
 
-// Owner Components
+// Owner
 const MyEquipmentPage = () => (
   <div className="container py-5">
     <h2>My Equipment</h2>
@@ -342,7 +337,7 @@ const AnalyticsPage = () => (
   </div>
 );
 
-// Renter Components
+// Renter
 const RentalDetailsPage = () => (
   <div className="container py-5">
     <h2>Rental Details</h2>
@@ -357,7 +352,7 @@ const FavoritesPage = () => (
   </div>
 );
 
-// Shared Components
+// Shared
 const NotificationsPage = () => (
   <div className="container py-5">
     <h2>Notifications</h2>
@@ -365,7 +360,7 @@ const NotificationsPage = () => (
   </div>
 );
 
-// Public Pages
+// Public
 const AboutPage = () => (
   <div className="container py-5">
     <h2>About RentMate</h2>
@@ -415,7 +410,7 @@ const CommunityGuidelinesPage = () => (
   </div>
 );
 
-// Legal Pages
+// Legal
 const TermsPage = () => (
   <div className="container py-5">
     <h2>Terms of Service</h2>
@@ -444,7 +439,7 @@ const AccessibilityPage = () => (
   </div>
 );
 
-// Error Pages
+// Error
 const NotAuthorizedPage = () => (
   <div className="container py-5 text-center">
     <h2>Access Denied</h2>
