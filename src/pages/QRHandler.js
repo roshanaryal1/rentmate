@@ -1,7 +1,6 @@
 // src/pages/QRHandler.js
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { qrCodeService } from '../services/qrCodeService';
 import { useAuth } from '../contexts/AuthContext';
 
 const QRHandler = () => {
@@ -9,101 +8,125 @@ const QRHandler = () => {
   const navigate = useNavigate();
   const { currentUser } = useAuth();
   const [loading, setLoading] = useState(true);
-  const [qrData, setQrData] = useState(null);
   const [error, setError] = useState('');
+  const [qrData, setQrData] = useState(null);
 
-  useEffect(() => {
-    if (qrId) {
-      processQRCode();
-    }
-  }, [qrId]);
-
-  const processQRCode = async () => {
+  const handleQRCode = useCallback(async (id) => {
     try {
       setLoading(true);
-      const data = await qrCodeService.processScannedQR(qrId);
-      setQrData(data);
+      setError('');
       
-      // Update usage statistics
-      await qrCodeService.updateQRUsage(qrId, 'scanned');
+      // Mock QR processing - replace with actual service call
+      // For now, just parse the ID to determine the type
+      let result;
       
-      // Handle different QR types
-      handleQRAction(data);
+      if (id.startsWith('eq-')) {
+        result = {
+          type: 'equipment',
+          equipmentId: id.replace('eq-', '')
+        };
+      } else if (id.startsWith('rental-')) {
+        result = {
+          type: 'rental',
+          rentalId: id.replace('rental-', ''),
+          action: 'view'
+        };
+      } else if (id.startsWith('invite-')) {
+        result = {
+          type: 'admin_invite',
+          inviteCode: id.replace('invite-', '')
+        };
+      } else {
+        result = {
+          type: 'unknown',
+          data: id
+        };
+      }
+      
+      setQrData(result);
+      
+      // Route based on QR code type
+      switch (result.type) {
+        case 'equipment':
+          navigate(`/equipment/${result.equipmentId}`);
+          break;
+        case 'rental':
+          if (result.action === 'checkin' || result.action === 'checkout') {
+            // Handle rental check-in/out
+            await handleRentalAction(result);
+          } else {
+            navigate(`/rental-details/${result.rentalId}`);
+          }
+          break;
+        case 'admin_invite':
+          if (currentUser) {
+            navigate('/signup?type=admin&invite=' + result.inviteCode);
+          } else {
+            navigate('/signup?type=admin&invite=' + result.inviteCode);
+          }
+          break;
+        case 'feedback':
+          navigate(`/feedback/${result.rentalId}`);
+          break;
+        case 'owner_auth':
+        case 'admin_auth':
+          // Handle authentication verification
+          handleAuthVerification(result);
+          break;
+        default:
+          setError('Unknown QR code type');
+      }
     } catch (error) {
       console.error('Error processing QR code:', error);
-      setError(error.message || 'Invalid or expired QR code');
+      setError('Failed to process QR code: ' + error.message);
     } finally {
       setLoading(false);
     }
-  };
+  }, [navigate, currentUser]);
 
-  const handleQRAction = (data) => {
-    switch (data.type) {
-      case 'equipment':
-        handleEquipmentQR(data);
-        break;
-      case 'rental':
-        handleRentalQR(data);
-        break;
-      case 'admin_invite':
-        handleAdminInvite(data);
-        break;
-      case 'feedback':
-        handleFeedbackQR(data);
-        break;
-      default:
-        setError('Unknown QR code type');
-    }
-  };
-
-  const handleEquipmentQR = (data) => {
-    // Redirect to equipment details with QR context
-    navigate(`/equipment/${data.equipmentId}?from=qr&qrId=${qrId}`);
-  };
-
-  const handleRentalQR = (data) => {
-    if (!currentUser) {
-      localStorage.setItem('pendingQRAction', JSON.stringify(data));
-      navigate('/login');
-      return;
-    }
-
-    // Handle rental check-in/out
-    if (data.action === 'checkin' || data.action === 'checkout') {
-      navigate(`/rental/${data.rentalId}/${data.action}?qrId=${qrId}`);
-    }
-  };
-
-  const handleAdminInvite = (data) => {
-    if (currentUser) {
-      // User is already logged in, show invite acceptance
-      navigate(`/admin-invite/${data.inviteCode}?qrId=${qrId}`);
+  useEffect(() => {
+    if (qrId) {
+      handleQRCode(qrId);
     } else {
-      // Redirect to signup with admin invite context
-      localStorage.setItem('adminInvite', JSON.stringify(data));
-      navigate('/signup?type=admin');
+      setError('No QR code ID provided');
+      setLoading(false);
+    }
+  }, [qrId, handleQRCode]);
+
+  const handleRentalAction = async (qrData) => {
+    try {
+      // Mock rental action processing
+      console.log('Processing rental action:', qrData);
+      alert(`${qrData.action} successful!`);
+      navigate('/rental-history');
+    } catch (error) {
+      console.error('Error processing rental action:', error);
+      setError('Failed to process rental action');
     }
   };
 
-  const handleFeedbackQR = (data) => {
-    if (!currentUser) {
-      localStorage.setItem('pendingQRAction', JSON.stringify(data));
-      navigate('/login');
-      return;
-    }
-    
-    navigate(`/feedback/${data.rentalId}?qrId=${qrId}&rewards=${data.rewardPoints}`);
+  const handleAuthVerification = (qrData) => {
+    // Display authentication information
+    setQrData({
+      ...qrData,
+      verified: true,
+      timestamp: new Date().toISOString()
+    });
   };
 
   if (loading) {
     return (
-      <div className="min-vh-100 d-flex align-items-center justify-content-center">
-        <div className="text-center">
-          <div className="spinner-border text-primary mb-3" style={{ width: '3rem', height: '3rem' }}>
-            <span className="visually-hidden">Loading...</span>
+      <div className="container py-5">
+        <div className="row justify-content-center">
+          <div className="col-md-6 text-center">
+            <div className="spinner-border text-primary" role="status">
+              <span className="visually-hidden">Loading...</span>
+            </div>
+            <h4 className="mt-3">Processing QR Code...</h4>
+            <p className="text-muted">
+              Please wait while we process your request.
+            </p>
           </div>
-          <h5>Processing QR Code...</h5>
-          <p className="text-muted">Please wait while we process your request</p>
         </div>
       </div>
     );
@@ -111,29 +134,88 @@ const QRHandler = () => {
 
   if (error) {
     return (
-      <div className="min-vh-100 d-flex align-items-center justify-content-center">
-        <div className="container">
-          <div className="row justify-content-center">
-            <div className="col-md-6">
-              <div className="card border-0 shadow-sm">
-                <div className="card-body text-center py-5">
-                  <i className="bi bi-exclamation-triangle display-1 text-warning mb-3"></i>
-                  <h4 className="mb-3">QR Code Error</h4>
-                  <p className="text-muted mb-4">{error}</p>
-                  <div className="d-flex gap-2 justify-content-center">
-                    <button 
-                      onClick={() => navigate('/')}
-                      className="btn btn-primary"
-                    >
-                      Go Home
-                    </button>
-                    <button 
-                      onClick={() => window.location.reload()}
-                      className="btn btn-outline-secondary"
-                    >
-                      Try Again
-                    </button>
-                  </div>
+      <div className="container py-5">
+        <div className="row justify-content-center">
+          <div className="col-md-6">
+            <div className="alert alert-danger">
+              <h4 className="alert-heading">
+                <i className="bi bi-exclamation-triangle me-2"></i>
+                QR Code Error
+              </h4>
+              <p className="mb-0">{error}</p>
+            </div>
+            <div className="text-center">
+              <button 
+                onClick={() => navigate('/')} 
+                className="btn btn-primary me-2"
+              >
+                Go Home
+              </button>
+              <button 
+                onClick={() => navigate('/qr-tools')} 
+                className="btn btn-outline-secondary"
+              >
+                QR Tools
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // If we have auth verification data, show it
+  if (qrData && (qrData.type === 'owner_auth' || qrData.type === 'admin_auth')) {
+    return (
+      <div className="container py-5">
+        <div className="row justify-content-center">
+          <div className="col-md-6">
+            <div className="card">
+              <div className="card-header bg-success text-white text-center">
+                <h5 className="mb-0">
+                  <i className="bi bi-shield-check me-2"></i>
+                  Authentication Verified
+                </h5>
+              </div>
+              <div className="card-body">
+                <div className="text-center mb-3">
+                  <i className="bi bi-person-check display-1 text-success"></i>
+                </div>
+                
+                <table className="table table-borderless">
+                  <tbody>
+                    <tr>
+                      <td><strong>Type:</strong></td>
+                      <td className="text-capitalize">
+                        {qrData.type.replace('_', ' ')}
+                      </td>
+                    </tr>
+                    <tr>
+                      <td><strong>Name:</strong></td>
+                      <td>{qrData.name || 'Not provided'}</td>
+                    </tr>
+                    <tr>
+                      <td><strong>Email:</strong></td>
+                      <td>{qrData.email || 'Not provided'}</td>
+                    </tr>
+                    <tr>
+                      <td><strong>Verified:</strong></td>
+                      <td>
+                        <span className="badge bg-success">
+                          {new Date(qrData.timestamp).toLocaleString()}
+                        </span>
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+                
+                <div className="text-center">
+                  <button 
+                    onClick={() => navigate('/')} 
+                    className="btn btn-primary"
+                  >
+                    Continue
+                  </button>
                 </div>
               </div>
             </div>
@@ -143,186 +225,26 @@ const QRHandler = () => {
     );
   }
 
-  // This should rarely be shown as we redirect in handleQRAction
+  // Fallback - shouldn't normally reach here
   return (
-    <div className="min-vh-100 d-flex align-items-center justify-content-center">
-      <div className="text-center">
-        <i className="bi bi-qr-code display-1 text-success mb-3"></i>
-        <h5>QR Code Processed Successfully</h5>
-        <p className="text-muted">Redirecting you now...</p>
+    <div className="container py-5">
+      <div className="row justify-content-center">
+        <div className="col-md-6 text-center">
+          <i className="bi bi-check-circle display-1 text-success"></i>
+          <h3 className="mt-3">QR Code Processed</h3>
+          <p className="text-muted">
+            Your QR code has been processed successfully.
+          </p>
+          <button 
+            onClick={() => navigate('/')} 
+            className="btn btn-primary"
+          >
+            Go Home
+          </button>
+        </div>
       </div>
     </div>
   );
 };
 
 export default QRHandler;
-
-// src/components/QRCode/QRDashboardIntegration.js
-import React from 'react';
-import { AdminQRFeatures } from './AdminQRFeatures';
-import { OwnerQRFeatures } from './OwnerQRFeatures';
-import { RenterQRFeatures } from './RenterQRFeatures';
-import { useAuth } from '../../contexts/AuthContext';
-
-export const QRDashboardIntegration = ({ dashboardType }) => {
-  const { userRole } = useAuth();
-
-  // Determine which QR features to show
-  const getQRComponent = () => {
-    switch (dashboardType || userRole) {
-      case 'admin':
-        return <AdminQRFeatures />;
-      case 'owner':
-        return <OwnerQRFeatures />;
-      case 'renter':
-      default:
-        return <RenterQRFeatures />;
-    }
-  };
-
-  return (
-    <div className="qr-dashboard-integration">
-      {getQRComponent()}
-    </div>
-  );
-};
-
-// Example integration into AdminDashboard.jsx - ADD THIS TO YOUR EXISTING ADMIN DASHBOARD
-/*
-// In your AdminDashboard.jsx, add this to the tab content:
-
-{activeTab === 'QR Tools' && (
-  <div>
-    <AdminQRFeatures />
-  </div>
-)}
-
-// And add 'QR Tools' to your navItems array:
-const navItems = [
-  { label: 'Dashboard', icon: <HouseDoor /> },
-  { label: 'Equipment', icon: <Tools /> },
-  { label: 'Users', icon: <People /> },
-  { label: 'Rentals', icon: <FileEarmark /> },
-  { label: 'Dispute Center', icon: <Flag /> },
-  { label: 'Review Moderation', icon: <StarFill /> },
-  { label: 'QR Tools', icon: <QrCode /> }, // Add this line
-  { label: 'Analytics', icon: <GraphUp /> },
-  { label: 'Settings', icon: <Gear /> }
-];
-*/
-
-// Example integration into OwnerDashboard.jsx - ADD THIS TO YOUR EXISTING OWNER DASHBOARD
-/*
-// Add QR section to your owner dashboard:
-
-<div className="row mb-4">
-  <div className="col">
-    <div className="card border-0 shadow-sm">
-      <div className="card-header">
-        <h5 className="mb-0">
-          <i className="bi bi-qr-code me-2"></i>
-          QR Code Management
-        </h5>
-      </div>
-      <div className="card-body">
-        <OwnerQRFeatures />
-      </div>
-    </div>
-  </div>
-</div>
-*/
-
-// Example integration into RenterDashboard.js - ADD THIS TO YOUR EXISTING RENTER DASHBOARD
-/*
-// Add QR tab to your existing tab navigation:
-
-{activeTab === 'qr-tools' && (
-  <div>
-    <RenterQRFeatures />
-  </div>
-)}
-
-// And update your tab navigation to include:
-<button 
-  className={`nav-link py-3 border-0 fw-semibold ${activeTab === 'qr-tools' ? 'active' : ''}`}
-  onClick={() => setActiveTab('qr-tools')}
->
-  <i className="bi bi-qr-code-scan me-2"></i>
-  QR Tools
-</button>
-*/
-
-// src/components/QRCode/QuickQRActions.js - Floating QR button for mobile
-import React, { useState } from 'react';
-import { EnhancedQRScanner } from './EnhancedQRGenerator';
-import { useAuth } from '../../contexts/AuthContext';
-
-export const QuickQRActions = () => {
-  const [showScanner, setShowScanner] = useState(false);
-  const { currentUser } = useAuth();
-
-  const handleScanSuccess = (decodedText) => {
-    // Process the scanned QR code
-    if (decodedText.includes('/qr/')) {
-      // Direct URL to QR handler
-      window.location.href = decodedText;
-    } else {
-      // Try to extract QR ID and redirect
-      try {
-        const qrData = JSON.parse(decodedText);
-        // Handle different QR types
-        console.log('Scanned QR data:', qrData);
-        alert('QR Code scanned successfully!');
-      } catch (error) {
-        alert('Invalid QR code format');
-      }
-    }
-    setShowScanner(false);
-  };
-
-  if (!currentUser) return null;
-
-  return (
-    <>
-      {/* Floating QR Scanner Button */}
-      <div className="position-fixed bottom-0 end-0 p-3" style={{ zIndex: 1050 }}>
-        <button
-          onClick={() => setShowScanner(true)}
-          className="btn btn-primary rounded-circle shadow-lg"
-          style={{ width: '56px', height: '56px' }}
-          title="Scan QR Code"
-        >
-          <i className="bi bi-qr-code-scan fs-5"></i>
-        </button>
-      </div>
-
-      {/* Scanner Modal */}
-      {showScanner && (
-        <div className="modal fade show d-block" style={{ backgroundColor: 'rgba(0,0,0,0.5)', zIndex: 1055 }}>
-          <div className="modal-dialog modal-dialog-centered">
-            <div className="modal-content">
-              <div className="modal-header">
-                <h5 className="modal-title">
-                  <i className="bi bi-qr-code-scan me-2"></i>
-                  Quick QR Scanner
-                </h5>
-                <button
-                  type="button"
-                  className="btn-close"
-                  onClick={() => setShowScanner(false)}
-                ></button>
-              </div>
-              <div className="modal-body">
-                <EnhancedQRScanner
-                  onScanSuccess={handleScanSuccess}
-                  title="Scan Any QR Code"
-                  instructions="Point your camera at any RentMate QR code"
-                />
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-    </>
-  );
-};

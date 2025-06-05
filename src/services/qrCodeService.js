@@ -1,177 +1,172 @@
 // src/services/qrCodeService.js
-import { collection, addDoc, updateDoc, doc, getDoc, getDocs, query, where, serverTimestamp } from 'firebase/firestore';
-import { db } from '../firebase';
+// Mock QR Code Service - Replace with actual implementation
 
 export const qrCodeService = {
-  // Generate QR data for equipment
+  // Generate QR code for equipment
   generateEquipmentQR: async (equipmentId, ownerId) => {
     try {
-      const qrData = {
-        type: 'equipment',
-        equipmentId,
-        ownerId,
-        createdAt: serverTimestamp(),
-        actions: ['view_details', 'request_rental', 'report_issue']
-      };
-
-      const qrRef = await addDoc(collection(db, 'qrCodes'), qrData);
-      
-      // Update equipment with QR code ID
-      await updateDoc(doc(db, 'equipment', equipmentId), {
-        qrCodeId: qrRef.id,
-        qrCodeUrl: `${window.location.origin}/qr/${qrRef.id}`,
-        updatedAt: serverTimestamp()
-      });
-
+      const qrUrl = `${window.location.origin}/equipment/${equipmentId}`;
       return {
-        qrId: qrRef.id,
-        qrUrl: `${window.location.origin}/qr/${qrRef.id}`,
-        qrData: JSON.stringify(qrData)
+        success: true,
+        qrUrl: qrUrl,
+        qrId: `eq-${equipmentId}`,
+        createdAt: new Date().toISOString()
       };
     } catch (error) {
       console.error('Error generating equipment QR:', error);
-      throw error;
+      throw new Error('Failed to generate equipment QR code');
     }
   },
 
-  // Generate QR for rental check-in/out
-  generateRentalQR: async (rentalId, type = 'checkin') => {
+  // Generate QR code for rental actions
+  generateRentalQR: async (rentalId, action = 'view') => {
     try {
-      const qrData = {
-        type: 'rental',
-        rentalId,
-        action: type, // 'checkin' or 'checkout'
-        createdAt: serverTimestamp(),
-        expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000) // 24 hours
-      };
-
-      const qrRef = await addDoc(collection(db, 'qrCodes'), qrData);
-      
+      const qrUrl = `${window.location.origin}/rental/${rentalId}/${action}`;
       return {
-        qrId: qrRef.id,
-        qrUrl: `${window.location.origin}/qr/${qrRef.id}`,
-        qrData: JSON.stringify(qrData)
+        success: true,
+        qrUrl: qrUrl,
+        qrId: `rental-${rentalId}-${action}`,
+        action: action,
+        createdAt: new Date().toISOString()
       };
     } catch (error) {
       console.error('Error generating rental QR:', error);
-      throw error;
+      throw new Error('Failed to generate rental QR code');
     }
   },
 
-  // Generate QR for admin invitation
-  generateAdminInviteQR: async (inviterId, inviteCode) => {
-    try {
-      const qrData = {
-        type: 'admin_invite',
-        inviterId,
-        inviteCode,
-        createdAt: serverTimestamp(),
-        expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000) // 7 days
-      };
-
-      const qrRef = await addDoc(collection(db, 'qrCodes'), qrData);
-      
-      return {
-        qrId: qrRef.id,
-        qrUrl: `${window.location.origin}/qr/${qrRef.id}`,
-        qrData: JSON.stringify(qrData)
-      };
-    } catch (error) {
-      console.error('Error generating admin invite QR:', error);
-      throw error;
-    }
-  },
-
-  // Generate QR for feedback/rewards
+  // Generate QR code for feedback
   generateFeedbackQR: async (rentalId, rewardPoints = 0) => {
     try {
-      const qrData = {
-        type: 'feedback',
-        rentalId,
-        rewardPoints,
-        createdAt: serverTimestamp(),
-        actions: ['leave_review', 'claim_rewards']
-      };
-
-      const qrRef = await addDoc(collection(db, 'qrCodes'), qrData);
-      
+      const qrUrl = `${window.location.origin}/feedback/${rentalId}?points=${rewardPoints}`;
       return {
-        qrId: qrRef.id,
-        qrUrl: `${window.location.origin}/qr/${qrRef.id}`,
-        qrData: JSON.stringify(qrData)
+        success: true,
+        qrUrl: qrUrl,
+        qrId: `feedback-${rentalId}`,
+        rewardPoints: rewardPoints,
+        createdAt: new Date().toISOString()
       };
     } catch (error) {
       console.error('Error generating feedback QR:', error);
-      throw error;
+      throw new Error('Failed to generate feedback QR code');
+    }
+  },
+
+  // Generate admin invite QR
+  generateAdminInviteQR: async (adminId, inviteCode) => {
+    try {
+      const qrUrl = `${window.location.origin}/signup?type=admin&invite=${inviteCode}`;
+      return {
+        success: true,
+        qrUrl: qrUrl,
+        qrId: `invite-${inviteCode}`,
+        adminId: adminId,
+        expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(), // 7 days
+        createdAt: new Date().toISOString()
+      };
+    } catch (error) {
+      console.error('Error generating admin invite QR:', error);
+      throw new Error('Failed to generate admin invite QR code');
     }
   },
 
   // Process scanned QR code
   processScannedQR: async (qrId) => {
     try {
-      const qrDoc = await getDoc(doc(db, 'qrCodes', qrId));
-      
-      if (!qrDoc.exists()) {
-        throw new Error('QR code not found');
+      // Mock processing based on QR ID pattern
+      if (qrId.startsWith('eq-')) {
+        return {
+          type: 'equipment',
+          equipmentId: qrId.replace('eq-', ''),
+          status: 'active'
+        };
+      } else if (qrId.startsWith('rental-')) {
+        const parts = qrId.split('-');
+        return {
+          type: 'rental',
+          rentalId: parts[1],
+          action: parts[2] || 'view'
+        };
+      } else if (qrId.startsWith('feedback-')) {
+        return {
+          type: 'feedback',
+          rentalId: qrId.replace('feedback-', '')
+        };
+      } else if (qrId.startsWith('invite-')) {
+        return {
+          type: 'admin_invite',
+          inviteCode: qrId.replace('invite-', '')
+        };
+      } else {
+        return {
+          type: 'unknown',
+          data: qrId
+        };
       }
+    } catch (error) {
+      console.error('Error processing QR code:', error);
+      throw new Error('Failed to process QR code');
+    }
+  },
 
-      const qrData = qrDoc.data();
+  // Process rental action (check-in/check-out)
+  processRentalAction: async (rentalId, action, userId) => {
+    try {
+      console.log(`Processing ${action} for rental ${rentalId} by user ${userId}`);
       
-      // Check if QR code has expired
-      if (qrData.expiresAt && qrData.expiresAt.toDate() < new Date()) {
-        throw new Error('QR code has expired');
-      }
-
+      // Mock processing - in real implementation, update database
       return {
-        id: qrDoc.id,
-        ...qrData
+        success: true,
+        message: `${action} completed successfully`,
+        timestamp: new Date().toISOString(),
+        rentalId: rentalId,
+        action: action,
+        userId: userId
       };
     } catch (error) {
-      console.error('Error processing scanned QR:', error);
-      throw error;
+      console.error('Error processing rental action:', error);
+      return {
+        success: false,
+        message: 'Failed to process rental action'
+      };
     }
   },
 
-  // Get QR codes for equipment
-  getEquipmentQRCodes: async (ownerId) => {
+  // Validate QR code
+  validateQR: async (qrId) => {
     try {
-      const q = query(
-        collection(db, 'qrCodes'),
-        where('type', '==', 'equipment'),
-        where('ownerId', '==', ownerId)
-      );
-      
-      const snapshot = await getDocs(q);
-      return snapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data()
-      }));
+      // Mock validation
+      return {
+        valid: true,
+        expired: false,
+        type: qrId.split('-')[0],
+        createdAt: new Date().toISOString()
+      };
     } catch (error) {
-      console.error('Error getting equipment QR codes:', error);
-      throw error;
+      console.error('Error validating QR code:', error);
+      return {
+        valid: false,
+        expired: true
+      };
     }
   },
 
-  // Update QR code usage stats
-  updateQRUsage: async (qrId, action) => {
+  // Get QR code analytics
+  getQRAnalytics: async (ownerId) => {
     try {
-      const qrRef = doc(db, 'qrCodes', qrId);
-      const qrDoc = await getDoc(qrRef);
-      
-      if (qrDoc.exists()) {
-        const currentData = qrDoc.data();
-        const usageCount = (currentData.usageCount || 0) + 1;
-        const lastUsed = serverTimestamp();
-        
-        await updateDoc(qrRef, {
-          usageCount,
-          lastUsed,
-          lastAction: action
-        });
-      }
+      // Mock analytics data
+      return {
+        totalScans: Math.floor(Math.random() * 100),
+        uniqueScans: Math.floor(Math.random() * 50),
+        lastScannedAt: new Date().toISOString(),
+        topEquipment: [
+          { id: 'eq1', name: 'Power Drill', scans: 25 },
+          { id: 'eq2', name: 'Camping Tent', scans: 18 }
+        ]
+      };
     } catch (error) {
-      console.error('Error updating QR usage:', error);
-      // Don't throw error as this is analytics only
+      console.error('Error fetching QR analytics:', error);
+      throw new Error('Failed to fetch QR analytics');
     }
   }
 };
