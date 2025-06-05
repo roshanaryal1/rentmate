@@ -1,38 +1,50 @@
 # RentMate - Equipment Rental Platform
 
-[![Version](https://img.shields.io/badge/version-1.2.1-blue.svg)](https://github.com/roshanaryal1/rentmate/releases)
+[![Version](https://img.shields.io/badge/version-1.3.0-blue.svg)](https://github.com/roshanaryal1/rentmate/releases)
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 [![React](https://img.shields.io/badge/React-19.1.0-blue.svg)](https://reactjs.org/)
 [![Firebase](https://img.shields.io/badge/Firebase-11.8.1-orange.svg)](https://firebase.google.com/)
+[![Material-UI](https://img.shields.io/badge/Material--UI-7.1.0-blue.svg)](https://mui.com/)
 
-RentMate is a modern, full-featured equipment rental platform that connects equipment owners with renters. Built with React and Firebase, it provides a seamless experience for listing, browsing, and renting construction and industrial equipment.
+RentMate is a modern, full-featured equipment rental platform that connects equipment owners with renters. Built with React and Firebase, it provides a seamless experience for listing, browsing, and managing equipment rentals with advanced features like QR code integration, enhanced analytics, and Material-UI components.
 
 ## 🌟 Features
+
+### 🆕 **New in v1.3.0**
+- **🔄 QR Code Integration**: Generate and scan QR codes for equipment tracking
+- **📊 Enhanced Analytics**: Advanced Material-UI powered dashboards with better data visualization
+- **📱 Improved Mobile Experience**: Better responsive design with Material-UI components
+- **🎨 Modern UI/UX**: Upgraded to Material-UI 7.1.0 for better user experience
+- **⚡ Performance Boost**: Optimized with React 19.1.0 and latest dependencies
+- **🔧 Better Error Handling**: Enhanced error boundaries and user feedback
 
 ### For Equipment Renters
 - **Browse Equipment**: Discover a wide variety of construction and industrial equipment
 - **Advanced Search**: Filter by category, location, price, and availability
+- **QR Code Scanning**: Quick equipment identification and details access
 - **Rental Management**: Track current and past rentals with detailed history
-- **User Dashboard**: Manage your rental history and preferences
+- **User Dashboard**: Comprehensive analytics and rental insights
 - **Secure Authentication**: Google OAuth and email/password login
 - **Mobile Responsive**: Access RentMate seamlessly on any device
 - **Real-time Notifications**: Get updates on rental status and approvals
-- **Equipment Details Modal**: View detailed equipment information before renting
+- **Equipment Details Modal**: View detailed equipment information with enhanced UI
 
 ### For Equipment Owners
 - **List Equipment**: Add your equipment with detailed descriptions and pricing
-- **Inventory Management**: Track availability and rental status
+- **QR Code Generation**: Create QR codes for easy equipment identification
+- **Inventory Management**: Track availability and rental status with visual analytics
 - **Rental Approval System**: Review and approve rental requests
-- **Earnings Dashboard**: Monitor rental income and performance
-- **Equipment Analytics**: View equipment performance metrics
-- **Request Management**: Handle rental requests with approval/decline workflow
+- **Earnings Dashboard**: Monitor rental income with advanced charts and projections
+- **Equipment Analytics**: View equipment performance metrics with Material-UI components
+- **Request Management**: Handle rental requests with improved workflow
 
 ### For Administrators
-- **User Management**: Oversee user accounts and permissions with role editing
+- **User Management**: Oversee user accounts and permissions with enhanced role editing
 - **Equipment Approval**: Review and approve new equipment listings
-- **Platform Analytics**: Monitor platform usage with comprehensive charts
+- **Platform Analytics**: Monitor platform usage with comprehensive Material-UI charts
 - **Content Moderation**: Ensure quality and safety standards
-- **Advanced Dashboard**: Role-specific analytics and insights
+- **Advanced Dashboard**: Role-specific analytics with better data visualization
+- **System Health Monitoring**: Track platform performance and user engagement
 
 ## 🚀 Live Demo
 
@@ -42,7 +54,7 @@ Visit the live application: [RentMate Platform](https://rentmate-c7360.web.app)
 
 Before running this project, make sure you have:
 
-- Node.js (v16 or higher)
+- Node.js (v18 or higher) - **Updated requirement for v1.3.0**
 - npm or yarn package manager
 - Firebase account with Firestore and Authentication enabled
 - Git
@@ -98,20 +110,39 @@ rentmate/
 ├── src/
 │   ├── components/          # Reusable UI components
 │   │   ├── auth/           # Authentication components
-│   │   ├── Dashboard/      # Dashboard components
+│   │   ├── Dashboard/      # Dashboard components with Material-UI
 │   │   ├── Equipment/      # Equipment-related components
 │   │   ├── Rental/         # Rental management components
+│   │   ├── QRCode/         # QR code generation and scanning (NEW)
 │   │   └── common/         # Shared components
 │   ├── contexts/           # React contexts
 │   ├── data/              # Sample data and constants
 │   ├── pages/             # Page components
 │   ├── services/          # API and service functions
-│   ├── theme/             # Theme and styling
+│   ├── theme/             # Material-UI theme and styling
+│   ├── utils/             # Utility functions (NEW)
 │   ├── App.js             # Main application component
 │   └── index.js           # Application entry point
 ├── package.json
 └── README.md
 ```
+
+## 🆕 New Features in v1.3.0
+
+### QR Code Integration
+- **Equipment QR Codes**: Each equipment item now has a unique QR code
+- **Quick Scanning**: Scan QR codes to instantly access equipment details
+- **Offline Access**: QR codes work even with limited connectivity
+
+### Enhanced Analytics
+- **Material-UI Charts**: Beautiful, interactive charts for better data visualization
+- **Real-time Updates**: Live data updates with improved performance
+- **Export Functionality**: Export reports and analytics data
+
+### Improved User Experience
+- **Material-UI Components**: Consistent, modern UI across all pages
+- **Better Mobile Support**: Enhanced responsive design
+- **Loading States**: Improved loading indicators and transitions
 
 ## 🧪 Testing
 
@@ -150,12 +181,7 @@ npm test -- --coverage
    ```
 
 ### GitHub Pages
-1. Install gh-pages:
-   ```bash
-   npm install --save-dev gh-pages
-   ```
-
-2. Deploy:
+1. Deploy using built-in script:
    ```bash
    npm run deploy
    ```
@@ -202,6 +228,7 @@ We welcome contributions! Please follow these steps:
 
 ### Development Guidelines
 - Follow React best practices
+- Use Material-UI components for consistency
 - Write meaningful commit messages
 - Add tests for new features
 - Update documentation as needed
@@ -220,46 +247,47 @@ If you encounter any issues or have questions:
 
 ## 🗺️ Roadmap
 
-### Version 1.3.0 (Future)
+### Version 1.4.0 (Planned)
 - [ ] Equipment insurance integration
-- [ ] Maintenance scheduling
+- [ ] Maintenance scheduling system
 - [ ] Review and rating system
-- [ ] Multi-language support
+- [ ] Multi-language support (i18n)
+- [ ] Payment integration (Stripe)
+- [ ] Push notifications
 - [ ] Advanced reporting features
-- [ ] Mobile app development
 
-## 📊 What's New in v1.2.1 (January 2025)
+## 📊 What's New in v1.3.0 (June 2025)
+
+### 🚀 Major Features
+- **Material-UI Upgrade**: Enhanced UI/UX with Material-UI 7.1.0
+- **Advanced Analytics**: Better data visualization and insights
+- **Performance Improvements**: Optimized with React 19.1.0
+- **Enhanced Mobile Experience**: Better responsive design
+
+### 🔧 Technical Improvements
+- Upgraded to React 19.1.0 for better performance
+- Added Material-UI 7.1.0 for consistent design system
+- Implemented QR code generation and scanning
+- Enhanced error handling and user feedback
+- Improved component structure and maintainability
+- Better accessibility compliance
 
 ### 🐛 Bug Fixes
-- **Fixed authentication flow**: Resolved issues with user role assignment and persistent login
-- **Improved rental request system**: Fixed approval/decline workflow for equipment owners
-- **Enhanced error handling**: Better error messages and fallback states
-- **UI/UX improvements**: Fixed responsive design issues on mobile devices
-- **Performance optimizations**: Reduced bundle size and improved loading times
+- Fixed authentication persistence issues
+- Improved mobile responsiveness
+- Enhanced error message clarity
+- Fixed chart rendering issues
+- Improved form validation
 
-### 🔧 Improvements
-- **Better notification system**: Enhanced real-time notifications for rental updates
-- **Equipment detail modal**: Improved equipment viewing experience
-- **Admin dashboard**: Enhanced user management with role editing capabilities
-- **Search functionality**: Improved equipment search with better filtering
-- **Form validation**: Enhanced validation across all forms
-
-### 💻 Technical Updates
-- Updated Firebase SDK integration
-- Improved component error boundaries
-- Enhanced TypeScript support preparation
-- Better code splitting for performance
-- Optimized Firebase security rules
-
-For previous version details, see our [CHANGELOG](CHANGELOG.md).
+For detailed changelog, see [CHANGELOG.md](CHANGELOG.md).
 
 ## 🏆 Acknowledgments
 
 - [React](https://reactjs.org/) - UI library
 - [Firebase](https://firebase.google.com/) - Backend services
-- [Bootstrap](https://getbootstrap.com/) - CSS framework
+- [Material-UI](https://mui.com/) - React component library
 - [React Router](https://reactrouter.com/) - Client-side routing
-- [Bootstrap Icons](https://icons.getbootstrap.com/) - Icon library
+- [QRCode.React](https://github.com/zpao/qrcode.react) - QR code generation
 - [Chart.js](https://www.chartjs.org/) - Data visualization
 - [date-fns](https://date-fns.org/) - Date utility library
 
