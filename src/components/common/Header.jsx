@@ -125,6 +125,20 @@ const Header = () => {
     return badges[userRole] || badges.renter;
   };
 
+  // Utility for dashboard link
+  const getDashboardLink = () => {
+    switch (userRole) {
+      case 'admin':
+        return '/admin-dashboard';
+      case 'owner':
+        return '/owner-dashboard';
+      case 'renter':
+        return '/renter-dashboard';
+      default:
+        return '/';
+    }
+  };
+
   return (
     <>
       <nav
@@ -220,31 +234,99 @@ const Header = () => {
                     </li>
                     <li><hr className="dropdown-divider d-lg-none" /></li>
                     <li>
+                      <Link className="dropdown-item" to={getDashboardLink()}>
+                        <i className="bi bi-speedometer2 me-2"></i>
+                        Dashboard
+                      </Link>
+                    </li>
+                    <li><hr className="dropdown-divider" /></li>
+                    {/* Role-specific menu items */}
+                    {userRole === 'owner' && (
+                      <>
+                        <li>
+                          <Link className="dropdown-item" to="/add-equipment">
+                            <i className="bi bi-plus-circle me-2"></i>
+                            Add Equipment
+                          </Link>
+                        </li>
+                        <li>
+                          <Link className="dropdown-item" to="/my-equipment">
+                            <i className="bi bi-tools me-2"></i>
+                            My Equipment
+                          </Link>
+                        </li>
+                        <li>
+                          <Link className="dropdown-item" to="/owner-rentals">
+                            <i className="bi bi-calendar-week me-2"></i>
+                            Manage Rentals
+                          </Link>
+                        </li>
+                      </>
+                    )}
+                    {userRole === 'renter' && (
+                      <>
+                        <li>
+                          <Link className="dropdown-item" to="/rental-history">
+                            <i className="bi bi-clock-history me-2"></i>
+                            Rental History
+                          </Link>
+                        </li>
+                        <li>
+                          <Link className="dropdown-item" to="/favorites">
+                            <i className="bi bi-heart me-2"></i>
+                            Favorites
+                          </Link>
+                        </li>
+                      </>
+                    )}
+                    {userRole === 'admin' && (
+                      <>
+                        <li>
+                          <Link className="dropdown-item" to="/admin-users">
+                            <i className="bi bi-people me-2"></i>
+                            User Management
+                          </Link>
+                        </li>
+                        <li>
+                          <Link className="dropdown-item" to="/admin-reports">
+                            <i className="bi bi-graph-up me-2"></i>
+                            Reports
+                          </Link>
+                        </li>
+                      </>
+                    )}
+                    <li><hr className="dropdown-divider" /></li>
+                    {/* QR Tools menu item */}
+                    <li>
+                      <Link className="dropdown-item" to="/qr-tools">
+                        <i className="bi bi-qr-code me-2"></i>
+                        QR Tools
+                      </Link>
+                    </li>
+                    <li><hr className="dropdown-divider" /></li>
+                    <li>
                       <Link className="dropdown-item" to="/profile">
-                        <i className="bi bi-person me-2"></i> My Profile
+                        <i className="bi bi-person me-2"></i>
+                        Profile
                       </Link>
                     </li>
                     <li>
                       <Link className="dropdown-item" to="/settings">
-                        <i className="bi bi-gear me-2"></i> Settings
+                        <i className="bi bi-gear me-2"></i>
+                        Settings
                       </Link>
                     </li>
-                    {userRole === 'owner' && (
-                      <li>
-                        <Link className="dropdown-item" to="/analytics">
-                          <i className="bi bi-graph-up me-2"></i> Analytics
-                        </Link>
-                      </li>
-                    )}
                     <li>
                       <Link className="dropdown-item" to="/help">
-                        <i className="bi bi-question-circle me-2"></i> Help & Support
+                        <i className="bi bi-question-circle me-2"></i>
+                        Help
                       </Link>
                     </li>
                     <li><hr className="dropdown-divider" /></li>
                     <li>
                       <button className="dropdown-item text-danger" onClick={handleLogout}>
-                        <i className="bi bi-box-arrow-right me-2"></i> Sign Out
+                        <i className="bi bi-box-arrow-right me-2"></i>
+                        Logout
                       </button>
                     </li>
                   </ul>
@@ -269,6 +351,32 @@ const Header = () => {
         <div className="navbarOverlay" onClick={() => setIsMenuOpen(false)} tabIndex={-1} aria-hidden="true"></div>
       )}
       <div className="navbarSpacer"></div>
+
+      {/* Mobile QR Quick Access (shows on mobile when logged in and menu open) */}
+      {currentUser && isMenuOpen && (
+        <div className="d-md-none bg-light border-top p-3">
+          <div className="row g-2">
+            <div className="col-6">
+              <Link 
+                to="/qr-tools" 
+                className="btn btn-primary btn-sm w-100"
+              >
+                <i className="bi bi-qr-code-scan d-block mb-1"></i>
+                <small>QR Tools</small>
+              </Link>
+            </div>
+            <div className="col-6">
+              <Link 
+                to="/help" 
+                className="btn btn-outline-primary btn-sm w-100"
+              >
+                <i className="bi bi-tools d-block mb-1"></i>
+                <small>Help</small>
+              </Link>
+            </div>
+          </div>
+        </div>
+      )}
     </>
   );
 };

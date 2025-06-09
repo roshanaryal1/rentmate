@@ -1,3 +1,5 @@
+/* src/components/FeedbackModal.css */
+
 /* Overlay */
 .feedback-overlay {
   position: fixed;
@@ -205,7 +207,6 @@
 
   .feedback-content {
     padding: 20px;
-    
   }
 
   .feedback-content h2 {

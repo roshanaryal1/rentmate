@@ -35,6 +35,7 @@ import AuthDebug from './components/AuthDebug';
 
 // QR Code Tools Page
 import QRCodePage from './pages/QRCodePage';
+import QRHandler from './pages/QRHandler';
 
 // CSS
 import 'bootstrap/dist/css/bootstrap.min.css';
@@ -62,8 +63,9 @@ function App() {
                 <Route path="/signup" element={<Signup />} />
                 <Route path="/forgot-password" element={<ForgotPassword />} />
 
-                {/* QR Code Tools Route */}
+                {/* QR Code Tools Routes */}
                 <Route path="/qr-tools" element={<QRCodePage />} />
+                <Route path="/qr/:qrId" element={<QRHandler />} />
 
                 {/* Equipment rental */}
                 <Route 
@@ -271,7 +273,7 @@ function App() {
   );
 }
 
-// Placeholder pages
+// Placeholder pages (same as before)
 const ProfilePage = () => (
   <div className="container py-5">
     <h2>My Profile</h2>

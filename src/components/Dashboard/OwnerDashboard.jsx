@@ -1,4 +1,4 @@
-// Debug and Fixed OwnerDashboard.jsx
+// Enhanced OwnerDashboard.jsx with Rental Approval
 import React, { useState, useEffect, createContext, useContext } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
@@ -79,6 +79,207 @@ const DebugInfo = ({ currentUser, equipmentItems, allEquipment }) => {
   );
 };
 
+// ✅ NEW: Rental Approval Component
+const RentalApprovalSection = ({ currentUser, onApprovalChange }) => {
+  const [pendingRentals, setPendingRentals] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+
+  useEffect(() => {
+    fetchPendingRentals();
+  }, [currentUser]);
+
+  const fetchPendingRentals = async () => {
+    if (!currentUser) return;
+
+    try {
+      setLoading(true);
+      
+      // Fetch rentals where current user is the owner and status is pending
+      const rentalsSnapshot = await getDocs(collection(db, 'rentals'));
+      const allRentals = rentalsSnapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      }));
+
+      // Filter for pending rentals where current user is the equipment owner
+      const pendingForOwner = allRentals.filter(rental => 
+        rental.ownerId === currentUser.uid && rental.status === 'pending'
+      );
+
+      console.log(`📥 Found ${pendingForOwner.length} pending rentals for approval`);
+      setPendingRentals(pendingForOwner);
+
+    } catch (error) {
+      console.error('❌ Error fetching pending rentals:', error);
+      setError('Failed to load rental requests');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleApproval = async (rentalId, action) => {
+    try {
+      const newStatus = action === 'approve' ? 'approved' : 'rejected';
+      
+      await updateDoc(doc(db, 'rentals', rentalId), {
+        status: newStatus,
+        updatedAt: serverTimestamp(),
+        [`${action}dAt`]: serverTimestamp(),
+        [`${action}dBy`]: currentUser.uid
+      });
+
+      // Remove from local state
+      setPendingRentals(prev => prev.filter(rental => rental.id !== rentalId));
+      
+      // Notify parent component
+      if (onApprovalChange) {
+        onApprovalChange();
+      }
+
+      console.log(`✅ Rental ${action}d successfully`);
+      
+      // Show success message
+      alert(`Rental request ${action}d successfully!`);
+
+    } catch (error) {
+      console.error(`❌ Error ${action}ing rental:`, error);
+      setError(`Failed to ${action} rental request`);
+    }
+  };
+
+  const formatDate = (dateObj) => {
+    if (!dateObj) return 'Unknown';
+    if (dateObj.toDate) return dateObj.toDate().toLocaleDateString();
+    if (dateObj.seconds) return new Date(dateObj.seconds * 1000).toLocaleDateString();
+    return new Date(dateObj).toLocaleDateString();
+  };
+
+  if (loading) {
+    return (
+      <div className="card border-0 shadow-sm">
+        <div className="card-header">
+          <h5 className="mb-0">📥 Pending Rental Requests</h5>
+        </div>
+        <div className="card-body text-center py-4">
+          <div className="spinner-border text-primary" role="status">
+            <span className="visually-hidden">Loading...</span>
+          </div>
+          <p className="mt-2 text-muted">Loading rental requests...</p>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="card border-0 shadow-sm">
+      <div className="card-header d-flex justify-content-between align-items-center">
+        <h5 className="mb-0">📥 Pending Rental Requests ({pendingRentals.length})</h5>
+        <button 
+          className="btn btn-outline-secondary btn-sm"
+          onClick={fetchPendingRentals}
+        >
+          🔄 Refresh
+        </button>
+      </div>
+      <div className="card-body">
+        {error && (
+          <div className="alert alert-danger">
+            <i className="bi bi-exclamation-triangle me-2"></i>
+            {error}
+          </div>
+        )}
+
+        {pendingRentals.length > 0 ? (
+          <div className="row">
+            {pendingRentals.map(rental => (
+              <div key={rental.id} className="col-md-6 mb-3">
+                <div className="card border border-warning">
+                  <div className="card-body">
+                    <div className="d-flex justify-content-between align-items-start mb-3">
+                      <div>
+                        <h6 className="fw-bold mb-1">{rental.equipmentName}</h6>
+                        <small className="text-muted">
+                          <i className="bi bi-person me-1"></i>
+                          {rental.renterName} ({rental.renterEmail})
+                        </small>
+                      </div>
+                      <span className="badge bg-warning text-dark">Pending</span>
+                    </div>
+
+                    <div className="row g-2 mb-3 small">
+                      <div className="col-6">
+                        <strong>Start Date:</strong><br/>
+                        <span className="text-muted">{formatDate(rental.startDate)}</span>
+                      </div>
+                      <div className="col-6">
+                        <strong>End Date:</strong><br/>
+                        <span className="text-muted">{formatDate(rental.endDate)}</span>
+                      </div>
+                      <div className="col-6">
+                        <strong>Duration:</strong><br/>
+                        <span className="text-muted">{rental.totalDays} day{rental.totalDays !== 1 ? 's' : ''}</span>
+                      </div>
+                      <div className="col-6">
+                        <strong>Total Price:</strong><br/>
+                        <span className="text-success fw-bold">${rental.totalPrice}</span>
+                      </div>
+                    </div>
+
+                    {rental.notes && (
+                      <div className="mb-3">
+                        <strong className="small">Renter Notes:</strong>
+                        <p className="small text-muted mb-0 mt-1">{rental.notes}</p>
+                      </div>
+                    )}
+
+                    <div className="mb-3">
+                      <strong className="small">Contact Info:</strong>
+                      <div className="small text-muted">
+                        📞 {rental.renterPhone || 'Not provided'}<br/>
+                        📍 {rental.renterAddress || 'Not provided'}
+                      </div>
+                    </div>
+
+                    <div className="d-flex gap-2">
+                      <button
+                        className="btn btn-success btn-sm flex-fill"
+                        onClick={() => handleApproval(rental.id, 'approve')}
+                      >
+                        <i className="bi bi-check-circle me-1"></i>
+                        Approve
+                      </button>
+                      <button
+                        className="btn btn-danger btn-sm flex-fill"
+                        onClick={() => handleApproval(rental.id, 'reject')}
+                      >
+                        <i className="bi bi-x-circle me-1"></i>
+                        Reject
+                      </button>
+                    </div>
+
+                    <small className="text-muted d-block mt-2">
+                      Request ID: #{rental.id.slice(-6)}
+                    </small>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <div className="text-center py-4">
+            <div className="display-1 mb-3">📭</div>
+            <h6>No Pending Requests</h6>
+            <p className="text-muted mb-0">
+              All rental requests have been processed. New requests will appear here.
+            </p>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+};
+
 // Main Owner Dashboard Component
 function OwnerDashboard() {
   const { currentUser, logout } = useAuth();
@@ -117,6 +318,12 @@ function OwnerDashboard() {
       window.location.reload();
     }
   }, [location]);
+
+  // ✅ NEW: Handle approval changes
+  const handleApprovalChange = () => {
+    // Refresh the dashboard data when approvals change
+    window.location.reload();
+  };
 
   // Fetch all data from Firebase
   useEffect(() => {
@@ -203,15 +410,14 @@ function OwnerDashboard() {
           setActiveRentals([]);
         }
 
-        // 4. Fetch pending rental requests
+        // 4. ✅ UPDATED: Fetch pending rental requests from 'rentals' collection
         try {
-          const requestsSnapshot = await getDocs(collection(db, 'rentalRequests'));
-          requests = requestsSnapshot.docs
-            .map(doc => ({ id: doc.id, ...doc.data() }))
-            .filter(request => request.ownerId === currentUser.uid && request.status === 'pending');
+          const pendingRentals = ownerRentals.filter(rental => 
+            rental.status === 'pending'
+          );
 
-          console.log(`📥 Found ${requests.length} pending requests`);
-          setPendingRequests(requests);
+          console.log(`📥 Found ${pendingRentals.length} pending requests`);
+          setPendingRequests(pendingRentals);
 
         } catch (requestsError) {
           console.log('ℹ️ No pending requests found:', requestsError);
@@ -243,6 +449,11 @@ function OwnerDashboard() {
           r.status === 'completed'
         ).length;
 
+        // Calculate pending requests count
+        const pendingRequestsCount = ownerRentals.filter(r => 
+          r.status === 'pending'
+        ).length;
+
         // Calculate average rating
         const ratingsSum = ownerEquipment.reduce((sum, eq) => sum + (eq.rating || 0), 0);
         const avgRating = totalEquipment > 0 ? (ratingsSum / totalEquipment) : 0;
@@ -252,7 +463,7 @@ function OwnerDashboard() {
           availableEquipment,
           rentedEquipment,
           totalRevenue,
-          pendingRequests: requests.length,
+          pendingRequests: pendingRequestsCount, // ✅ Fixed to use actual pending count
           activeRentals: activeRentalsCount,
           completedRentals: completedRentalsCount,
           avgRating: avgRating.toFixed(1),
@@ -448,12 +659,27 @@ function OwnerDashboard() {
                 <div>
                   <h2 className="mb-1">{stats.pendingRequests}</h2>
                   <p className="text-muted mb-0 small">Pending Requests</p>
+                  {stats.pendingRequests > 0 && (
+                    <small className="text-warning">⚠️ Needs attention</small>
+                  )}
                 </div>
               </div>
             </div>
           </div>
         </div>
       </div>
+
+      {/* ✅ NEW: Rental Approval Section */}
+      {stats.pendingRequests > 0 && (
+        <div className="row mb-4">
+          <div className="col">
+            <RentalApprovalSection 
+              currentUser={currentUser}
+              onApprovalChange={handleApprovalChange}
+            />
+          </div>
+        </div>
+      )}
 
       {/* Equipment Section */}
       <div className="row mb-4">

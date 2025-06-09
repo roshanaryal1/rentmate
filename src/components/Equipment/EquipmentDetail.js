@@ -1,4 +1,4 @@
-// TODO: Implement Equipment/EquipmentDetail.js component
+// src/components/Equipment/EquipmentDetail.js
 import React, { useState, useEffect } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { doc, getDoc, updateDoc, increment } from 'firebase/firestore';
@@ -39,7 +39,7 @@ function EquipmentDetail() {
     fetchEquipment();
   }, [id]);
 
-  const handleRentClick = () => {
+  const handleQuickRent = () => {
     if (!currentUser) {
       // Store the equipment ID they wanted to rent and redirect to login
       localStorage.setItem('pendingRental', id);
@@ -49,12 +49,26 @@ function EquipmentDetail() {
     }
   };
 
+  const handlePayAndRent = () => {
+    if (!currentUser) {
+      // Store the equipment ID they wanted to rent and redirect to login
+      localStorage.setItem('pendingRental', id);
+      navigate('/login');
+    } else {
+      navigate(`/payment/${id}`);
+    }
+  };
+
   if (loading) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-blue-600 mx-auto"></div>
-          <p className="mt-4 text-gray-600">Loading equipment details...</p>
+      <div className="container py-5">
+        <div className="row justify-content-center">
+          <div className="col-md-6 text-center">
+            <div className="spinner-border text-primary" style={{ width: '3rem', height: '3rem' }} role="status">
+              <span className="visually-hidden">Loading...</span>
+            </div>
+            <p className="mt-3 text-muted">Loading equipment details...</p>
+          </div>
         </div>
       </div>
     );
@@ -62,178 +76,256 @@ function EquipmentDetail() {
 
   if (error || !equipment) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="text-center">
-          <h2 className="text-2xl font-bold text-gray-900 mb-4">Equipment Not Found</h2>
-          <p className="text-gray-600 mb-6">{error || 'The equipment you\'re looking for doesn\'t exist.'}</p>
-          <Link
-            to="/"
-            className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700"
-          >
-            Back to Browse
-          </Link>
+      <div className="container py-5">
+        <div className="row justify-content-center">
+          <div className="col-md-6 text-center">
+            <div className="alert alert-danger">
+              <h4 className="alert-heading">Equipment Not Found</h4>
+              <p className="mb-0">{error || 'The equipment you\'re looking for doesn\'t exist.'}</p>
+            </div>
+            <Link to="/" className="btn btn-primary">
+              <i className="bi bi-arrow-left me-2"></i>
+              Back to Browse
+            </Link>
+          </div>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      {/* Navigation */}
-      <nav className="bg-white shadow-sm">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between h-16">
-            <div className="flex items-center">
-              <Link to="/" className="text-xl font-bold text-blue-600">RentMate</Link>
-            </div>
-            <div className="flex items-center space-x-4">
-              {currentUser ? (
-                <Link
-                  to="/my-dashboard"
-                  className="text-gray-700 hover:text-blue-600"
-                >
-                  My Dashboard
-                </Link>
-              ) : (
-                <div className="flex items-center space-x-4">
-                  <Link
-                    to="/login"
-                    className="text-gray-700 hover:text-blue-600"
-                  >
-                    Login
-                  </Link>
-                  <Link
-                    to="/signup"
-                    className="px-3 py-1 border border-transparent text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700"
-                  >
-                    Sign Up
-                  </Link>
+    <div className="container py-4">
+      {/* Breadcrumb Navigation */}
+      <nav aria-label="breadcrumb" className="mb-4">
+        <ol className="breadcrumb">
+          <li className="breadcrumb-item">
+            <Link to="/" className="text-decoration-none">
+              <i className="bi bi-house me-1"></i>
+              Home
+            </Link>
+          </li>
+          <li className="breadcrumb-item">
+            <Link to="/" className="text-decoration-none">Browse Equipment</Link>
+          </li>
+          <li className="breadcrumb-item active" aria-current="page">{equipment.name}</li>
+        </ol>
+      </nav>
+
+      <div className="row">
+        {/* Equipment Image */}
+        <div className="col-lg-6 mb-4">
+          <div className="equipment-image-container">
+            {equipment.imageUrl ? (
+              <img
+                src={equipment.imageUrl}
+                alt={equipment.name}
+                className="img-fluid rounded shadow"
+                style={{ width: '100%', height: '400px', objectFit: 'cover' }}
+                onError={(e) => {
+                  e.target.style.display = 'none';
+                  e.target.nextSibling.style.display = 'flex';
+                }}
+              />
+            ) : (
+              <div className="d-flex align-items-center justify-content-center bg-light rounded shadow"
+                   style={{ width: '100%', height: '400px' }}>
+                <div className="text-center text-muted">
+                  <i className="bi bi-image" style={{ fontSize: '4rem' }}></i>
+                  <p className="mt-2">No image available</p>
                 </div>
-              )}
+              </div>
+            )}
+            
+            {/* Image fallback */}
+            <div className="d-none align-items-center justify-content-center bg-light rounded shadow"
+                 style={{ width: '100%', height: '400px' }}>
+              <div className="text-center text-muted">
+                <i className="bi bi-image" style={{ fontSize: '4rem' }}></i>
+                <p className="mt-2">Image not available</p>
+              </div>
             </div>
           </div>
         </div>
-      </nav>
 
-      {/* Main Content */}
-      <div className="py-12 px-4 sm:px-6 lg:px-8">
-        <div className="max-w-4xl mx-auto">
-          <Link
-            to="/"
-            className="text-blue-600 hover:text-blue-500 mb-4 inline-block"
-          >
-            ← Back to Browse
-          </Link>
+        {/* Equipment Details */}
+        <div className="col-lg-6">
+          <div className="equipment-details">
+            {/* Header */}
+            <div className="mb-4">
+              <h1 className="display-5 fw-bold mb-2">{equipment.name}</h1>
+              
+              <div className="d-flex flex-wrap align-items-center gap-2 mb-3">
+                <span className="badge bg-primary fs-6">{equipment.category}</span>
+                <span className={`badge fs-6 ${equipment.available ? 'bg-success' : 'bg-danger'}`}>
+                  {equipment.available ? 'Available' : 'Currently Rented'}
+                </span>
+                {equipment.approvalStatus && (
+                  <span className={`badge fs-6 ${equipment.approvalStatus === 'approved' ? 'bg-success' : 'bg-warning'}`}>
+                    {equipment.approvalStatus === 'approved' ? 'Verified' : 'Pending Approval'}
+                  </span>
+                )}
+              </div>
 
-          <div className="bg-white shadow rounded-lg overflow-hidden">
-            {/* Equipment Header */}
-            <div className="px-6 py-8 bg-gray-50 border-b">
-              <div className="flex justify-between items-start">
-                <div>
-                  <h1 className="text-3xl font-bold text-gray-900">{equipment.name}</h1>
-                  <p className="text-lg text-blue-600 font-medium mt-1">{equipment.category}</p>
-                  <div className="mt-2 flex items-center space-x-4 text-sm text-gray-500">
-                    <span>{equipment.views} views</span>
-                    <span>•</span>
-                    <span>{equipment.rentals} rentals</span>
+              <div className="d-flex align-items-center text-muted small mb-3">
+                <i className="bi bi-eye me-1"></i>
+                <span className="me-3">{equipment.views || 0} views</span>
+                <i className="bi bi-calendar-check me-1"></i>
+                <span>{equipment.bookings || 0} bookings</span>
+              </div>
+
+              <div className="price-section">
+                <h2 className="text-success fw-bold mb-0">
+                  ${equipment.ratePerDay}
+                  <span className="fs-5 text-muted fw-normal">/day</span>
+                </h2>
+              </div>
+            </div>
+
+            {/* Description */}
+            <div className="mb-4">
+              <h5 className="fw-semibold mb-2">Description</h5>
+              <p className="text-muted">{equipment.description}</p>
+            </div>
+
+            {/* Features */}
+            {equipment.features && equipment.features.length > 0 && (
+              <div className="mb-4">
+                <h5 className="fw-semibold mb-3">Features</h5>
+                <div className="row">
+                  {equipment.features.map((feature, index) => (
+                    <div key={index} className="col-sm-6 mb-2">
+                      <div className="d-flex align-items-start">
+                        <i className="bi bi-check-circle-fill text-success me-2 mt-1"></i>
+                        <span className="small">{feature}</span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Rental Information */}
+            <div className="mb-4">
+              <h5 className="fw-semibold mb-3">Rental Information</h5>
+              <div className="row g-3">
+                <div className="col-sm-6">
+                  <div className="d-flex align-items-center">
+                    <i className="bi bi-person-circle text-primary me-2"></i>
+                    <div>
+                      <small className="text-muted d-block">Owner</small>
+                      <span className="fw-medium">{equipment.ownerName || 'Equipment Owner'}</span>
+                    </div>
                   </div>
                 </div>
-                <div className="text-right">
-                  <p className="text-3xl font-bold text-green-600">${equipment.ratePerDay}/day</p>
-                  <div className="mt-2">
-                    <span className={`px-3 py-1 inline-flex text-sm leading-5 font-semibold rounded-full ${
-                      equipment.available ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
-                    }`}>
-                      {equipment.available ? 'Available' : 'Currently Rented'}
-                    </span>
+                <div className="col-sm-6">
+                  <div className="d-flex align-items-center">
+                    <i className="bi bi-geo-alt text-primary me-2"></i>
+                    <div>
+                      <small className="text-muted d-block">Location</small>
+                      <span className="fw-medium">{equipment.location}</span>
+                    </div>
                   </div>
                 </div>
               </div>
             </div>
 
-            {/* Equipment Details */}
-            <div className="px-6 py-8">
-              <div className="grid md:grid-cols-2 gap-8">
-                <div>
-                  <h2 className="text-xl font-semibold text-gray-900 mb-4">Description</h2>
-                  <p className="text-gray-700 leading-relaxed">{equipment.description}</p>
-
-                  {equipment.features && equipment.features.length > 0 && (
-                    <div className="mt-6">
-                      <h3 className="text-lg font-semibold text-gray-900 mb-3">Features</h3>
-                      <ul className="space-y-2">
-                        {equipment.features.map((feature, index) => (
-                          <li key={index} className="flex items-start">
-                            <svg className="h-5 w-5 text-blue-500 mt-0.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
-                              <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
-                            </svg>
-                            <span className="ml-2 text-gray-700">{feature}</span>
-                          </li>
-                        ))}
-                      </ul>
-                    </div>
-                  )}
+            {/* Action Buttons */}
+            <div className="rental-actions">
+              {equipment.available && (equipment.approvalStatus === 'approved' || !equipment.approvalStatus) ? (
+                <div className="d-grid gap-2">
+                  <button
+                    onClick={handlePayAndRent}
+                    className="btn btn-primary btn-lg"
+                    disabled={!equipment.available}
+                  >
+                    <i className="bi bi-credit-card me-2"></i>
+                    {currentUser ? 'Pay & Rent Now' : 'Login to Pay & Rent'}
+                  </button>
+                  
+                  <button
+                    onClick={handleQuickRent}
+                    className="btn btn-outline-primary"
+                    disabled={!equipment.available}
+                  >
+                    <i className="bi bi-calendar-check me-2"></i>
+                    {currentUser ? 'Schedule Rental' : 'Login to Schedule'}
+                  </button>
                 </div>
+              ) : (
+                <div className="alert alert-warning">
+                  <i className="bi bi-exclamation-triangle me-2"></i>
+                  {!equipment.available ? 'This equipment is currently not available for rent.' : 'This equipment is pending approval.'}
+                </div>
+              )}
 
-                <div>
-                  <h2 className="text-xl font-semibold text-gray-900 mb-4">Rental Information</h2>
-                  <dl className="space-y-4">
-                    <div>
-                      <dt className="text-sm font-medium text-gray-500">Owner</dt>
-                      <dd className="mt-1 text-gray-900">{equipment.ownerName}</dd>
-                    </div>
-                    <div>
-                      <dt className="text-sm font-medium text-gray-500">Location</dt>
-                      <dd className="mt-1 text-gray-900">{equipment.location}</dd>
-                    </div>
-                    {equipment.contactInfo && (
-                      <div>
-                        <dt className="text-sm font-medium text-gray-500">Contact Info</dt>
-                        <dd className="mt-1 text-gray-900">{equipment.contactInfo}</dd>
-                      </div>
-                    )}
-                    <div>
-                      <dt className="text-sm font-medium text-gray-500">Status</dt>
-                      <dd className="mt-1">
-                        <span className={`px-2 py-1 text-xs font-medium rounded-full ${
-                          equipment.status === 'approved' ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800'
-                        }`}>
-                          {equipment.status === 'approved' ? 'Approved' : 'Pending Approval'}
-                        </span>
-                      </dd>
-                    </div>
-                  </dl>
+              {!currentUser && (
+                <div className="text-center mt-3">
+                  <small className="text-muted">
+                    Don't have an account?{' '}
+                    <Link to="/signup" className="text-primary text-decoration-none">
+                      Sign up here
+                    </Link>
+                  </small>
+                </div>
+              )}
+            </div>
 
-                  {/* Rent Button */}
-                  <div className="mt-8">
-                    {equipment.available && equipment.status === 'approved' ? (
-                      <button
-                        onClick={handleRentClick}
-                        className="w-full py-3 px-6 border border-transparent rounded-md shadow-sm text-lg font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
-                      >
-                        {currentUser ? 'Rent This Equipment' : 'Login to Rent'}
-                      </button>
-                    ) : (
-                      <div className="w-full py-3 px-6 border border-gray-300 rounded-md shadow-sm text-lg font-medium text-gray-400 bg-gray-100 text-center">
-                        {!equipment.available ? 'Currently Unavailable' : 'Pending Approval'}
-                      </div>
-                    )}
-                  </div>
+            {/* Trust Signals */}
+            <div className="mt-4 p-3 bg-light rounded">
+              <h6 className="fw-semibold mb-2">
+                <i className="bi bi-shield-check text-success me-2"></i>
+                Rental Protection
+              </h6>
+              <ul className="list-unstyled mb-0 small">
+                <li><i className="bi bi-check text-success me-1"></i> Secure payment processing</li>
+                <li><i className="bi bi-check text-success me-1"></i> Equipment condition guarantee</li>
+                <li><i className="bi bi-check text-success me-1"></i> 24/7 customer support</li>
+                <li><i className="bi bi-check text-success me-1"></i> Flexible rental periods</li>
+              </ul>
+            </div>
+          </div>
+        </div>
+      </div>
 
-                  {!currentUser && (
-                    <p className="mt-3 text-sm text-gray-500 text-center">
-                      <Link to="/signup" className="text-blue-600 hover:text-blue-500">
-                        Sign up
-                      </Link> or{' '}
-                      <Link to="/login" className="text-blue-600 hover:text-blue-500">
-                        login
-                      </Link> to start renting equipment
-                    </p>
-                  )}
+      {/* Additional Equipment Info */}
+      <div className="row mt-5">
+        <div className="col-12">
+          <div className="card border-0 bg-light">
+            <div className="card-body">
+              <h5 className="card-title">
+                <i className="bi bi-info-circle me-2"></i>
+                Important Information
+              </h5>
+              <div className="row">
+                <div className="col-md-6">
+                  <h6>Before You Rent:</h6>
+                  <ul className="small mb-0">
+                    <li>Check equipment availability dates</li>
+                    <li>Review pickup and return instructions</li>
+                    <li>Understand the rental terms and conditions</li>
+                  </ul>
+                </div>
+                <div className="col-md-6">
+                  <h6>During Your Rental:</h6>
+                  <ul className="small mb-0">
+                    <li>Use equipment as intended and safely</li>
+                    <li>Contact owner for any issues or questions</li>
+                    <li>Return equipment in the same condition</li>
+                  </ul>
                 </div>
               </div>
             </div>
           </div>
+        </div>
+      </div>
+
+      {/* Back Button */}
+      <div className="row mt-4">
+        <div className="col-12">
+          <Link to="/" className="btn btn-outline-secondary">
+            <i className="bi bi-arrow-left me-2"></i>
+            Back to Browse Equipment
+          </Link>
         </div>
       </div>
     </div>
