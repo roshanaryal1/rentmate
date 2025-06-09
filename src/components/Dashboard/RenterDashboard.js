@@ -1,23 +1,38 @@
+// src/components/Dashboard/RenterDashboard.js
 import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import { collection, getDocs, query, where, orderBy, addDoc, deleteDoc, doc } from 'firebase/firestore';
 import { db } from '../../firebase';
 import EquipmentDetailModal from '../Equipment/EquipmentDetailModal';
+import FeedbackModal from '../FeedbackModal';
 
 function RenterDashboard() {
   const { currentUser } = useAuth();
   const navigate = useNavigate();
+  
+  // Equipment and data state
   const [equipmentList, setEquipmentList] = useState([]);
   const [rentalHistory, setRentalHistory] = useState([]);
   const [favorites, setFavorites] = useState([]);
   const [loading, setLoading] = useState(true);
+  
+  // UI state
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('all');
   const [priceRange, setPriceRange] = useState('all');
   const [activeTab, setActiveTab] = useState('browse');
   const [selectedEquipment, setSelectedEquipment] = useState(null);
   const [showDetailModal, setShowDetailModal] = useState(false);
+  
+  // ✅ Feedback modal state
+  const [showFeedbackModal, setShowFeedbackModal] = useState(false);
+  const [feedbackData, setFeedbackData] = useState({
+    title: '',
+    message: '',
+    redirectPath: ''
+  });
+
   const [stats, setStats] = useState({
     totalRentals: 0,
     activeRentals: 0,
@@ -27,6 +42,41 @@ function RenterDashboard() {
 
   // Check if user has access to personal tabs
   const hasPersonalAccess = currentUser !== null;
+
+  // ✅ Check for URL parameters to show feedback
+  useEffect(() => {
+    const urlParams = new URLSearchParams(window.location.search);
+    const equipmentAdded = urlParams.get('equipmentAdded');
+    const rentalSuccess = urlParams.get('rentalSuccess');
+    const paymentSuccess = urlParams.get('paymentSuccess');
+
+    if (equipmentAdded === 'true') {
+      setFeedbackData({
+        title: 'Equipment Added Successfully! 🎉',
+        message: 'Your equipment has been listed and is now available for rent. You can manage it from your Owner Dashboard.',
+        redirectPath: '/add-equipment'
+      });
+      setShowFeedbackModal(true);
+      // Clean URL
+      window.history.replaceState({}, document.title, window.location.pathname);
+    } else if (rentalSuccess === 'true') {
+      setFeedbackData({
+        title: 'Rental Request Submitted! 📋',
+        message: 'Your rental request has been sent to the equipment owner. You\'ll receive a notification once they respond.',
+        redirectPath: '/renter-dashboard'
+      });
+      setShowFeedbackModal(true);
+      window.history.replaceState({}, document.title, window.location.pathname);
+    } else if (paymentSuccess === 'true') {
+      setFeedbackData({
+        title: 'Payment Successful! 💳',
+        message: 'Your payment has been processed successfully. Check your email for the rental confirmation and pickup details.',
+        redirectPath: '/renter-dashboard'
+      });
+      setShowFeedbackModal(true);
+      window.history.replaceState({}, document.title, window.location.pathname);
+    }
+  }, []);
 
   // Redirect to browse tab if user is not authenticated and tries to access personal tabs
   useEffect(() => {
@@ -104,8 +154,13 @@ function RenterDashboard() {
       setFavorites(prev => [...prev, newFavorite]);
       console.log('✅ Added to favorites:', equipmentData.name);
       
-      // Show success feedback (you can enhance this with a toast notification)
-      alert('Added to favorites!');
+      // ✅ Show feedback for favorites
+      setFeedbackData({
+        title: 'Added to Favorites! ❤️',
+        message: `"${equipmentData.name}" has been added to your favorites list.`,
+        redirectPath: '/renter-dashboard'
+      });
+      setShowFeedbackModal(true);
     } catch (error) {
       console.error('❌ Error adding to favorites:', error);
       alert('Failed to add to favorites. Please try again.');
@@ -126,8 +181,13 @@ function RenterDashboard() {
       setFavorites(prev => prev.filter(fav => fav.equipmentId !== equipmentId));
       console.log('✅ Removed from favorites');
       
-      // Show success feedback
-      alert('Removed from favorites!');
+      // ✅ Show feedback for removal
+      setFeedbackData({
+        title: 'Removed from Favorites',
+        message: 'The item has been removed from your favorites list.',
+        redirectPath: '/renter-dashboard'
+      });
+      setShowFeedbackModal(true);
     } catch (error) {
       console.error('❌ Error removing from favorites:', error);
       alert('Failed to remove from favorites. Please try again.');
@@ -274,11 +334,12 @@ function RenterDashboard() {
   const getStatusBadge = (status) => {
     const statusConfig = {
       'active': { class: 'bg-success', text: 'Active' },
-      'approved': { class: 'bg-success', text: 'Active' },
+      'approved': { class: 'bg-success', text: 'Approved' },
       'completed': { class: 'bg-primary', text: 'Completed' },
       'pending': { class: 'bg-warning text-dark', text: 'Pending' },
       'cancelled': { class: 'bg-danger', text: 'Cancelled' },
-      'rejected': { class: 'bg-secondary', text: 'Rejected' }
+      'rejected': { class: 'bg-secondary', text: 'Rejected' },
+      'paid': { class: 'bg-info', text: 'Paid' }
     };
     
     const config = statusConfig[status] || { class: 'bg-secondary', text: 'Unknown' };
@@ -296,7 +357,7 @@ function RenterDashboard() {
     setPriceRange('all');
   };
 
-  // Handle actions that require authentication
+  // ✅ Enhanced handle actions that require authentication with payment support
   const handleAuthRequiredAction = (action, equipmentId = null) => {
     if (!currentUser) {
       // Store intended action for after login
@@ -309,6 +370,10 @@ function RenterDashboard() {
     switch (action) {
       case 'rent':
         navigate(`/rent/${equipmentId}`);
+        break;
+      case 'pay':
+        // ✅ Navigate to payment page
+        navigate(`/payment/${equipmentId}`);
         break;
       case 'favorites':
         navigate('/favorites');
@@ -324,6 +389,15 @@ function RenterDashboard() {
   return (
     <div className="min-vh-100" style={{ backgroundColor: '#f8fafc' }}>
       <div className="container-fluid py-4">
+        {/* ✅ Feedback Modal */}
+        <FeedbackModal
+          isOpen={showFeedbackModal}
+          onClose={() => setShowFeedbackModal(false)}
+          title={feedbackData.title}
+          message={feedbackData.message}
+          redirectPath={feedbackData.redirectPath}
+        />
+
         {/* Equipment Detail Modal */}
         <EquipmentDetailModal
           equipment={selectedEquipment}
@@ -757,6 +831,18 @@ function RenterDashboard() {
                             <i className="bi bi-eye me-1"></i>
                             View Details
                           </Link>
+                          
+                          {/* ✅ Add Payment Button for approved rentals */}
+                          {rental.status === 'approved' && (
+                            <button
+                              onClick={() => handleAuthRequiredAction('pay', rental.equipmentId)}
+                              className="btn btn-success btn-sm"
+                            >
+                              <i className="bi bi-credit-card me-1"></i>
+                              Pay Now
+                            </button>
+                          )}
+                          
                           {rental.status === 'completed' && (
                             <Link
                               to={`/review/${rental.id}`}
@@ -938,8 +1024,6 @@ function EquipmentCard({
           }}>
             {item.description}
           </p>
-          
-          
           
           <div className="d-flex justify-content-between align-items-center mb-3">
             <div>
