@@ -4,6 +4,7 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
 import { db } from '../../firebase';
+import FeedbackModal from '../FeedbackModal'; // Added FeedbackModal import
 
 function AddEquipment() {
   const { currentUser } = useAuth();
@@ -11,6 +12,7 @@ function AddEquipment() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
+  const [showFeedbackModal, setShowFeedbackModal] = useState(false); // Added state for FeedbackModal
   
   const [formData, setFormData] = useState({
     name: '',
@@ -95,6 +97,20 @@ function AddEquipment() {
     return true;
   };
 
+  const resetForm = () => {
+    setFormData({
+      name: '',
+      description: '',
+      category: '',
+      ratePerDay: '',
+      location: '',
+      features: '',
+      imageUrl: ''
+    });
+    setError('');
+    setSuccess('');
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     
@@ -163,10 +179,11 @@ function AddEquipment() {
       
       setSuccess('Equipment added successfully!');
       
-      // Wait a moment to show success message, then redirect
-      setTimeout(() => {
-        navigate('/owner-dashboard?equipmentAdded=true');
-      }, 1500);
+      // Reset form
+      resetForm();
+      
+      // Show FeedbackModal instead of immediate redirect
+      setShowFeedbackModal(true);
       
     } catch (error) {
       console.error('❌ Error adding equipment:', error);
@@ -174,6 +191,13 @@ function AddEquipment() {
     } finally {
       setLoading(false);
     }
+  };
+
+  // Handle FeedbackModal close
+  const handleFeedbackModalClose = () => {
+    setShowFeedbackModal(false);
+    // Optional: redirect to dashboard after modal closes
+    // navigate('/owner-dashboard?equipmentAdded=true');
   };
 
   // Redirect if not logged in
@@ -249,13 +273,15 @@ function AddEquipment() {
                 </div>
               )}
 
-              {/* Debug Info */}
-              <div className="alert alert-info small mb-4">
-                <strong>🐛 Debug Info:</strong><br/>
-                User ID: <code>{currentUser.uid}</code><br/>
-                User Email: <code>{currentUser.email}</code><br/>
-                User Name: <code>{currentUser.displayName || 'Not set'}</code>
-              </div>
+              {/* Debug Info - You can remove this in production */}
+              {process.env.NODE_ENV === 'development' && (
+                <div className="alert alert-info small mb-4">
+                  <strong>🐛 Debug Info:</strong><br/>
+                  User ID: <code>{currentUser.uid}</code><br/>
+                  User Email: <code>{currentUser.email}</code><br/>
+                  User Name: <code>{currentUser.displayName || 'Not set'}</code>
+                </div>
+              )}
               
               <form onSubmit={handleSubmit}>
                 <div className="row g-3">
@@ -469,6 +495,15 @@ function AddEquipment() {
           </div>
         </div>
       </div>
+
+      {/* FeedbackModal */}
+      <FeedbackModal
+        isOpen={showFeedbackModal}
+        onClose={handleFeedbackModalClose}
+        title="Equipment Added Successfully! 🎉"
+        message={`Your equipment "${formData.name || 'equipment'}" has been added to the marketplace and is now available for rent.`}
+        redirectPath="/add-equipment"
+      />
     </div>
   );
 }
