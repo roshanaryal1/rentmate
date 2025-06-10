@@ -5,66 +5,63 @@ import './Footer.css';
 
 const Footer = () => {
   const { currentUser, userRole } = useAuth();
-
-  // Get current year
   const currentYear = new Date().getFullYear();
 
-  // Navigation links based on user role
+  // Get footer links based on user role
   const getFooterLinks = () => {
     const commonLinks = [
-      { label: 'Browse Equipment', path: '/', section: 'explore' },
-      { label: 'How It Works', path: '/how-it-works', section: 'explore' },
-      { label: 'About Us', path: '/about', section: 'explore' },
+      { label: 'Browse Equipment', path: '/' },
+      { label: 'How It Works', path: '/how-it-works' },
+      { label: 'About Us', path: '/about' },
+      { label: 'Categories', path: '/categories' },
     ];
 
     if (!currentUser) {
       return {
         explore: commonLinks,
         account: [
-          { label: 'Sign Up', path: '/signup', section: 'account' },
-          { label: 'Log In', path: '/login', section: 'account' },
+          { label: 'Sign Up', path: '/signup' },
+          { label: 'Log In', path: '/login' },
         ],
       };
     }
 
     const accountLinks = [
-      { label: 'My Profile', path: '/profile', section: 'account' },
-      { label: 'Settings', path: '/settings', section: 'account' },
+      { label: 'My Profile', path: '/profile' },
+      { label: 'Settings', path: '/settings' },
     ];
 
-    if (userRole === 'admin') {
-      return {
-        explore: commonLinks,
-        account: [
-          ...accountLinks,
-          { label: 'Admin Dashboard', path: '/admin-dashboard', section: 'account' },
-          { label: 'User Management', path: '/admin-users', section: 'account' },
-        ],
-      };
+    switch (userRole) {
+      case 'admin':
+        return {
+          explore: commonLinks,
+          account: [
+            ...accountLinks,
+            { label: 'Admin Dashboard', path: '/admin-dashboard' },
+            { label: 'User Management', path: '/admin-users' },
+          ],
+        };
+      case 'owner':
+        return {
+          explore: commonLinks,
+          account: [
+            ...accountLinks,
+            { label: 'Owner Dashboard', path: '/owner-dashboard' },
+            { label: 'My Equipment', path: '/my-equipment' },
+            { label: 'Add Equipment', path: '/add-equipment' },
+          ],
+        };
+      default: // renter
+        return {
+          explore: commonLinks,
+          account: [
+            ...accountLinks,
+            { label: 'My Dashboard', path: '/renter-dashboard' },
+            { label: 'My Rentals', path: '/rental-history' },
+            { label: 'Favorites', path: '/favorites' },
+          ],
+        };
     }
-
-    if (userRole === 'owner') {
-      return {
-        explore: commonLinks,
-        account: [
-          ...accountLinks,
-          { label: 'Owner Dashboard', path: '/owner-dashboard', section: 'account' },
-          { label: 'My Equipment', path: '/my-equipment', section: 'account' },
-          { label: 'Add Equipment', path: '/add-equipment', section: 'account' },
-        ],
-      };
-    }
-
-    // Renter links
-    return {
-      explore: commonLinks,
-      account: [
-        ...accountLinks,
-        { label: 'My Dashboard', path: '/renter-dashboard', section: 'account' },
-        { label: 'My Rentals', path: '/rental-history', section: 'account' },
-        { label: 'Favorites', path: '/favorites', section: 'account' },
-      ],
-    };
   };
 
   const footerLinks = getFooterLinks();
@@ -83,25 +80,50 @@ const Footer = () => {
               </span>
             </Link>
             <p className="footer-tagline">
-              Your trusted platform for equipment rental. Connect with local equipment owners and find everything you need for your projects.
+              Your trusted platform for equipment rental. Connect with local equipment owners 
+              and find everything you need for your projects.
             </p>
             <div className="social-links">
-              <a href="https://facebook.com/rentmate" target="_blank" rel="noopener noreferrer" aria-label="Facebook" className="social-link">
+              <a 
+                href="https://facebook.com/rentmate" 
+                target="_blank" 
+                rel="noopener noreferrer" 
+                aria-label="Follow us on Facebook"
+                className="social-link"
+              >
                 <i className="bi bi-facebook"></i>
               </a>
-              <a href="https://twitter.com/rentmate" target="_blank" rel="noopener noreferrer" aria-label="Twitter" className="social-link">
+              <a 
+                href="https://twitter.com/rentmate" 
+                target="_blank" 
+                rel="noopener noreferrer" 
+                aria-label="Follow us on Twitter"
+                className="social-link"
+              >
                 <i className="bi bi-twitter"></i>
               </a>
-              <a href="https://instagram.com/rentmate" target="_blank" rel="noopener noreferrer" aria-label="Instagram" className="social-link">
+              <a 
+                href="https://instagram.com/rentmate" 
+                target="_blank" 
+                rel="noopener noreferrer" 
+                aria-label="Follow us on Instagram"
+                className="social-link"
+              >
                 <i className="bi bi-instagram"></i>
               </a>
-              <a href="https://linkedin.com/company/rentmate" target="_blank" rel="noopener noreferrer" aria-label="LinkedIn" className="social-link">
+              <a 
+                href="https://linkedin.com/company/rentmate" 
+                target="_blank" 
+                rel="noopener noreferrer" 
+                aria-label="Follow us on LinkedIn"
+                className="social-link"
+              >
                 <i className="bi bi-linkedin"></i>
               </a>
             </div>
           </div>
 
-          {/* Quick Links */}
+          {/* Explore Links */}
           <div className="footer-section">
             <h3 className="footer-title">Explore</h3>
             <ul className="footer-links">
@@ -112,11 +134,6 @@ const Footer = () => {
                   </Link>
                 </li>
               ))}
-              <li>
-                <Link to="/categories" className="footer-link">
-                  Categories
-                </Link>
-              </li>
             </ul>
           </div>
 
@@ -136,7 +153,7 @@ const Footer = () => {
             </ul>
           </div>
 
-          {/* Support */}
+          {/* Support Links */}
           <div className="footer-section">
             <h3 className="footer-title">Support</h3>
             <ul className="footer-links">
@@ -168,7 +185,7 @@ const Footer = () => {
             </ul>
           </div>
 
-          {/* Contact Info */}
+          {/* Contact Information */}
           <div className="footer-section">
             <h3 className="footer-title">Contact</h3>
             <div className="contact-info">
@@ -192,28 +209,7 @@ const Footer = () => {
           </div>
         </div>
 
-        {/* Footer Bottom */}
-        <div className="footer-bottom">
-          <div className="footer-bottom-content">
-            <p className="copyright">
-              © {currentYear} RentMate. All rights reserved.
-            </p>
-            <div className="footer-legal-links">
-              <Link to="/privacy-policy" className="legal-link">
-                Privacy Policy
-              </Link>
-              <Link to="/terms-of-service" className="legal-link">
-                Terms of Service
-              </Link>
-              <Link to="/cookie-policy" className="legal-link">
-                Cookie Policy
-              </Link>
-              <Link to="/accessibility" className="legal-link">
-                Accessibility
-              </Link>
-            </div>
-          </div>
-        </div>
+
       </div>
     </footer>
   );
