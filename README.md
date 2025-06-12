@@ -1,6 +1,5 @@
 # RentMate - Equipment Rental Platform
-
-[![Version](https://img.shields.io/badge/version-1.3.0-blue.svg)](https://github.com/roshanaryal1/rentmate/releases)
+[![Version](https://img.shields.io/badge/version-1.3.1-blue.svg)](https://github.com/roshanaryal1/rentmate/releases)
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 [![React](https://img.shields.io/badge/React-19.1.0-blue.svg)](https://reactjs.org/)
 [![Firebase](https://img.shields.io/badge/Firebase-11.8.1-orange.svg)](https://firebase.google.com/)

@@ -13,6 +13,59 @@ All notable changes to RentMate will be documented in this file.
 - [ ] Push notifications
 - [ ] Advanced reporting features
 
+## [1.3.1] - 2025-06-12
+
+### 🐛 Bug Fixes
+- **Authentication & User Management**
+  - ✅ Fixed session timeout issues on mobile devices
+  - ✅ Improved Google OAuth callback handling
+  - ✅ Resolved user profile update conflicts
+  - ✅ Enhanced password reset email delivery
+
+- **Equipment Management**  
+  - ✅ Fixed QR code generation for newly added equipment
+  - ✅ Resolved equipment image loading delays
+  - ✅ Improved equipment search performance
+  - ✅ Fixed equipment availability status sync
+
+- **Rental System**
+  - ✅ Fixed rental duration calculation edge cases
+  - ✅ Improved rental request notification delivery
+  - ✅ Resolved pricing calculation inconsistencies
+  - ✅ Fixed rental history pagination issues
+
+- **UI/UX Improvements**
+  - ✅ Fixed Material-UI modal z-index conflicts
+  - ✅ Improved loading states for dashboard components
+  - ✅ Enhanced mobile navigation drawer behavior
+  - ✅ Fixed responsive chart rendering on small screens
+
+### 🔧 Performance Improvements
+- **Frontend Optimizations**
+  - Reduced bundle size by optimizing Material-UI imports
+  - Improved lazy loading for dashboard components
+  - Enhanced image compression and caching
+  - Optimized Firebase query batching
+
+- **User Experience Enhancements**
+  - Faster page transitions with better preloading
+  - Improved error message clarity and actionability
+  - Enhanced offline functionality and caching
+  - Better accessibility compliance (WCAG 2.1 AA)
+
+### 🔒 Security Updates
+- Updated Firebase security rules for enhanced protection
+- Improved input validation and sanitization
+- Enhanced CORS configuration
+- Better rate limiting for API calls
+
+### 📱 Mobile Improvements
+- Fixed touch interaction issues on iOS Safari
+- Improved QR code scanner performance on Android
+- Enhanced mobile form validation feedback
+- Better keyboard navigation support
+
+
 ## [1.3.0] - 2025-06-05
 
 ### 🚀 Major Features
