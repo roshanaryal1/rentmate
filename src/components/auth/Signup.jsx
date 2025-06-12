@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
+import { TermsModal, PrivacyModal } from './LegalModals';
 
 export default function Signup() {
   // Form data state
@@ -22,6 +23,8 @@ export default function Signup() {
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [touched, setTouched] = useState({});
   const [formErrors, setFormErrors] = useState({});
+  const [showTermsModal, setShowTermsModal] = useState(false);
+  const [showPrivacyModal, setShowPrivacyModal] = useState(false);
 
   const { signup, signInWithGoogle, currentUser } = useAuth();
   const navigate = useNavigate();
@@ -506,9 +509,13 @@ export default function Signup() {
                         />
                         <label className="form-check-label" htmlFor="termsChecked">
                           I agree to the{' '}
-                          <a href="/terms" className="text-decoration-none fw-semibold" target="_blank" rel="noopener noreferrer">
+                          <button
+                            type="button"
+                            className="btn btn-link p-0 text-decoration-none fw-semibold"
+                            onClick={() => setShowTermsModal(true)}
+                          >
                             Terms of Service
-                          </a>
+                          </button>
                         </label>
                       </div>
                       <div className="form-check">
@@ -524,9 +531,13 @@ export default function Signup() {
                         />
                         <label className="form-check-label" htmlFor="privacyChecked">
                           I agree to the{' '}
-                          <a href="/privacy" className="text-decoration-none fw-semibold" target="_blank" rel="noopener noreferrer">
+                          <button
+                            type="button"
+                            className="btn btn-link p-0 text-decoration-none fw-semibold"
+                            onClick={() => setShowPrivacyModal(true)}
+                          >
                             Privacy Policy
-                          </a>
+                          </button>
                         </label>
                       </div>
                     </div>
@@ -585,6 +596,16 @@ export default function Signup() {
           </div>
         </div>
       </div>
+
+      {/* Legal Document Modals */}
+      <TermsModal 
+        show={showTermsModal} 
+        onHide={() => setShowTermsModal(false)} 
+      />
+      <PrivacyModal 
+        show={showPrivacyModal} 
+        onHide={() => setShowPrivacyModal(false)} 
+      />
     </div>
   );
 }
