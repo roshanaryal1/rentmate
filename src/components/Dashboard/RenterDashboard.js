@@ -6,6 +6,7 @@ import { collection, getDocs, query, where, orderBy, addDoc, deleteDoc, doc } fr
 import { db } from '../../firebase';
 import EquipmentDetailModal from '../Equipment/EquipmentDetailModal';
 import FeedbackModal from '../FeedbackModal';
+import RentalFeedbackForm from '../RentalFeedbackForm'; // ✅ NEW: Import rental feedback form
 
 function RenterDashboard() {
   const { currentUser } = useAuth();
@@ -32,6 +33,11 @@ function RenterDashboard() {
     message: '',
     redirectPath: ''
   });
+
+  // ✅ NEW: Rental feedback state
+  const [showRentalFeedback, setShowRentalFeedback] = useState(false);
+  const [selectedRentalForFeedback, setSelectedRentalForFeedback] = useState(null);
+  const [rentalFeedbacks, setRentalFeedbacks] = useState([]);
 
   const [stats, setStats] = useState({
     totalRentals: 0,
@@ -78,12 +84,67 @@ function RenterDashboard() {
     }
   }, []);
 
+  // ✅ NEW: Load existing rental feedbacks
+  useEffect(() => {
+    const existingFeedbacks = JSON.parse(localStorage.getItem('rentalFeedbacks') || '[]');
+    setRentalFeedbacks(existingFeedbacks);
+  }, []);
+
   // Redirect to browse tab if user is not authenticated and tries to access personal tabs
   useEffect(() => {
     if (!hasPersonalAccess && activeTab === 'rentals') {
       setActiveTab('browse');
     }
   }, [hasPersonalAccess, activeTab]);
+
+  // ✅ NEW: Handle rental feedback submission
+  const handleRentalFeedbackSubmit = async (feedbackData) => {
+    try {
+      console.log('Rental feedback submitted:', feedbackData);
+      
+      // TODO: Save to Firebase
+      // await addDoc(collection(db, 'rentalFeedbacks'), {
+      //   ...feedbackData,
+      //   userId: currentUser.uid,
+      //   createdAt: new Date()
+      // });
+      
+      // For now, save to localStorage (you can remove this later)
+      const existingFeedbacks = JSON.parse(localStorage.getItem('rentalFeedbacks') || '[]');
+      const newFeedback = {
+        ...feedbackData,
+        userId: currentUser?.uid,
+        submittedAt: new Date().toISOString()
+      };
+      existingFeedbacks.push(newFeedback);
+      localStorage.setItem('rentalFeedbacks', JSON.stringify(existingFeedbacks));
+      
+      // Update local state
+      setRentalFeedbacks(existingFeedbacks);
+      
+      // Show success message using existing FeedbackModal
+      setFeedbackData({
+        title: 'Thank You for Your Feedback! 🌟',
+        message: 'Your review helps other renters make better decisions and helps owners improve their service.',
+        redirectPath: '/renter-dashboard'
+      });
+      setShowFeedbackModal(true);
+      
+      // Reset feedback form state
+      setSelectedRentalForFeedback(null);
+      setShowRentalFeedback(false);
+      
+    } catch (error) {
+      console.error('Error submitting rental feedback:', error);
+      throw error; // This will be caught by the feedback form component
+    }
+  };
+
+  // ✅ NEW: Handle opening the rental feedback form
+  const handleOpenRentalFeedback = (rental) => {
+    setSelectedRentalForFeedback(rental);
+    setShowRentalFeedback(true);
+  };
 
   // Fetch user favorites from Firebase
   const fetchFavorites = async () => {
@@ -208,6 +269,11 @@ function RenterDashboard() {
   // Check if item is favorited
   const isFavorited = (equipmentId) => {
     return favorites.some(fav => fav.equipmentId === equipmentId);
+  };
+
+  // ✅ NEW: Check if rental has feedback
+  const hasRentalFeedback = (rentalId) => {
+    return rentalFeedbacks.some(feedback => feedback.rentalId === rentalId);
   };
 
   // Fetch all data from Firebase
@@ -396,6 +462,19 @@ function RenterDashboard() {
           title={feedbackData.title}
           message={feedbackData.message}
           redirectPath={feedbackData.redirectPath}
+        />
+
+        {/* ✅ NEW: Rental Feedback Form */}
+        <RentalFeedbackForm
+          isOpen={showRentalFeedback}
+          onClose={() => setShowRentalFeedback(false)}
+          onSubmit={handleRentalFeedbackSubmit}
+          equipmentData={selectedRentalForFeedback ? {
+            id: selectedRentalForFeedback.equipmentId,
+            name: selectedRentalForFeedback.equipmentName,
+            rentalDate: selectedRentalForFeedback.startDate,
+            rentalId: selectedRentalForFeedback.id
+          } : {}}
         />
 
         {/* Equipment Detail Modal */}
@@ -843,15 +922,26 @@ function RenterDashboard() {
                             </button>
                           )}
                           
+                          {/* ✅ UPDATED: Rental Feedback Button */}
                           {rental.status === 'completed' && (
-                            <Link
-                              to={`/review/${rental.id}`}
-                              className="btn btn-warning btn-sm"
-                            >
-                              <i className="bi bi-star me-1"></i>
-                              Review
-                            </Link>
+                            <>
+                              {hasRentalFeedback(rental.id) ? (
+                                <button className="btn btn-success btn-sm" disabled>
+                                  <i className="bi bi-check-circle me-1"></i>
+                                  Feedback Given
+                                </button>
+                              ) : (
+                                <button
+                                  onClick={() => handleOpenRentalFeedback(rental)}
+                                  className="btn btn-warning btn-sm"
+                                >
+                                  <i className="bi bi-star me-1"></i>
+                                  Leave Feedback
+                                </button>
+                              )}
+                            </>
                           )}
+                          
                           {rental.status === 'active' && (
                             <button className="btn btn-info btn-sm">
                               <i className="bi bi-chat-dots me-1"></i>
